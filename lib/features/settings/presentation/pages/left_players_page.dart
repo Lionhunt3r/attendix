@@ -1,0 +1,205 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/config/supabase_config.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/person/person.dart';
+import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+
+/// Provider for left (archived) players
+final leftPlayersProvider = FutureProvider<List<Person>>((ref) async {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+
+  if (tenant == null) return [];
+
+  final response = await supabase
+      .from('players')
+      .select('*, instruments(id, name)')
+      .eq('tenantId', tenant.id!)
+      .not('left', 'is', null)
+      .order('lastName');
+
+  return (response as List).map((e) => Person.fromJson(e as Map<String, dynamic>)).toList();
+});
+
+/// Left Players Page - shows archived/former members
+class LeftPlayersPage extends ConsumerWidget {
+  const LeftPlayersPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playersAsync = ref.watch(leftPlayersProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ehemalige Mitglieder'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: playersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: AppColors.danger),
+              const SizedBox(height: AppDimensions.paddingM),
+              Text('Fehler: $e'),
+              const SizedBox(height: AppDimensions.paddingM),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(leftPlayersProvider),
+                child: const Text('Erneut versuchen'),
+              ),
+            ],
+          ),
+        ),
+        data: (players) {
+          if (players.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.history_outlined, size: 80, color: AppColors.medium),
+                  const SizedBox(height: AppDimensions.paddingL),
+                  Text(
+                    'Keine ehemaligen Mitglieder',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: AppDimensions.paddingS),
+                  Text(
+                    'Hier erscheinen archivierte Mitglieder',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(leftPlayersProvider),
+            child: ListView.builder(
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
+              itemCount: players.length,
+              itemBuilder: (context, index) {
+                final player = players[index];
+                return _LeftPlayerItem(
+                  player: player,
+                  onReactivate: () => _reactivatePlayer(context, ref, player),
+                  onViewDetails: () => context.push('/people/${player.id}'),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _reactivatePlayer(BuildContext context, WidgetRef ref, Person player) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mitglied reaktivieren?'),
+        content: Text('Möchtest du ${player.fullName} wieder aktivieren?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Reaktivieren'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        final supabase = ref.read(supabaseClientProvider);
+        await supabase
+            .from('players')
+            .update({'left': null})
+            .eq('id', player.id!);
+
+        ref.invalidate(leftPlayersProvider);
+
+        if (context.mounted) {
+          ToastHelper.showSuccess(context, '${player.fullName} wurde reaktiviert');
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ToastHelper.showError(context, 'Fehler: $e');
+        }
+      }
+    }
+  }
+}
+
+class _LeftPlayerItem extends StatelessWidget {
+  const _LeftPlayerItem({
+    required this.player,
+    required this.onReactivate,
+    required this.onViewDetails,
+  });
+
+  final Person player;
+  final VoidCallback onReactivate;
+  final VoidCallback onViewDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+      child: ListTile(
+        onTap: onViewDetails,
+        leading: CircleAvatar(
+          backgroundColor: AppColors.medium.withValues(alpha: 0.2),
+          child: Text(
+            player.initials,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: AppColors.medium,
+            ),
+          ),
+        ),
+        title: Text(
+          player.fullName,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (player.groupName != null)
+              Text(
+                player.groupName!,
+                style: const TextStyle(fontSize: 12, color: AppColors.medium),
+              ),
+            if (player.left != null)
+              Text(
+                'Ausgetreten: ${_formatDate(player.left!)}',
+                style: TextStyle(fontSize: 12, color: AppColors.warning),
+              ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.restore, color: AppColors.success),
+          tooltip: 'Reaktivieren',
+          onPressed: onReactivate,
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(String dateStr) {
+    final date = DateTime.tryParse(dateStr);
+    if (date == null) return dateStr;
+    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+  }
+}

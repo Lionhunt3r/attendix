@@ -1,0 +1,554 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/config/supabase_config.dart';
+import '../../core/constants/enums.dart';
+import '../../data/models/attendance/attendance.dart';
+import '../../data/models/person/person.dart';
+import '../../data/repositories/attendance_repository.dart';
+import '../../data/repositories/player_repository.dart';
+import 'tenant_providers.dart';
+
+/// Date range for statistics filtering
+class StatisticsDateRange {
+  final DateTime start;
+  final DateTime end;
+
+  const StatisticsDateRange({required this.start, required this.end});
+
+  /// Default: Last 6 months
+  factory StatisticsDateRange.defaultRange() {
+    final now = DateTime.now();
+    return StatisticsDateRange(
+      start: DateTime(now.year, now.month - 6, now.day),
+      end: now,
+    );
+  }
+}
+
+/// State notifier for date range
+class StatisticsDateRangeNotifier extends StateNotifier<StatisticsDateRange> {
+  StatisticsDateRangeNotifier() : super(StatisticsDateRange.defaultRange());
+
+  void setRange(DateTime start, DateTime end) {
+    state = StatisticsDateRange(start: start, end: end);
+  }
+
+  void setFromDateTimeRange(DateTimeRange range) {
+    state = StatisticsDateRange(start: range.start, end: range.end);
+  }
+}
+
+final statisticsDateRangeProvider =
+    StateNotifierProvider<StatisticsDateRangeNotifier, StatisticsDateRange>(
+  (ref) => StatisticsDateRangeNotifier(),
+);
+
+/// Provider for filtered attendances within date range
+final filteredAttendancesForStatsProvider =
+    FutureProvider<List<Attendance>>((ref) async {
+  final repo = ref.watch(attendanceRepositoryProvider);
+  final tenantId = ref.watch(currentTenantIdProvider);
+  final dateRange = ref.watch(statisticsDateRangeProvider);
+
+  if (tenantId == null) return [];
+
+  repo.setTenantId(tenantId);
+
+  // Get all attendances in range
+  final attendances = await repo.getAttendances(
+    since: dateRange.start,
+    withPersonAttendances: false,
+    limit: 500, // Higher limit for statistics
+  );
+
+  // Filter to only include dates within the range
+  return attendances.where((a) {
+    final date = DateTime.tryParse(a.date);
+    if (date == null) return false;
+    return date.isAfter(dateRange.start.subtract(const Duration(days: 1))) &&
+        date.isBefore(dateRange.end.add(const Duration(days: 1)));
+  }).toList();
+});
+
+/// Provider for all person attendances for statistics
+final allPersonAttendancesForStatsProvider =
+    FutureProvider<List<PersonAttendance>>((ref) async {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenantId = ref.watch(currentTenantIdProvider);
+
+  if (tenantId == null) return [];
+
+  // Get all attendances first
+  final attendances = await ref.watch(filteredAttendancesForStatsProvider.future);
+
+  if (attendances.isEmpty) return [];
+
+  // Query all person_attendances for these attendance IDs
+  final attendanceIds = attendances.map((a) => a.id).whereType<int>().toList();
+
+  if (attendanceIds.isEmpty) return [];
+
+  try {
+    final response = await supabase
+        .from('person_attendances')
+        .select('*, person:person_id(id, firstName, lastName, birthday, instrument, left, paused)')
+        .inFilter('attendance_id', attendanceIds);
+
+    return (response as List).map((e) {
+      final personData = e['person'] as Map<String, dynamic>?;
+      return PersonAttendance(
+        id: e['id']?.toString(),
+        attendanceId: e['attendance_id'],
+        personId: e['person_id'],
+        status: _parseStatus(e['status']),
+        notes: e['notes'],
+        firstName: personData?['firstName'],
+        lastName: personData?['lastName'],
+        instrument: personData?['instrument'],
+        groupName: null, // We'll get group name from players
+      );
+    }).toList();
+  } catch (e) {
+    return [];
+  }
+});
+
+AttendanceStatus _parseStatus(dynamic status) {
+  if (status == null) return AttendanceStatus.neutral;
+  if (status is AttendanceStatus) return status;
+
+  final statusStr = status.toString().toLowerCase();
+  return AttendanceStatus.values.firstWhere(
+    (s) => s.name.toLowerCase() == statusStr,
+    orElse: () => AttendanceStatus.neutral,
+  );
+}
+
+/// Provider for active players
+final activePlayersForStatsProvider = FutureProvider<List<Person>>((ref) async {
+  final repo = ref.watch(playerRepositoryProvider);
+  final tenantId = ref.watch(currentTenantIdProvider);
+
+  if (tenantId == null) return [];
+
+  repo.setTenantId(tenantId);
+  final players = await repo.getPlayers();
+
+  // Filter to active players only (left is null or empty = still active, not paused)
+  return players.where((p) {
+    final isNotLeft = p.left == null || p.left!.isEmpty;
+    return isNotLeft && !p.paused;
+  }).toList();
+});
+
+/// Computed statistics from attendances
+class AttendanceStatistics {
+  final int totalAttendances;
+  final int averagePercentage;
+  final Attendance? bestAttendance;
+  final Attendance? worstAttendance;
+  final Map<AttendanceStatus, int> statusDistribution;
+  final int presentCount;
+  final int excusedCount;
+  final int lateCount;
+  final int absentCount;
+
+  const AttendanceStatistics({
+    required this.totalAttendances,
+    required this.averagePercentage,
+    this.bestAttendance,
+    this.worstAttendance,
+    required this.statusDistribution,
+    required this.presentCount,
+    required this.excusedCount,
+    required this.lateCount,
+    required this.absentCount,
+  });
+
+  factory AttendanceStatistics.empty() => const AttendanceStatistics(
+        totalAttendances: 0,
+        averagePercentage: 0,
+        statusDistribution: {},
+        presentCount: 0,
+        excusedCount: 0,
+        lateCount: 0,
+        absentCount: 0,
+      );
+}
+
+/// Provider for computed statistics
+final attendanceStatisticsProvider = Provider<AttendanceStatistics>((ref) {
+  final attendancesAsync = ref.watch(filteredAttendancesForStatsProvider);
+  final personAttendancesAsync = ref.watch(allPersonAttendancesForStatsProvider);
+
+  final attendances = attendancesAsync.valueOrNull ?? [];
+  final personAttendances = personAttendancesAsync.valueOrNull ?? [];
+
+  if (attendances.isEmpty) {
+    return AttendanceStatistics.empty();
+  }
+
+  // Sort by percentage for best/worst
+  final sorted = [...attendances]
+    ..sort((a, b) => (a.percentage ?? 0).compareTo(b.percentage ?? 0));
+
+  // Calculate average percentage
+  final validPercentages =
+      attendances.where((a) => a.percentage != null).map((a) => a.percentage!);
+  final avgPercentage = validPercentages.isEmpty
+      ? 0
+      : (validPercentages.reduce((a, b) => a + b) / validPercentages.length)
+          .round();
+
+  // Aggregate status counts
+  int presentCount = 0;
+  int excusedCount = 0;
+  int lateCount = 0;
+  int absentCount = 0;
+
+  for (final pa in personAttendances) {
+    switch (pa.status) {
+      case AttendanceStatus.present:
+        presentCount++;
+        break;
+      case AttendanceStatus.excused:
+        excusedCount++;
+        break;
+      case AttendanceStatus.late:
+      case AttendanceStatus.lateExcused:
+        lateCount++;
+        break;
+      case AttendanceStatus.absent:
+        absentCount++;
+        break;
+      case AttendanceStatus.neutral:
+        break;
+    }
+  }
+
+  return AttendanceStatistics(
+    totalAttendances: attendances.length,
+    averagePercentage: avgPercentage,
+    bestAttendance: sorted.isNotEmpty ? sorted.last : null,
+    worstAttendance: sorted.isNotEmpty ? sorted.first : null,
+    statusDistribution: {
+      AttendanceStatus.present: presentCount,
+      AttendanceStatus.excused: excusedCount,
+      AttendanceStatus.late: lateCount,
+      AttendanceStatus.absent: absentCount,
+    },
+    presentCount: presentCount,
+    excusedCount: excusedCount,
+    lateCount: lateCount,
+    absentCount: absentCount,
+  );
+});
+
+/// Data for attendance trend chart (last N attendances)
+class TrendChartData {
+  final List<String> labels;
+  final List<double> values;
+
+  const TrendChartData({required this.labels, required this.values});
+}
+
+final trendChartDataProvider = Provider<TrendChartData>((ref) {
+  final attendancesAsync = ref.watch(filteredAttendancesForStatsProvider);
+
+  return attendancesAsync.maybeWhen(
+    data: (attendances) {
+      // Sort by date and take last 20
+      final sorted = [...attendances]
+        ..sort((a, b) => a.date.compareTo(b.date));
+      final last20 = sorted.length > 20 ? sorted.sublist(sorted.length - 20) : sorted;
+
+      return TrendChartData(
+        labels: last20.map((a) {
+          final date = DateTime.tryParse(a.date);
+          if (date == null) return '';
+          return '${date.day}.${date.month}';
+        }).toList(),
+        values: last20.map((a) => a.percentage ?? 0.0).toList(),
+      );
+    },
+    orElse: () => const TrendChartData(labels: [], values: []),
+  );
+});
+
+/// Data for group/instrument bar chart
+class GroupChartData {
+  final String name;
+  final double percentage;
+  final int count;
+
+  const GroupChartData({
+    required this.name,
+    required this.percentage,
+    required this.count,
+  });
+}
+
+final groupChartDataProvider = Provider<List<GroupChartData>>((ref) {
+  final personAttendancesAsync = ref.watch(allPersonAttendancesForStatsProvider);
+  final playersAsync = ref.watch(activePlayersForStatsProvider);
+
+  final personAttendances = personAttendancesAsync.valueOrNull ?? [];
+  final players = playersAsync.valueOrNull ?? [];
+
+  if (personAttendances.isEmpty || players.isEmpty) return [];
+
+  // Create player map for group lookup
+  final playerGroupMap = <int, String>{};
+  for (final player in players) {
+    if (player.id != null) {
+      playerGroupMap[player.id!] = player.groupName ?? 'Unbekannt';
+    }
+  }
+
+  // Group stats by instrument
+  final Map<String, ({int present, int total})> groupStats = {};
+
+  for (final pa in personAttendances) {
+    if (pa.personId == null) continue;
+
+    final groupName = playerGroupMap[pa.personId] ?? 'Unbekannt';
+    final current = groupStats[groupName] ?? (present: 0, total: 0);
+
+    final isPresent = pa.status == AttendanceStatus.present ||
+        pa.status == AttendanceStatus.late ||
+        pa.status == AttendanceStatus.lateExcused;
+
+    groupStats[groupName] = (
+      present: current.present + (isPresent ? 1 : 0),
+      total: current.total + 1,
+    );
+  }
+
+  // Convert to chart data and sort
+  final result = groupStats.entries.map((e) {
+    final percentage =
+        e.value.total > 0 ? (e.value.present / e.value.total * 100) : 0.0;
+    return GroupChartData(
+      name: e.key,
+      percentage: percentage,
+      count: e.value.total,
+    );
+  }).toList()
+    ..sort((a, b) => b.percentage.compareTo(a.percentage));
+
+  return result;
+});
+
+/// Data for top players chart
+class PlayerChartData {
+  final String name;
+  final double percentage;
+  final int attendanceCount;
+
+  const PlayerChartData({
+    required this.name,
+    required this.percentage,
+    required this.attendanceCount,
+  });
+}
+
+final topPlayersChartDataProvider = Provider<List<PlayerChartData>>((ref) {
+  final personAttendancesAsync = ref.watch(allPersonAttendancesForStatsProvider);
+  final playersAsync = ref.watch(activePlayersForStatsProvider);
+
+  final personAttendances = personAttendancesAsync.valueOrNull ?? [];
+  final players = playersAsync.valueOrNull ?? [];
+
+  if (personAttendances.isEmpty || players.isEmpty) return [];
+
+  // Calculate stats per player
+  final Map<int, ({String name, int present, int total})> playerStats = {};
+
+  for (final player in players) {
+    if (player.id != null) {
+      final lastName = player.lastName;
+      final lastInitial = lastName.isNotEmpty ? '${lastName[0]}.' : '';
+      playerStats[player.id!] = (
+        name: '${player.firstName} $lastInitial',
+        present: 0,
+        total: 0,
+      );
+    }
+  }
+
+  for (final pa in personAttendances) {
+    if (pa.personId != null && playerStats.containsKey(pa.personId)) {
+      final current = playerStats[pa.personId]!;
+      final isPresent = pa.status == AttendanceStatus.present ||
+          pa.status == AttendanceStatus.late ||
+          pa.status == AttendanceStatus.lateExcused;
+
+      playerStats[pa.personId!] = (
+        name: current.name,
+        present: current.present + (isPresent ? 1 : 0),
+        total: current.total + 1,
+      );
+    }
+  }
+
+  // Convert and sort by percentage (top 20)
+  final result = playerStats.values
+      .where((e) => e.total > 0)
+      .map((e) => PlayerChartData(
+            name: e.name,
+            percentage: e.present / e.total * 100,
+            attendanceCount: e.total,
+          ))
+      .toList()
+    ..sort((a, b) => b.percentage.compareTo(a.percentage));
+
+  return result.take(20).toList();
+});
+
+/// Data for "diva index" - unexcused absences
+final divaIndexChartDataProvider = Provider<List<PlayerChartData>>((ref) {
+  final personAttendancesAsync = ref.watch(allPersonAttendancesForStatsProvider);
+  final playersAsync = ref.watch(activePlayersForStatsProvider);
+
+  final personAttendances = personAttendancesAsync.valueOrNull ?? [];
+  final players = playersAsync.valueOrNull ?? [];
+
+  if (personAttendances.isEmpty || players.isEmpty) return [];
+
+  // Count unexcused absences per player
+  final Map<int, ({String name, int absences})> absenceStats = {};
+
+  for (final player in players) {
+    if (player.id != null) {
+      final lastName = player.lastName;
+      final lastInitial = lastName.isNotEmpty ? '${lastName[0]}.' : '';
+      absenceStats[player.id!] = (
+        name: '${player.firstName} $lastInitial',
+        absences: 0,
+      );
+    }
+  }
+
+  for (final pa in personAttendances) {
+    if (pa.personId != null &&
+        pa.status == AttendanceStatus.absent &&
+        absenceStats.containsKey(pa.personId)) {
+      final current = absenceStats[pa.personId]!;
+      absenceStats[pa.personId!] = (
+        name: current.name,
+        absences: current.absences + 1,
+      );
+    }
+  }
+
+  // Convert and sort by absences (top 15)
+  final result = absenceStats.values
+      .where((e) => e.absences > 0)
+      .map((e) => PlayerChartData(
+            name: e.name,
+            percentage: e.absences.toDouble(),
+            attendanceCount: e.absences,
+          ))
+      .toList()
+    ..sort((a, b) => b.percentage.compareTo(a.percentage));
+
+  return result.take(15).toList();
+});
+
+/// Age distribution data
+class AgeDistributionData {
+  final String label;
+  final int count;
+
+  const AgeDistributionData({required this.label, required this.count});
+}
+
+final ageDistributionProvider = Provider<List<AgeDistributionData>>((ref) {
+  final playersAsync = ref.watch(activePlayersForStatsProvider);
+  final players = playersAsync.valueOrNull ?? [];
+
+  if (players.isEmpty) return [];
+
+  // Calculate ages
+  final now = DateTime.now();
+  final ages = <int>[];
+
+  for (final player in players) {
+    if (player.birthday != null) {
+      final birthday = DateTime.tryParse(player.birthday!);
+      if (birthday != null) {
+        final age = now.year -
+            birthday.year -
+            ((now.month < birthday.month ||
+                    (now.month == birthday.month && now.day < birthday.day))
+                ? 1
+                : 0);
+        ages.add(age);
+      }
+    }
+  }
+
+  if (ages.isEmpty) return [];
+
+  // Create 3-year buckets
+  final minAge = ages.reduce((a, b) => a < b ? a : b);
+  final maxAge = ages.reduce((a, b) => a > b ? a : b);
+
+  final bucketStart = (minAge ~/ 3) * 3;
+  final bucketEnd = ((maxAge ~/ 3) + 1) * 3;
+
+  final List<AgeDistributionData> result = [];
+
+  for (int i = bucketStart; i < bucketEnd; i += 3) {
+    final count = ages.where((a) => a >= i && a < i + 3).length;
+    if (count > 0) {
+      result.add(AgeDistributionData(
+        label: '$i-${i + 2}',
+        count: count,
+      ));
+    }
+  }
+
+  return result;
+});
+
+/// Average age per instrument
+final avgAgePerInstrumentProvider = Provider<List<GroupChartData>>((ref) {
+  final playersAsync = ref.watch(activePlayersForStatsProvider);
+  final players = playersAsync.valueOrNull ?? [];
+
+  if (players.isEmpty) return [];
+
+  final now = DateTime.now();
+  final Map<String, List<int>> groupAges = {};
+
+  for (final player in players) {
+    if (player.birthday != null) {
+      final birthday = DateTime.tryParse(player.birthday!);
+      if (birthday != null) {
+        final age = now.year -
+            birthday.year -
+            ((now.month < birthday.month ||
+                    (now.month == birthday.month && now.day < birthday.day))
+                ? 1
+                : 0);
+
+        final groupName = player.groupName ?? 'Unbekannt';
+        groupAges.putIfAbsent(groupName, () => []).add(age);
+      }
+    }
+  }
+
+  final result = groupAges.entries.map((e) {
+    final avgAge = e.value.reduce((a, b) => a + b) / e.value.length;
+    return GroupChartData(
+      name: '${e.key} (${e.value.length})',
+      percentage: avgAge,
+      count: e.value.length,
+    );
+  }).toList()
+    ..sort((a, b) => b.percentage.compareTo(a.percentage));
+
+  return result;
+});
