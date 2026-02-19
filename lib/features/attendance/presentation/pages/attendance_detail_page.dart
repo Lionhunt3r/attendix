@@ -1,0 +1,1511 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../../core/config/supabase_config.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/attendance_providers.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/dialog_helper.dart';
+import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/attendance/attendance.dart';
+import '../../../../data/models/person/person.dart';
+import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+
+/// Provider for attendance detail
+final attendanceDetailProvider = FutureProvider.family<Attendance?, int>((ref, attendanceId) async {
+  final supabase = ref.watch(supabaseClientProvider);
+
+  final response = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('id', attendanceId)
+      .maybeSingle();
+
+  if (response == null) return null;
+  return Attendance.fromJson(response as Map<String, dynamic>);
+});
+
+/// Provider for attendance type of a specific attendance
+final attendanceTypeForAttendanceProvider = FutureProvider.family<AttendanceType?, int>((ref, attendanceId) async {
+  final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
+  if (attendance?.typeId == null) return null;
+
+  final supabase = ref.watch(supabaseClientProvider);
+  final response = await supabase
+      .from('attendance_types')
+      .select('*')
+      .eq('id', attendance!.typeId!)
+      .maybeSingle();
+
+  if (response == null) return null;
+  return AttendanceType.fromJson(response as Map<String, dynamic>);
+});
+
+/// Provider for person attendances for a specific attendance
+final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+
+  if (tenant == null) return [];
+
+  // Get all persons with their attendance status for this attendance
+  // Use person_id as the relation name since that's the foreign key column
+  final response = await supabase
+      .from('person_attendances')
+      .select('*, player:person_id(firstName, lastName, img, instrument, groupName)')
+      .eq('attendance_id', attendanceId);
+
+  return (response as List).map((e) {
+    // Extract player data from nested structure
+    final playerData = e['player'] as Map<String, dynamic>?;
+    return PersonAttendance.fromJson({
+      ...e,
+      'firstName': playerData?['firstName'],
+      'lastName': playerData?['lastName'],
+      'img': playerData?['img'],
+      'instrument': playerData?['instrument'],
+      'groupName': playerData?['groupName'],
+    });
+  }).toList();
+});
+
+/// Provider for all persons in tenant (for attendance taking)
+final allPersonsForAttendanceProvider = FutureProvider<List<Person>>((ref) async {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+  
+  if (tenant == null) return [];
+
+  final response = await supabase
+      .from('player')
+      .select('*')
+      .eq('tenantId', tenant.id!)
+      .order('lastName', ascending: true);
+
+  return (response as List)
+      .map((e) => Person.fromJson(e as Map<String, dynamic>))
+      .toList();
+});
+
+/// Attendance detail/taking page
+class AttendanceDetailPage extends ConsumerStatefulWidget {
+  const AttendanceDetailPage({super.key, required this.attendanceId});
+
+  final int attendanceId;
+
+  @override
+  ConsumerState<AttendanceDetailPage> createState() => _AttendanceDetailPageState();
+}
+
+class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
+  final Map<int, AttendanceStatus> _localStatuses = {};
+  final Map<int, String?> _personAttendanceIds = {}; // Map personId -> personAttendanceId
+  final Map<int, String?> _personNotes = {}; // Map personId -> notes
+  final Map<int, String?> _changedBy = {}; // Map personId -> changedBy userId
+  final Map<int, String?> _changedAt = {}; // Map personId -> changedAt timestamp
+  bool _hasChanges = false;
+  final Set<int> _selectedPersonIds = {};
+  bool _isSelectionMode = false;
+
+  // Realtime channels
+  dynamic _personAttChannel;
+
+  @override
+  void initState() {
+    super.initState();
+    // Subscribe to realtime changes after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _subscribeToRealtimeChanges();
+    });
+  }
+
+  @override
+  void dispose() {
+    _unsubscribeFromRealtimeChanges();
+    super.dispose();
+  }
+
+  void _subscribeToRealtimeChanges() {
+    final supabase = ref.read(supabaseClientProvider);
+
+    // Subscribe to PersonAttendance changes for this attendance
+    _personAttChannel = supabase
+        .channel('person-att-${widget.attendanceId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'person_attendances',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'attendance_id',
+            value: widget.attendanceId,
+          ),
+          callback: _onPersonAttendanceChange,
+        )
+        .subscribe();
+  }
+
+  void _unsubscribeFromRealtimeChanges() {
+    _personAttChannel?.unsubscribe();
+  }
+
+  void _onPersonAttendanceChange(dynamic payload) {
+    // Check if this is an update we made ourselves (to avoid double updates)
+    if (_hasChanges) return;
+
+    final newRecord = payload.newRecord as Map<String, dynamic>?;
+    if (newRecord == null || newRecord.isEmpty) return;
+
+    final personId = newRecord['person_id'] as int?;
+    final statusStr = newRecord['status'] as String?;
+    final notes = newRecord['notes'] as String?;
+    final changedBy = newRecord['changed_by'] as String?;
+    final changedAt = newRecord['changed_at'] as String?;
+
+    if (personId != null && statusStr != null) {
+      final status = AttendanceStatus.values.firstWhere(
+        (s) => s.name.toLowerCase() == statusStr.toLowerCase(),
+        orElse: () => AttendanceStatus.neutral,
+      );
+
+      setState(() {
+        _localStatuses[personId] = status;
+        _personNotes[personId] = notes;
+        _changedBy[personId] = changedBy;
+        _changedAt[personId] = changedAt;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final attendanceAsync = ref.watch(attendanceDetailProvider(widget.attendanceId));
+    final personsAsync = ref.watch(allPersonsForAttendanceProvider);
+    final personAttendancesAsync = ref.watch(personAttendancesProvider(widget.attendanceId));
+    final attendanceTypeAsync = ref.watch(attendanceTypeForAttendanceProvider(widget.attendanceId));
+
+    // Get available statuses from attendance type, or use all statuses as default
+    final availableStatuses = attendanceTypeAsync.valueOrNull?.availableStatuses ?? AttendanceStatus.values;
+
+    // Merge person attendance data into local state whenever it changes
+    ref.listen(personAttendancesProvider(widget.attendanceId), (previous, next) {
+      if (next.value != null && next.value!.isNotEmpty) {
+        // Only update if we don't have local changes, or this is the first load
+        final isFirstLoad = _localStatuses.isEmpty;
+        if (isFirstLoad || !_hasChanges) {
+          setState(() {
+            for (final pa in next.value!) {
+              if (pa.personId != null) {
+                _localStatuses[pa.personId!] = pa.status;
+                _personAttendanceIds[pa.personId!] = pa.id;
+                _personNotes[pa.personId!] = pa.notes;
+                _changedBy[pa.personId!] = pa.changedBy;
+                _changedAt[pa.personId!] = pa.changedAt;
+              }
+            }
+          });
+        }
+      }
+    });
+
+    return attendanceAsync.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Anwesenheit')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        appBar: AppBar(title: const Text('Anwesenheit')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: AppColors.danger),
+              const SizedBox(height: AppDimensions.paddingM),
+              Text('Fehler: $error'),
+              ElevatedButton(
+                onPressed: () => ref.refresh(attendanceDetailProvider(widget.attendanceId)),
+                child: const Text('Erneut versuchen'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (attendance) {
+        if (attendance == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Anwesenheit')),
+            body: const Center(child: Text('Anwesenheit nicht gefunden')),
+          );
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(attendance.typeInfo ?? 'Anwesenheit'),
+                Text(
+                  attendance.formattedDate,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.medium,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              if (_isSelectionMode) ...[
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: _exitSelectionMode,
+                  tooltip: 'Auswahl beenden',
+                ),
+                PopupMenuButton<AttendanceStatus>(
+                  icon: const Icon(Icons.edit),
+                  tooltip: 'Status für Auswahl setzen',
+                  onSelected: _batchUpdateSelected,
+                  itemBuilder: (context) => availableStatuses.map((s) =>
+                    PopupMenuItem(
+                      value: s,
+                      child: Row(
+                        children: [
+                          Icon(_getStatusIcon(s), color: _getStatusColor(s)),
+                          const SizedBox(width: 8),
+                          Text(_getStatusLabel(s)),
+                        ],
+                      ),
+                    ),
+                  ).toList(),
+                ),
+              ] else ...[
+                if (_hasChanges)
+                  TextButton.icon(
+                    onPressed: _saveChanges,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Speichern'),
+                  ),
+                PopupMenuButton<String>(
+                  onSelected: _handleMenuAction,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'all_present',
+                      child: ListTile(
+                        leading: Icon(Icons.check_circle, color: AppColors.success),
+                        title: Text('Alle anwesend'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'all_absent',
+                      child: ListTile(
+                        leading: Icon(Icons.cancel, color: AppColors.danger),
+                        title: Text('Alle abwesend'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'stats',
+                      child: ListTile(
+                        leading: Icon(Icons.bar_chart),
+                        title: Text('Statistik'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'notes',
+                      child: ListTile(
+                        leading: Icon(Icons.note_add),
+                        title: Text('Notizen'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'photo',
+                      child: ListTile(
+                        leading: Icon(Icons.camera_alt),
+                        title: Text('Foto'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          body: personsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => Center(child: Text('Fehler: $error')),
+            data: (persons) => _AttendanceGrid(
+              persons: persons,
+              localStatuses: _localStatuses,
+              personNotes: _personNotes,
+              changedBy: _changedBy,
+              changedAt: _changedAt,
+              selectedPersonIds: _selectedPersonIds,
+              isSelectionMode: _isSelectionMode,
+              availableStatuses: availableStatuses,
+              onStatusChanged: (personId, status) {
+                setState(() {
+                  _localStatuses[personId] = status;
+                  _hasChanges = true;
+                });
+              },
+              onLongPress: _enterSelectionMode,
+              onSelectionToggle: _toggleSelection,
+              onNoteChanged: _updatePersonNote,
+              onShowModifierInfo: _showModifierInfo,
+            ),
+          ),
+          bottomNavigationBar: _AttendanceStatusBar(
+            persons: personsAsync.valueOrNull ?? [],
+            localStatuses: _localStatuses,
+            selectedCount: _selectedPersonIds.length,
+            isSelectionMode: _isSelectionMode,
+          ),
+        );
+      },
+    );
+  }
+
+  void _enterSelectionMode(int personId) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedPersonIds.add(personId);
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedPersonIds.clear();
+    });
+  }
+
+  void _toggleSelection(int personId) {
+    setState(() {
+      if (_selectedPersonIds.contains(personId)) {
+        _selectedPersonIds.remove(personId);
+        if (_selectedPersonIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedPersonIds.add(personId);
+      }
+    });
+  }
+
+  /// Update notes for a specific person
+  Future<void> _updatePersonNote(int personId, String? notes) async {
+    final personAttendanceId = _personAttendanceIds[personId];
+    if (personAttendanceId == null) {
+      ToastHelper.showError(context, 'Kein Anwesenheitseintrag gefunden');
+      return;
+    }
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      await supabase
+          .from('person_attendances')
+          .update({
+            'notes': notes,
+            'changed_at': DateTime.now().toIso8601String(),
+            'changed_by': supabase.auth.currentUser?.id,
+          })
+          .eq('id', personAttendanceId);
+
+      setState(() {
+        _personNotes[personId] = notes;
+      });
+
+      if (mounted) {
+        ToastHelper.showSuccess(context, notes?.isNotEmpty == true ? 'Notiz gespeichert' : 'Notiz gelöscht');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler: $e');
+      }
+    }
+  }
+
+  /// Show modifier info (who changed, when)
+  Future<void> _showModifierInfo(int personId) async {
+    final changedBy = _changedBy[personId];
+    final changedAt = _changedAt[personId];
+
+    String message;
+    if (changedBy == null) {
+      message = 'Der Status wurde bisher nicht verändert.';
+    } else {
+      // Try to get the user name from players
+      final persons = ref.read(allPersonsForAttendanceProvider).valueOrNull ?? [];
+      final modifier = persons.firstWhere(
+        (p) => p.appId == changedBy,
+        orElse: () => Person(firstName: 'Unbekannt', lastName: ''),
+      );
+
+      final modifierName = modifier.fullName.isNotEmpty ? modifier.fullName : 'Unbekannt';
+      message = 'Zuletzt geändert von $modifierName';
+
+      if (changedAt != null) {
+        final date = DateTime.tryParse(changedAt);
+        if (date != null) {
+          message += '\nam ${DateFormat('dd.MM.yyyy').format(date)} um ${DateFormat('HH:mm').format(date)} Uhr';
+        }
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Info'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _batchUpdateSelected(AttendanceStatus status) async {
+    // Get the personAttendanceIds for selected persons
+    final ids = _selectedPersonIds
+        .map((personId) => _personAttendanceIds[personId])
+        .whereType<String>()
+        .toList();
+
+    if (ids.isEmpty) {
+      ToastHelper.showError(context, 'Keine Personen mit Anwesenheitseinträgen ausgewählt');
+      return;
+    }
+
+    // Update local state immediately
+    setState(() {
+      for (final personId in _selectedPersonIds) {
+        _localStatuses[personId] = status;
+      }
+      _hasChanges = true;
+    });
+
+    // Save to backend
+    await ref.read(attendanceNotifierProvider.notifier).batchUpdatePersonAttendances(
+      ids,
+      widget.attendanceId,
+      status,
+    );
+
+    if (mounted) {
+      ToastHelper.showSuccess(context, '${_selectedPersonIds.length} Einträge aktualisiert');
+      _exitSelectionMode();
+      ref.invalidate(personAttendancesProvider(widget.attendanceId));
+    }
+  }
+
+  void _handleMenuAction(String action) {
+    switch (action) {
+      case 'all_present':
+        _setAllStatus(AttendanceStatus.present);
+        break;
+      case 'all_absent':
+        _setAllStatus(AttendanceStatus.absent);
+        break;
+      case 'stats':
+        _showStatsDialog();
+        break;
+      case 'notes':
+        _showNotesDialog();
+        break;
+      case 'photo':
+        _takePhoto();
+        break;
+    }
+  }
+
+  void _setAllStatus(AttendanceStatus status) {
+    final persons = ref.read(allPersonsForAttendanceProvider).valueOrNull ?? [];
+    setState(() {
+      for (final person in persons) {
+        if (person.id != null) {
+          _localStatuses[person.id!] = status;
+        }
+      }
+      _hasChanges = true;
+    });
+  }
+
+  /// Show statistics dialog
+  void _showStatsDialog() {
+    final persons = ref.read(allPersonsForAttendanceProvider).valueOrNull ?? [];
+    final total = persons.length;
+    final present = _localStatuses.values.where((s) => s == AttendanceStatus.present).length;
+    final excused = _localStatuses.values.where((s) => s.isExcused).length;
+    final absent = _localStatuses.values.where((s) => s == AttendanceStatus.absent).length;
+    final late = _localStatuses.values.where((s) => s == AttendanceStatus.late || s == AttendanceStatus.lateExcused).length;
+    final unknown = total - present - excused - absent - late;
+    final percentage = total > 0 ? (present / total * 100) : 0.0;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Statistik'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildStatRow('Gesamt', total, AppColors.primary),
+            const Divider(),
+            _buildStatRow('Anwesend', present, AppColors.success,
+                percentage: total > 0 ? present / total * 100 : 0),
+            _buildStatRow('Entschuldigt', excused, AppColors.info,
+                percentage: total > 0 ? excused / total * 100 : 0),
+            _buildStatRow('Abwesend', absent, AppColors.danger,
+                percentage: total > 0 ? absent / total * 100 : 0),
+            _buildStatRow('Verspätet', late, AppColors.warning,
+                percentage: total > 0 ? late / total * 100 : 0),
+            _buildStatRow('Offen', unknown, AppColors.medium,
+                percentage: total > 0 ? unknown / total * 100 : 0),
+            const Divider(),
+            Container(
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.people, color: AppColors.success),
+                  const SizedBox(width: AppDimensions.paddingS),
+                  Text(
+                    'Anwesenheitsrate: ${percentage.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Schließen'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, int value, Color color, {double? percentage}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingXS),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: AppDimensions.paddingS),
+          Expanded(child: Text(label)),
+          Text(
+            '$value',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          if (percentage != null) ...[
+            const SizedBox(width: AppDimensions.paddingS),
+            SizedBox(
+              width: 50,
+              child: Text(
+                '(${percentage.toStringAsFixed(0)}%)',
+                style: TextStyle(color: AppColors.medium, fontSize: 12),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Show notes dialog
+  Future<void> _showNotesDialog() async {
+    final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
+    final currentNotes = attendance?.notes ?? '';
+
+    final result = await DialogHelper.showTextInput(
+      context,
+      title: 'Notizen',
+      initialValue: currentNotes,
+      hint: 'Notizen zur Anwesenheit...',
+      maxLines: 5,
+      confirmText: 'Speichern',
+    );
+
+    if (result != null && mounted) {
+      try {
+        final supabase = ref.read(supabaseClientProvider);
+        await supabase
+            .from('attendance')
+            .update({'notes': result})
+            .eq('id', widget.attendanceId);
+
+        ref.invalidate(attendanceDetailProvider(widget.attendanceId));
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Notizen gespeichert');
+        }
+      } catch (e) {
+        if (mounted) {
+          ToastHelper.showError(context, 'Fehler: $e');
+        }
+      }
+    }
+  }
+
+  /// Take or select a photo for this attendance
+  Future<void> _takePhoto() async {
+    // Show source selection dialog
+    final source = await showDialog<ImageSource>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Foto hinzufügen'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Kamera'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Galerie'),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Abbrechen'),
+          ),
+        ],
+      ),
+    );
+
+    if (source == null) return;
+
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      if (!mounted) return;
+      ToastHelper.showInfo(context, 'Lade Foto hoch...');
+
+      // Read file bytes
+      final bytes = await image.readAsBytes();
+      final fileName = 'attendance_${widget.attendanceId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      // Upload to Supabase storage
+      final supabase = ref.read(supabaseClientProvider);
+      final tenant = ref.read(currentTenantProvider);
+
+      if (tenant == null) {
+        if (mounted) {
+          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+        }
+        return;
+      }
+
+      final storagePath = '${tenant.id}/attendance/$fileName';
+
+      await supabase.storage
+          .from('attendance-images')
+          .uploadBinary(storagePath, bytes);
+
+      // Get the public URL
+      final publicUrl = supabase.storage
+          .from('attendance-images')
+          .getPublicUrl(storagePath);
+
+      // Update attendance with image URL
+      await supabase
+          .from('attendance')
+          .update({'img': publicUrl})
+          .eq('id', widget.attendanceId);
+
+      // Refresh the attendance data
+      ref.invalidate(attendanceDetailProvider(widget.attendanceId));
+
+      if (mounted) {
+        ToastHelper.showSuccess(context, 'Foto hochgeladen');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler beim Hochladen: $e');
+      }
+    }
+  }
+
+  Future<void> _saveChanges() async {
+    // Get all changed entries
+    final changedEntries = <MapEntry<int, AttendanceStatus>>[];
+
+    for (final entry in _localStatuses.entries) {
+      final personAttendanceId = _personAttendanceIds[entry.key];
+      if (personAttendanceId != null) {
+        changedEntries.add(entry);
+      }
+    }
+
+    if (changedEntries.isEmpty) {
+      ToastHelper.showInfo(context, 'Keine Änderungen vorhanden');
+      return;
+    }
+
+    // Update each person attendance
+    final notifier = ref.read(attendanceNotifierProvider.notifier);
+
+    for (final entry in changedEntries) {
+      final personAttendanceId = _personAttendanceIds[entry.key];
+      if (personAttendanceId != null) {
+        await notifier.updatePersonAttendance(
+          personAttendanceId,
+          widget.attendanceId,
+          entry.key,
+          {'status': entry.value.name},
+        );
+      }
+    }
+
+    // Recalculate percentage
+    await notifier.recalculatePercentage(widget.attendanceId);
+
+    if (mounted) {
+      ToastHelper.showSuccess(context, 'Änderungen gespeichert');
+      setState(() => _hasChanges = false);
+      ref.invalidate(personAttendancesProvider(widget.attendanceId));
+      ref.invalidate(attendanceDetailProvider(widget.attendanceId));
+    }
+  }
+
+  Color _getStatusColor(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => AppColors.success,
+      AttendanceStatus.absent => AppColors.danger,
+      AttendanceStatus.excused => AppColors.info,
+      AttendanceStatus.late => AppColors.warning,
+      AttendanceStatus.lateExcused => AppColors.warning,
+      AttendanceStatus.neutral => AppColors.medium,
+    };
+  }
+
+  IconData _getStatusIcon(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => Icons.check_circle,
+      AttendanceStatus.absent => Icons.cancel,
+      AttendanceStatus.excused => Icons.event_busy,
+      AttendanceStatus.late => Icons.schedule,
+      AttendanceStatus.lateExcused => Icons.schedule,
+      AttendanceStatus.neutral => Icons.help_outline,
+    };
+  }
+
+  String _getStatusLabel(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => 'Anwesend',
+      AttendanceStatus.absent => 'Abwesend',
+      AttendanceStatus.excused => 'Entschuldigt',
+      AttendanceStatus.late => 'Verspätet',
+      AttendanceStatus.lateExcused => 'Verspätet (entsch.)',
+      AttendanceStatus.neutral => 'Nicht erfasst',
+    };
+  }
+}
+
+class _AttendanceGrid extends StatelessWidget {
+  const _AttendanceGrid({
+    required this.persons,
+    required this.localStatuses,
+    required this.personNotes,
+    required this.changedBy,
+    required this.changedAt,
+    required this.selectedPersonIds,
+    required this.isSelectionMode,
+    required this.availableStatuses,
+    required this.onStatusChanged,
+    required this.onLongPress,
+    required this.onSelectionToggle,
+    required this.onNoteChanged,
+    required this.onShowModifierInfo,
+  });
+
+  final List<Person> persons;
+  final Map<int, AttendanceStatus> localStatuses;
+  final Map<int, String?> personNotes;
+  final Map<int, String?> changedBy;
+  final Map<int, String?> changedAt;
+  final Set<int> selectedPersonIds;
+  final bool isSelectionMode;
+  final List<AttendanceStatus> availableStatuses;
+  final void Function(int personId, AttendanceStatus status) onStatusChanged;
+  final void Function(int personId) onLongPress;
+  final void Function(int personId) onSelectionToggle;
+  final void Function(int personId, String? notes) onNoteChanged;
+  final void Function(int personId) onShowModifierInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    if (persons.isEmpty) {
+      return const Center(
+        child: Text('Keine Personen gefunden'),
+      );
+    }
+
+    // Group persons by instrument/group
+    final grouped = _groupByInstrument(persons);
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppDimensions.paddingS),
+      itemCount: grouped.length,
+      itemBuilder: (context, index) {
+        final group = grouped[index];
+        return _InstrumentGroupSection(
+          groupName: group.groupName,
+          persons: group.persons,
+          localStatuses: localStatuses,
+          personNotes: personNotes,
+          changedBy: changedBy,
+          changedAt: changedAt,
+          selectedPersonIds: selectedPersonIds,
+          isSelectionMode: isSelectionMode,
+          availableStatuses: availableStatuses,
+          onStatusChanged: onStatusChanged,
+          onLongPress: onLongPress,
+          onSelectionToggle: onSelectionToggle,
+          onNoteChanged: onNoteChanged,
+          onShowModifierInfo: onShowModifierInfo,
+        );
+      },
+    );
+  }
+
+  List<_InstrumentGroup> _groupByInstrument(List<Person> persons) {
+    final Map<String, List<Person>> grouped = {};
+
+    for (final person in persons) {
+      final groupName = person.groupName ?? 'Unbekannt';
+      grouped.putIfAbsent(groupName, () => []).add(person);
+    }
+
+    return grouped.entries
+        .map((e) => _InstrumentGroup(groupName: e.key, persons: e.value))
+        .toList()
+      ..sort((a, b) => a.groupName.compareTo(b.groupName));
+  }
+}
+
+class _InstrumentGroup {
+  final String groupName;
+  final List<Person> persons;
+
+  _InstrumentGroup({required this.groupName, required this.persons});
+}
+
+class _InstrumentGroupSection extends StatelessWidget {
+  const _InstrumentGroupSection({
+    required this.groupName,
+    required this.persons,
+    required this.localStatuses,
+    required this.personNotes,
+    required this.changedBy,
+    required this.changedAt,
+    required this.selectedPersonIds,
+    required this.isSelectionMode,
+    required this.availableStatuses,
+    required this.onStatusChanged,
+    required this.onLongPress,
+    required this.onSelectionToggle,
+    required this.onNoteChanged,
+    required this.onShowModifierInfo,
+  });
+
+  final String groupName;
+  final List<Person> persons;
+  final Map<int, AttendanceStatus> localStatuses;
+  final Map<int, String?> personNotes;
+  final Map<int, String?> changedBy;
+  final Map<int, String?> changedAt;
+  final Set<int> selectedPersonIds;
+  final bool isSelectionMode;
+  final List<AttendanceStatus> availableStatuses;
+  final void Function(int personId, AttendanceStatus status) onStatusChanged;
+  final void Function(int personId) onLongPress;
+  final void Function(int personId) onSelectionToggle;
+  final void Function(int personId, String? notes) onNoteChanged;
+  final void Function(int personId) onShowModifierInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimensions.paddingM,
+            vertical: AppDimensions.paddingS,
+          ),
+          child: Row(
+            children: [
+              Text(
+                groupName,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: AppDimensions.paddingS),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${persons.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...persons.map((person) {
+          final status = localStatuses[person.id] ?? AttendanceStatus.neutral;
+          final isSelected = selectedPersonIds.contains(person.id);
+          final notes = personNotes[person.id];
+
+          return _AttendancePersonTile(
+            person: person,
+            status: status,
+            notes: notes,
+            isSelected: isSelected,
+            isSelectionMode: isSelectionMode,
+            availableStatuses: availableStatuses,
+            onStatusChanged: (newStatus) {
+              if (person.id != null) {
+                onStatusChanged(person.id!, newStatus);
+              }
+            },
+            onLongPress: () {
+              if (person.id != null) {
+                onLongPress(person.id!);
+              }
+            },
+            onSelectionToggle: () {
+              if (person.id != null) {
+                onSelectionToggle(person.id!);
+              }
+            },
+            onNoteChanged: (newNotes) {
+              if (person.id != null) {
+                onNoteChanged(person.id!, newNotes);
+              }
+            },
+            onShowModifierInfo: () {
+              if (person.id != null) {
+                onShowModifierInfo(person.id!);
+              }
+            },
+          );
+        }),
+        const SizedBox(height: AppDimensions.paddingS),
+      ],
+    );
+  }
+}
+
+class _AttendancePersonTile extends StatelessWidget {
+  const _AttendancePersonTile({
+    required this.person,
+    required this.status,
+    required this.notes,
+    required this.isSelected,
+    required this.isSelectionMode,
+    required this.availableStatuses,
+    required this.onStatusChanged,
+    required this.onLongPress,
+    required this.onSelectionToggle,
+    required this.onNoteChanged,
+    required this.onShowModifierInfo,
+  });
+
+  final Person person;
+  final AttendanceStatus status;
+  final String? notes;
+  final bool isSelected;
+  final bool isSelectionMode;
+  final List<AttendanceStatus> availableStatuses;
+  final void Function(AttendanceStatus) onStatusChanged;
+  final VoidCallback onLongPress;
+  final VoidCallback onSelectionToggle;
+  final void Function(String?) onNoteChanged;
+  final VoidCallback onShowModifierInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNotes = notes?.isNotEmpty == true;
+
+    return Slidable(
+      key: ValueKey(person.id),
+      enabled: !isSelectionMode,
+      endActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        extentRatio: 0.5,
+        children: [
+          SlidableAction(
+            onPressed: (_) => _showNoteDialog(context),
+            backgroundColor: AppColors.info,
+            foregroundColor: Colors.white,
+            icon: hasNotes ? Icons.edit_note : Icons.note_add,
+            label: 'Notiz',
+          ),
+          SlidableAction(
+            onPressed: (_) => onShowModifierInfo(),
+            backgroundColor: AppColors.medium,
+            foregroundColor: Colors.white,
+            icon: Icons.info_outline,
+            label: 'Info',
+          ),
+        ],
+      ),
+      child: Card(
+        margin: const EdgeInsets.only(bottom: AppDimensions.paddingXS),
+        color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
+        child: InkWell(
+          onTap: isSelectionMode ? onSelectionToggle : () => _cycleStatus(),
+          onLongPress: isSelectionMode ? null : onLongPress,
+          borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimensions.paddingM,
+              vertical: AppDimensions.paddingS,
+            ),
+            child: Row(
+              children: [
+                // Selection checkbox or Avatar
+                if (isSelectionMode)
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => onSelectionToggle(),
+                    activeColor: AppColors.primary,
+                  )
+                else
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: _getStatusColor(status).withValues(alpha: 0.2),
+                    backgroundImage: person.img != null ? NetworkImage(person.img!) : null,
+                    child: person.img == null
+                        ? Text(
+                            person.initials,
+                            style: TextStyle(
+                              color: _getStatusColor(status),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                  ),
+                const SizedBox(width: AppDimensions.paddingM),
+
+                // Name and info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            person.fullName,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          if (hasNotes) ...[
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.sticky_note_2,
+                              size: 14,
+                              color: AppColors.info,
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (person.groupName != null && !isSelectionMode)
+                        Text(
+                          person.groupName!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.medium,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Status indicator
+                _StatusChip(
+                  status: status,
+                  onTap: () => _showStatusPicker(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showNoteDialog(BuildContext context) {
+    final controller = TextEditingController(text: notes);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Notiz für ${person.fullName}'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Notiz eingeben...',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          if (notes?.isNotEmpty == true)
+            TextButton(
+              onPressed: () {
+                onNoteChanged(null);
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Löschen', style: TextStyle(color: AppColors.danger)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final newNotes = controller.text.trim();
+              onNoteChanged(newNotes.isEmpty ? null : newNotes);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _cycleStatus() {
+    // Cycle through available statuses only
+    if (availableStatuses.isEmpty) return;
+
+    final currentIndex = availableStatuses.indexOf(status);
+    if (currentIndex == -1) {
+      // Current status not in available, set to first available
+      onStatusChanged(availableStatuses.first);
+    } else {
+      // Move to next available status
+      final nextIndex = (currentIndex + 1) % availableStatuses.length;
+      onStatusChanged(availableStatuses[nextIndex]);
+    }
+  }
+
+  void _showStatusPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                person.fullName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text('Status auswählen'),
+            ),
+            const Divider(),
+            ...availableStatuses.map((s) => ListTile(
+              leading: Icon(
+                _getStatusIcon(s),
+                color: _getStatusColor(s),
+              ),
+              title: Text(_getStatusLabel(s)),
+              selected: s == status,
+              onTap: () {
+                onStatusChanged(s);
+                Navigator.pop(context);
+              },
+            )),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => AppColors.success,
+      AttendanceStatus.absent => AppColors.danger,
+      AttendanceStatus.excused => AppColors.info,
+      AttendanceStatus.late => AppColors.warning,
+      AttendanceStatus.lateExcused => AppColors.warning,
+      AttendanceStatus.neutral => AppColors.medium,
+    };
+  }
+
+  IconData _getStatusIcon(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => Icons.check_circle,
+      AttendanceStatus.absent => Icons.cancel,
+      AttendanceStatus.excused => Icons.event_busy,
+      AttendanceStatus.late => Icons.schedule,
+      AttendanceStatus.lateExcused => Icons.schedule,
+      AttendanceStatus.neutral => Icons.help_outline,
+    };
+  }
+
+  String _getStatusLabel(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => 'Anwesend',
+      AttendanceStatus.absent => 'Abwesend',
+      AttendanceStatus.excused => 'Entschuldigt',
+      AttendanceStatus.late => 'Verspätet',
+      AttendanceStatus.lateExcused => 'Verspätet (entsch.)',
+      AttendanceStatus.neutral => 'Nicht erfasst',
+    };
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({
+    required this.status,
+    required this.onTap,
+  });
+
+  final AttendanceStatus status;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _getStatusColor(status);
+    final icon = _getStatusIcon(status);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppDimensions.paddingS,
+          vertical: AppDimensions.paddingXS,
+        ),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 4),
+            Text(
+              _getStatusShort(status),
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => AppColors.success,
+      AttendanceStatus.absent => AppColors.danger,
+      AttendanceStatus.excused => AppColors.info,
+      AttendanceStatus.late => AppColors.warning,
+      AttendanceStatus.lateExcused => AppColors.warning,
+      AttendanceStatus.neutral => AppColors.medium,
+    };
+  }
+
+  IconData _getStatusIcon(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => Icons.check,
+      AttendanceStatus.absent => Icons.close,
+      AttendanceStatus.excused => Icons.event_busy,
+      AttendanceStatus.late => Icons.schedule,
+      AttendanceStatus.lateExcused => Icons.schedule,
+      AttendanceStatus.neutral => Icons.remove,
+    };
+  }
+
+  String _getStatusShort(AttendanceStatus status) {
+    return switch (status) {
+      AttendanceStatus.present => 'DA',
+      AttendanceStatus.absent => 'AB',
+      AttendanceStatus.excused => 'EN',
+      AttendanceStatus.late => 'SP',
+      AttendanceStatus.lateExcused => 'SE',
+      AttendanceStatus.neutral => '?',
+    };
+  }
+}
+
+class _AttendanceStatusBar extends StatelessWidget {
+  const _AttendanceStatusBar({
+    required this.persons,
+    required this.localStatuses,
+    required this.selectedCount,
+    required this.isSelectionMode,
+  });
+
+  final List<Person> persons;
+  final Map<int, AttendanceStatus> localStatuses;
+  final int selectedCount;
+  final bool isSelectionMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = persons.length;
+    final present = localStatuses.values.where((s) => s == AttendanceStatus.present).length;
+    final excused = localStatuses.values.where((s) => s.isExcused).length;
+    final absent = localStatuses.values.where((s) => s == AttendanceStatus.absent).length;
+    final unknown = total - present - excused - absent;
+    final percentage = total > 0 ? (present / total * 100) : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(AppDimensions.paddingM),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _StatItem(
+              label: 'Anwesend',
+              value: '$present',
+              color: AppColors.success,
+            ),
+            _StatItem(
+              label: 'Entsch.',
+              value: '$excused',
+              color: AppColors.info,
+            ),
+            _StatItem(
+              label: 'Abwesend',
+              value: '$absent',
+              color: AppColors.danger,
+            ),
+            _StatItem(
+              label: 'Offen',
+              value: '$unknown',
+              color: AppColors.medium,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.paddingM,
+                vertical: AppDimensions.paddingS,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
+              ),
+              child: Text(
+                '${percentage.round()}%',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.medium,
+          ),
+        ),
+      ],
+    );
+  }
+}
