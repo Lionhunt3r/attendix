@@ -7,6 +7,9 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../shared/widgets/loading/loading.dart';
+import '../../../../shared/widgets/common/empty_state.dart';
+import '../../../../shared/widgets/animations/animated_list_item.dart';
 
 /// Provider for groups/instruments
 final groupsProvider = FutureProvider<Map<int, String>>((ref) async {
@@ -297,78 +300,42 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
           // People list
           Expanded(
             child: peopleAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
+              loading: () => const ListSkeleton(
+                itemCount: 10,
+                showAvatar: true,
+                showSubtitle: true,
               ),
-              error: (error, stack) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: AppColors.danger,
-                    ),
-                    const SizedBox(height: AppDimensions.paddingM),
-                    Text('Fehler: $error'),
-                    const SizedBox(height: AppDimensions.paddingM),
-                    ElevatedButton(
-                      onPressed: () => ref.refresh(peopleListProvider),
-                      child: const Text('Erneut versuchen'),
-                    ),
-                  ],
-                ),
+              error: (error, stack) => EmptyStateWidget(
+                icon: Icons.error_outline,
+                title: 'Fehler beim Laden',
+                subtitle: 'Die Personenliste konnte nicht geladen werden.',
+                actionLabel: 'Erneut versuchen',
+                onAction: () => ref.refresh(peopleListProvider),
               ),
               data: (people) {
                 final filteredPeople = _filterPeople(people);
                 final sortedPeople = _sortPeople(filteredPeople);
 
                 if (people.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.people_outline,
-                          size: 80,
-                          color: AppColors.medium,
-                        ),
-                        const SizedBox(height: AppDimensions.paddingL),
-                        Text(
-                          'Keine Personen',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: AppDimensions.paddingS),
-                        Text(
-                          'Füge die erste Person hinzu',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.medium,
-                          ),
-                        ),
-                      ],
-                    ),
+                  return EmptyStateWidget(
+                    icon: Icons.people_outline,
+                    title: 'Keine Personen',
+                    subtitle: 'Füge die erste Person hinzu',
+                    actionLabel: 'Person hinzufügen',
+                    onAction: () => context.push('/people/new'),
                   );
                 }
 
                 if (sortedPeople.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: AppColors.medium,
-                        ),
-                        const SizedBox(height: AppDimensions.paddingM),
-                        Text(
-                          _searchQuery.isNotEmpty 
-                            ? 'Keine Ergebnisse für "$_searchQuery"'
-                            : 'Keine Personen für diesen Filter',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ],
-                    ),
+                  return EmptyStateWidget(
+                    icon: Icons.search_off,
+                    title: _searchQuery.isNotEmpty
+                        ? 'Keine Ergebnisse für "$_searchQuery"'
+                        : 'Keine Personen für diesen Filter',
+                    subtitle: _searchQuery.isNotEmpty
+                        ? 'Versuche es mit einem anderen Suchbegriff'
+                        : 'Passe den Filter an oder setze ihn zurück',
+                    animateIcon: false,
                   );
                 }
 
@@ -431,10 +398,17 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                               ),
                             ),
                             // Group members
-                            ...groupPeople.map((person) => _PersonListItem(
-                              person: person,
-                              onTap: () => context.push('/people/${person.id}'),
-                            )),
+                            ...groupPeople.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final person = entry.value;
+                              return AnimatedListItem(
+                                index: index,
+                                child: _PersonListItem(
+                                  person: person,
+                                  onTap: () => context.push('/people/${person.id}'),
+                                ),
+                              );
+                            }),
                           ],
                         );
                       },
@@ -453,9 +427,12 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                     itemCount: sortedPeople.length,
                     itemBuilder: (context, index) {
                       final person = sortedPeople[index];
-                      return _PersonListItem(
-                        person: person,
-                        onTap: () => context.push('/people/${person.id}'),
+                      return AnimatedListItem(
+                        index: index,
+                        child: _PersonListItem(
+                          person: person,
+                          onTap: () => context.push('/people/${person.id}'),
+                        ),
                       );
                     },
                   ),

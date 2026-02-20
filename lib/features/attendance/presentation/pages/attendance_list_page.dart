@@ -5,9 +5,15 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../shared/widgets/loading/loading.dart';
+import '../../../../shared/widgets/common/empty_state.dart';
+import '../../../../shared/widgets/display/percentage_badge.dart';
+import '../../../../shared/widgets/animations/animated_list_item.dart';
+
 
 /// Provider for attendance list
 final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
@@ -84,55 +90,37 @@ class AttendanceListPage extends ConsumerWidget {
         ],
       ),
       body: attendanceAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
+        loading: () => const ListSkeleton(
+          itemCount: 8,
+          showAvatar: true,
+          showSubtitle: true,
+          showTrailing: true,
         ),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 64,
-                color: AppColors.danger,
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-              Text('Fehler: $error'),
-              const SizedBox(height: AppDimensions.paddingM),
-              ElevatedButton(
-                onPressed: () => ref.refresh(attendanceListProvider),
-                child: const Text('Erneut versuchen'),
-              ),
-            ],
-          ),
+        error: (error, stack) => EmptyStateWidget(
+          icon: Icons.error_outline,
+          title: 'Fehler beim Laden',
+          subtitle: 'Die Anwesenheitsliste konnte nicht geladen werden.',
+          actionLabel: 'Erneut versuchen',
+          onAction: () => ref.refresh(attendanceListProvider),
         ),
         data: (attendances) {
           if (attendances.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.fact_check_outlined,
-                    size: 80,
-                    color: AppColors.medium,
-                  ),
-                  const SizedBox(height: AppDimensions.paddingL),
-                  Text(
-                    'Keine Anwesenheiten',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppDimensions.paddingS),
-                  Text(
-                    'Erstelle die erste Anwesenheitsliste',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.medium,
-                    ),
-                  ),
-                ],
-              ),
+            return EmptyStateWidget(
+              icon: Icons.fact_check_outlined,
+              title: 'Keine Anwesenheiten',
+              subtitle: 'Erstelle die erste Anwesenheitsliste',
+              actionLabel: 'Neue Anwesenheit',
+              onAction: () => context.push('/attendance/new'),
             );
           }
+
+          // Get highlighted type IDs from AttendanceTypes (like Ionic)
+          final attendanceTypes = ref.watch(attendanceTypesProvider).valueOrNull ?? [];
+          final highlightedTypeIds = attendanceTypes
+              .where((t) => t.highlight)
+              .map((t) => t.id)
+              .whereType<String>()
+              .toSet();
 
           // Separate into upcoming and past attendances (like Ionic)
           final now = DateTime.now();
@@ -182,9 +170,13 @@ class AttendanceListPage extends ConsumerWidget {
                     initiallyExpanded: true,
                     isPrimary: true,
                     children: [
-                      _AttendanceListItem(
-                        attendance: currentAttendance,
-                        onTap: () => context.push('/attendance/${currentAttendance!.id}'),
+                      AnimatedListItem(
+                        index: 0,
+                        child: _AttendanceListItem(
+                          attendance: currentAttendance,
+                          onTap: () => context.push('/attendance/${currentAttendance!.id}'),
+                          isHighlighted: highlightedTypeIds.contains(currentAttendance.typeId),
+                        ),
                       ),
                     ],
                   ),
@@ -196,10 +188,16 @@ class AttendanceListPage extends ConsumerWidget {
                     count: upcomingAttendances.length,
                     initiallyExpanded: true,
                     isPrimary: true,
-                    children: upcomingAttendances.map((attendance) => _AttendanceListItem(
-                      attendance: attendance,
-                      onTap: () => context.push('/attendance/${attendance.id}'),
-                    )).toList(),
+                    children: upcomingAttendances.asMap().entries.map((entry) =>
+                      AnimatedListItem(
+                        index: entry.key,
+                        child: _AttendanceListItem(
+                          attendance: entry.value,
+                          onTap: () => context.push('/attendance/${entry.value.id}'),
+                          isHighlighted: highlightedTypeIds.contains(entry.value.typeId),
+                        ),
+                      ),
+                    ).toList(),
                   ),
 
                 // Past Attendances Section (collapsed by default)
@@ -209,10 +207,16 @@ class AttendanceListPage extends ConsumerWidget {
                     count: pastAttendances.length,
                     initiallyExpanded: false,
                     isPrimary: false,
-                    children: pastAttendances.map((attendance) => _AttendanceListItem(
-                      attendance: attendance,
-                      onTap: () => context.push('/attendance/${attendance.id}'),
-                    )).toList(),
+                    children: pastAttendances.asMap().entries.map((entry) =>
+                      AnimatedListItem(
+                        index: entry.key,
+                        child: _AttendanceListItem(
+                          attendance: entry.value,
+                          onTap: () => context.push('/attendance/${entry.value.id}'),
+                          isHighlighted: highlightedTypeIds.contains(entry.value.typeId),
+                        ),
+                      ),
+                    ).toList(),
                   ),
               ],
             ),
@@ -317,10 +321,12 @@ class _AttendanceListItem extends StatelessWidget {
   const _AttendanceListItem({
     required this.attendance,
     required this.onTap,
+    this.isHighlighted = false,
   });
 
   final Attendance attendance;
   final VoidCallback onTap;
+  final bool isHighlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -373,8 +379,9 @@ class _AttendanceListItem extends StatelessWidget {
         ),
         title: Text(
           attendance.displayTitle,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
+          style: TextStyle(
+            // Dezentes Highlighting: nur fetter Text (wie Ionic)
+            fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w500,
           ),
         ),
         subtitle: Column(
@@ -400,7 +407,10 @@ class _AttendanceListItem extends StatelessWidget {
               ),
           ],
         ),
-        trailing: _PercentageBadge(percentage: attendance.percentage ?? 0),
+        trailing: PercentageBadge(
+          percentage: attendance.percentage ?? 0,
+          showBackground: true,
+        ),
       ),
     );
   }
@@ -423,39 +433,6 @@ class _AttendanceListItem extends StatelessWidget {
     if (start != null && end != null) return '$start - $end';
     if (start != null) return 'ab $start';
     return 'bis $end';
-  }
-}
-
-/// Percentage badge widget (like Ionic)
-class _PercentageBadge extends StatelessWidget {
-  const _PercentageBadge({required this.percentage});
-
-  final double percentage;
-
-  @override
-  Widget build(BuildContext context) {
-    final rate = percentage.round();
-    final color = rate >= 75
-        ? AppColors.success
-        : rate >= 50
-            ? AppColors.warning
-            : AppColors.danger;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        '$rate%',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
   }
 }
 
