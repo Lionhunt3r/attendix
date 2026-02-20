@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/config/supabase_config.dart';
 import '../../data/models/tenant/tenant.dart';
+import '../constants/enums.dart';
 
 const _tenantIdKey = 'current_tenant_id';
 
@@ -38,10 +40,12 @@ class CurrentTenantNotifier extends StateNotifier<Tenant?> {
             .maybeSingle();
         
         if (response != null) {
-          state = Tenant.fromJson(response as Map<String, dynamic>);
+          state = Tenant.fromJson(response);
         }
-      } catch (e) {
-        // Ignore errors, user will need to select tenant again
+      } catch (e, stack) {
+        // Log error but continue - user will need to select tenant again
+        debugPrint('Failed to load saved tenant: $e');
+        debugPrint('$stack');
       }
     }
   }
@@ -96,8 +100,8 @@ final userTenantsProvider = FutureProvider<List<Tenant>>((ref) async {
   return tenants;
 });
 
-/// Provider for current user's role in the selected tenant
-final currentTenantUserProvider = FutureProvider((ref) async {
+/// Provider for current user's TenantUser record in the selected tenant
+final currentTenantUserProvider = FutureProvider<TenantUser?>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
   final userId = supabase.auth.currentUser?.id;
@@ -111,5 +115,14 @@ final currentTenantUserProvider = FutureProvider((ref) async {
       .eq('userId', userId)
       .maybeSingle();
 
-  return response;
+  if (response == null) return null;
+  return TenantUser.fromJson(response);
+});
+
+/// Convenience provider for current user's role
+final currentRoleProvider = Provider<Role>((ref) {
+  final tenantUserAsync = ref.watch(currentTenantUserProvider);
+  final tenantUser = tenantUserAsync.valueOrNull;
+  if (tenantUser == null) return Role.none;
+  return tenantUser.roleEnum;
 });

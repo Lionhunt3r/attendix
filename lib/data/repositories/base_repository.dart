@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -23,8 +24,8 @@ abstract class BaseRepository {
   /// Handle Supabase errors consistently
   T handleError<T>(Object error, StackTrace stack, String operation) {
     // Log error
-    print('[$runtimeType] Error in $operation: $error');
-    print(stack);
+    debugPrint('[$runtimeType] Error in $operation: $error');
+    debugPrint('$stack');
 
     // Rethrow with more context
     if (error is PostgrestException) {

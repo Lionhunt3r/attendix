@@ -35,6 +35,9 @@ import '../../features/planning/presentation/pages/planning_page.dart';
 import '../../features/history/presentation/pages/history_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/meetings/presentation/pages/meetings_list_page.dart';
+import '../../features/voice_leader/presentation/pages/voice_leader_page.dart';
+import '../../features/members/presentation/pages/members_page.dart';
+import '../../features/registration/presentation/pages/tenant_registration_page.dart';
 
 /// Router provider
 final routerProvider = Provider<GoRouter>((ref) {
@@ -52,8 +55,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.matchedLocation == '/register' ||
           state.matchedLocation == '/forgot-password';
 
-      // If not logged in and not on auth route, redirect to login
-      if (!isLoggedIn && !isAuthRoute) {
+      // Public tenant registration route - allow access without login
+      final isTenantRegistration = state.matchedLocation.startsWith('/register/');
+
+      // If not logged in and not on auth route or tenant registration, redirect to login
+      if (!isLoggedIn && !isAuthRoute && !isTenantRegistration) {
         return '/login';
       }
 
@@ -80,6 +86,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/forgot-password',
         name: 'forgotPassword',
         builder: (context, state) => const ForgotPasswordPage(),
+      ),
+
+      // Public tenant registration (no auth required)
+      GoRoute(
+        path: '/register/:id',
+        name: 'tenantRegistration',
+        builder: (context, state) {
+          final registerId = state.pathParameters['id'] ?? '';
+          return TenantRegistrationPage(registerId: registerId);
+        },
       ),
 
       // Tenant selection
@@ -161,6 +177,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const SelfServiceOverviewPage(),
           ),
 
+          // Members (for players/helpers when showMembersList is enabled)
+          GoRoute(
+            path: '/members',
+            name: 'members',
+            builder: (context, state) => const MembersPage(),
+          ),
+
           // Statistics
           GoRoute(
             path: '/statistics',
@@ -214,7 +237,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: ':id',
                     name: 'songDetail',
                     builder: (context, state) {
-                      final id = state.pathParameters['id']!;
+                      final id = state.pathParameters['id'];
+                      if (id == null) return const SongsListPage();
                       return SongDetailPage(songId: id);
                     },
                   ),
@@ -259,7 +283,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: ':id',
                     name: 'attendanceTypeEdit',
                     builder: (context, state) {
-                      final id = state.pathParameters['id']!;
+                      final id = state.pathParameters['id'];
+                      if (id == null) return const AttendanceTypesPage();
                       return AttendanceTypeEditPage(typeId: id);
                     },
                   ),
@@ -279,6 +304,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'calendar',
                 name: 'calendarSubscription',
                 builder: (context, state) => const CalendarSubscriptionPage(),
+              ),
+              GoRoute(
+                path: 'voice-leader',
+                name: 'voiceLeader',
+                builder: (context, state) => const VoiceLeaderPage(),
               ),
             ],
           ),

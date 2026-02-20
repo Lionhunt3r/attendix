@@ -8,7 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../data/models/song/song.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
 
 /// Field Selection for planning
 class FieldSelection {
@@ -52,7 +52,7 @@ final upcomingAttendancesProvider = FutureProvider<List<Attendance>>((ref) async
 
   final now = DateTime.now().toIso8601String().substring(0, 10);
   final response = await supabase
-      .from('attendances')
+      .from('attendance')
       .select('*')
       .eq('tenantId', tenant.id!)
       .gte('date', now)
@@ -197,8 +197,10 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                           onChanged: (value) {
                             if (value != null) {
                               setState(() => _selectedAttendanceId = value);
-                              final att = attendances.firstWhere((a) => a.id == value);
-                              _loadPlanFromAttendance(att);
+                              final att = attendances.where((a) => a.id == value).firstOrNull;
+                              if (att != null) {
+                                _loadPlanFromAttendance(att);
+                              }
                             }
                           },
                         ),
@@ -567,7 +569,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
     try {
       final supabase = ref.read(supabaseClientProvider);
-      await supabase.from('attendances').update({
+      await supabase.from('attendance').update({
         'plan': {
           'time': _formatTime(_startTime),
           'end': _endTime != null ? _formatTime(_endTime!) : null,

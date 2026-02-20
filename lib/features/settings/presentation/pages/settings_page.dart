@@ -4,16 +4,17 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
 
-/// Settings page
+/// Settings page with role-based menu filtering
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tenant = ref.watch(currentTenantProvider);
+    final role = ref.watch(currentRoleProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -31,7 +32,7 @@ class SettingsPage extends ConsumerWidget {
                   leading: CircleAvatar(
                     backgroundColor: AppColors.primaryLight,
                     child: Text(
-                      tenant.shortName.isNotEmpty 
+                      tenant.shortName.isNotEmpty
                           ? tenant.shortName.substring(0, 2).toUpperCase()
                           : tenant.longName.substring(0, 2).toUpperCase(),
                       style: const TextStyle(
@@ -40,8 +41,12 @@ class SettingsPage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  title: tenant.shortName.isNotEmpty ? tenant.shortName : tenant.longName,
-                  subtitle: tenant.longName != tenant.shortName ? tenant.longName : null,
+                  title: tenant.shortName.isNotEmpty
+                      ? tenant.shortName
+                      : tenant.longName,
+                  subtitle: tenant.longName != tenant.shortName
+                      ? tenant.longName
+                      : null,
                   trailing: TextButton(
                     onPressed: () => context.go('/tenants'),
                     child: const Text('Wechseln'),
@@ -52,69 +57,124 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: AppDimensions.paddingM),
           ],
 
-          // Content management section
-          _SettingsSection(
-            title: 'Verwaltung',
-            children: [
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.category),
-                title: 'Terminarten',
-                subtitle: 'Proben, Auftritte, etc. verwalten',
-                onTap: () => context.push('/settings/types'),
-              ),
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.music_note),
-                title: 'Lieder',
-                subtitle: 'Lieder und Notenblätter verwalten',
-                onTap: () => context.push('/settings/songs'),
-              ),
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.piano),
-                title: 'Instrumente',
-                subtitle: 'Instrumentenliste verwalten',
-                onTap: () => context.push('/settings/instruments'),
-              ),
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.school),
-                title: 'Lehrer',
-                subtitle: 'Lehrer und Ausbilder verwalten',
-                onTap: () => context.push('/settings/teachers'),
-              ),
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.event),
-                title: 'Sitzungen',
-                subtitle: 'Vorstandssitzungen verwalten',
-                onTap: () => context.push('/settings/meetings'),
-              ),
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.people),
-                title: 'Benutzer',
-                subtitle: 'Rollen und Berechtigungen verwalten',
-                onTap: () => context.push('/settings/users'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.paddingM),
-
-          // Member management section
-          _SettingsSection(
-            title: 'Mitgliederverwaltung',
-            children: [
-              _SettingsTile(
-                leading: _SettingsIcon(
-                  icon: Icons.hourglass_empty,
-                  color: AppColors.warning,
+          // Content management section - only for users who can edit
+          if (role.canEdit) ...[
+            _SettingsSection(
+              title: 'Verwaltung',
+              children: [
+                // Only Admin/Responsible can manage attendance types
+                if (role.isAdmin || role.isResponsible)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.category),
+                    title: 'Terminarten',
+                    subtitle: 'Proben, Auftritte, etc. verwalten',
+                    onTap: () => context.push('/settings/types'),
+                  ),
+                // All roles can see songs
+                _SettingsTile(
+                  leading: const _SettingsIcon(icon: Icons.music_note),
+                  title: 'Lieder',
+                  subtitle: 'Lieder und Notenblätter verwalten',
+                  onTap: () => context.push('/settings/songs'),
                 ),
-                title: 'Ausstehende Registrierungen',
-                subtitle: 'Neue Selbst-Registrierungen prüfen',
-                onTap: () => context.push('/settings/pending'),
-              ),
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.history),
-                title: 'Ehemalige Mitglieder',
-                subtitle: 'Archivierte Mitglieder verwalten',
-                onTap: () => context.push('/settings/left'),
-              ),
+                // Only Admin/Responsible can manage instruments
+                if (role.isAdmin || role.isResponsible)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.piano),
+                    title: 'Instrumente',
+                    subtitle: 'Instrumentenliste verwalten',
+                    onTap: () => context.push('/settings/instruments'),
+                  ),
+                // Conductors (Admin, Responsible, Viewer) can see teachers
+                if (role.isConductor)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.school),
+                    title: 'Lehrer',
+                    subtitle: 'Lehrer und Ausbilder verwalten',
+                    onTap: () => context.push('/settings/teachers'),
+                  ),
+                // Only Admin/Responsible can manage meetings
+                if (role.isAdmin || role.isResponsible)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.event),
+                    title: 'Sitzungen',
+                    subtitle: 'Vorstandssitzungen verwalten',
+                    onTap: () => context.push('/settings/meetings'),
+                  ),
+                // Only Admin can manage users
+                if (role.isAdmin)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.people),
+                    title: 'Benutzer',
+                    subtitle: 'Rollen und Berechtigungen verwalten',
+                    onTap: () => context.push('/settings/users'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+
+          // Songs for players who can't edit but can view
+          if (!role.canEdit && role.canView) ...[
+            _SettingsSection(
+              title: 'Inhalte',
+              children: [
+                _SettingsTile(
+                  leading: const _SettingsIcon(icon: Icons.music_note),
+                  title: 'Lieder',
+                  subtitle: 'Lieder und Notenblätter ansehen',
+                  onTap: () => context.push('/settings/songs'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+
+          // Voice Leader settings - only for voice leaders
+          if (role.canSeeVoiceLeaderSettings) ...[
+            _SettingsSection(
+              title: 'Stimmführer',
+              children: [
+                _SettingsTile(
+                  leading: const _SettingsIcon(icon: Icons.record_voice_over),
+                  title: 'Stimmführer-Bereich',
+                  subtitle: 'Deine Stimmgruppe verwalten',
+                  onTap: () => context.push('/settings/voice-leader'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+
+          // Member management section - only for Admin/Responsible
+          if (role.isAdmin || role.isResponsible) ...[
+            _SettingsSection(
+              title: 'Mitgliederverwaltung',
+              children: [
+                _SettingsTile(
+                  leading: _SettingsIcon(
+                    icon: Icons.hourglass_empty,
+                    color: AppColors.warning,
+                  ),
+                  title: 'Ausstehende Registrierungen',
+                  subtitle: 'Neue Selbst-Registrierungen prüfen',
+                  onTap: () => context.push('/settings/pending'),
+                ),
+                _SettingsTile(
+                  leading: const _SettingsIcon(icon: Icons.history),
+                  title: 'Ehemalige Mitglieder',
+                  subtitle: 'Archivierte Mitglieder verwalten',
+                  onTap: () => context.push('/settings/left'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+
+          // Calendar subscription - for all authenticated users
+          _SettingsSection(
+            title: 'Kalender',
+            children: [
               _SettingsTile(
                 leading: const _SettingsIcon(icon: Icons.calendar_month),
                 title: 'Kalender-Abo',
@@ -125,27 +185,34 @@ class SettingsPage extends ConsumerWidget {
           ),
           const SizedBox(height: AppDimensions.paddingM),
 
-          // App settings section
-          _SettingsSection(
-            title: 'App-Einstellungen',
-            children: [
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.notifications),
-                title: 'Benachrichtigungen',
-                subtitle: 'Push-Benachrichtigungen konfigurieren',
-                onTap: () => context.push('/settings/notifications'),
-              ),
-              _SettingsTile(
-                leading: const _SettingsIcon(icon: Icons.tune),
-                title: 'Allgemein',
-                subtitle: 'Sprache, Theme und weitere Optionen',
-                onTap: () => context.push('/settings/general'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.paddingM),
+          // App settings section - for users with notification permission
+          if (role.isAdmin ||
+              role.isResponsible ||
+              role.isHelperRole ||
+              role.isPlayerRole) ...[
+            _SettingsSection(
+              title: 'App-Einstellungen',
+              children: [
+                _SettingsTile(
+                  leading: const _SettingsIcon(icon: Icons.notifications),
+                  title: 'Benachrichtigungen',
+                  subtitle: 'Push-Benachrichtigungen konfigurieren',
+                  onTap: () => context.push('/settings/notifications'),
+                ),
+                // General settings only for Admin/Responsible
+                if (role.isAdmin || role.isResponsible)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.tune),
+                    title: 'Allgemein',
+                    subtitle: 'Sprache, Theme und weitere Optionen',
+                    onTap: () => context.push('/settings/general'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
 
-          // Account section
+          // Account section - for all users
           _SettingsSection(
             title: 'Konto',
             children: [
@@ -165,13 +232,15 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () async {
                   // Store refs before async gap to avoid using ref after dispose
                   final supabase = ref.read(supabaseClientProvider);
-                  final tenantNotifier = ref.read(currentTenantProvider.notifier);
-                  
+                  final tenantNotifier =
+                      ref.read(currentTenantProvider.notifier);
+
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Abmelden'),
-                      content: const Text('Möchtest du dich wirklich abmelden?'),
+                      content:
+                          const Text('Möchtest du dich wirklich abmelden?'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(false),
@@ -198,6 +267,47 @@ class SettingsPage extends ConsumerWidget {
           ),
           const SizedBox(height: AppDimensions.paddingL),
 
+          // Applicant status hint
+          if (role.isApplicant) ...[
+            Card(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                child: Row(
+                  children: [
+                    Icon(Icons.hourglass_empty, color: AppColors.warning),
+                    const SizedBox(width: AppDimensions.paddingM),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Mitgliedschaft wird geprüft',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: AppDimensions.paddingXS),
+                          Text(
+                            'Ein Administrator wird deine Registrierung prüfen.',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.medium,
+                                    ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingL),
+          ],
+
           // App info
           Center(
             child: Column(
@@ -205,15 +315,15 @@ class SettingsPage extends ConsumerWidget {
                 Text(
                   'Attendix',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppColors.medium,
-                  ),
+                        color: AppColors.medium,
+                      ),
                 ),
                 const SizedBox(height: AppDimensions.paddingXS),
                 Text(
                   'Version ${AppConstants.appVersion}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.medium,
-                  ),
+                        color: AppColors.medium,
+                      ),
                 ),
               ],
             ),
@@ -236,6 +346,10 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Filter out null children (from conditional rendering)
+    final filteredChildren = children.whereType<Widget>().toList();
+    if (filteredChildren.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -247,15 +361,15 @@ class _SettingsSection extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppColors.medium,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: AppColors.medium,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
         Card(
           margin: EdgeInsets.zero,
           child: Column(
-            children: children,
+            children: filteredChildren,
           ),
         ),
       ],

@@ -14,7 +14,7 @@ import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../data/models/person/person.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
 
 /// Provider for attendance detail
 final attendanceDetailProvider = FutureProvider.family<Attendance?, int>((ref, attendanceId) async {
@@ -254,16 +254,27 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     if (newRecord == null || newRecord.isEmpty) return;
 
     final personId = newRecord['person_id'] as int?;
-    final statusStr = newRecord['status'] as String?;
+    final statusValue = newRecord['status'];
     final notes = newRecord['notes'] as String?;
     final changedBy = newRecord['changed_by'] as String?;
     final changedAt = newRecord['changed_at'] as String?;
 
-    if (personId != null && statusStr != null) {
-      final status = AttendanceStatus.values.firstWhere(
-        (s) => s.name.toLowerCase() == statusStr.toLowerCase(),
-        orElse: () => AttendanceStatus.neutral,
-      );
+    if (personId != null && statusValue != null) {
+      AttendanceStatus status;
+      if (statusValue is int) {
+        status = AttendanceStatus.fromValue(statusValue);
+      } else {
+        final statusStr = statusValue.toString();
+        final intValue = int.tryParse(statusStr);
+        if (intValue != null) {
+          status = AttendanceStatus.fromValue(intValue);
+        } else {
+          status = AttendanceStatus.values.firstWhere(
+            (s) => s.name.toLowerCase() == statusStr.toLowerCase(),
+            orElse: () => AttendanceStatus.neutral,
+          );
+        }
+      }
 
       setState(() {
         _localStatuses[personId] = status;
@@ -886,7 +897,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
           personAttendanceId,
           widget.attendanceId,
           entry.key,
-          {'status': entry.value.name},
+          {'status': entry.value.value},
         );
       }
     }
@@ -1328,21 +1339,6 @@ class _AttendancePersonTile extends StatelessWidget {
     );
   }
 
-  void _cycleStatus() {
-    // Cycle through available statuses only
-    if (availableStatuses.isEmpty) return;
-
-    final currentIndex = availableStatuses.indexOf(status);
-    if (currentIndex == -1) {
-      // Current status not in available, set to first available
-      onStatusChanged(availableStatuses.first);
-    } else {
-      // Move to next available status
-      final nextIndex = (currentIndex + 1) % availableStatuses.length;
-      onStatusChanged(availableStatuses[nextIndex]);
-    }
-  }
-
   void _showStatusPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1462,17 +1458,6 @@ class _StatusChip extends StatelessWidget {
       AttendanceStatus.late => Icons.schedule,
       AttendanceStatus.lateExcused => Icons.schedule,
       AttendanceStatus.neutral => Icons.remove,
-    };
-  }
-
-  String _getStatusShort(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => 'DA',
-      AttendanceStatus.absent => 'AB',
-      AttendanceStatus.excused => 'EN',
-      AttendanceStatus.late => 'SP',
-      AttendanceStatus.lateExcused => 'SE',
-      AttendanceStatus.neutral => '?',
     };
   }
 }

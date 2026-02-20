@@ -20,7 +20,7 @@ class StatisticsDateRange {
   factory StatisticsDateRange.defaultRange() {
     final now = DateTime.now();
     return StatisticsDateRange(
-      start: DateTime(now.year, now.month - 6, now.day),
+      start: now.subtract(const Duration(days: 180)),
       end: now,
     );
   }
@@ -109,7 +109,9 @@ final allPersonAttendancesForStatsProvider =
         groupName: null, // We'll get group name from players
       );
     }).toList();
-  } catch (e) {
+  } catch (e, stack) {
+    debugPrint('Error loading person attendances for stats: $e');
+    debugPrint('$stack');
     return [];
   }
 });

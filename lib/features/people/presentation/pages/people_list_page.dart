@@ -6,7 +6,7 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
 
 /// Provider for groups/instruments
 final groupsProvider = FutureProvider<Map<int, String>>((ref) async {
@@ -54,14 +54,14 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
         final groupName = person.instrument != null ? groups[person.instrument] : null;
         return person.copyWith(groupName: groupName);
       } catch (parseError) {
-        print('Error parsing person: $parseError');
-        print('JSON data: $e');
+        debugPrint('Error parsing person: $parseError');
+        debugPrint('JSON data: $e');
         rethrow;
       }
     }).toList();
   } catch (e, stack) {
-    print('Error fetching people: $e');
-    print('Stack trace: $stack');
+    debugPrint('Error fetching people: $e');
+    debugPrint('Stack trace: $stack');
     rethrow;
   }
 });
