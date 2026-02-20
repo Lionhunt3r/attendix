@@ -17,16 +17,33 @@ final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
   // Guard against null tenant or null tenant.id
   if (tenant?.id == null) return [];
 
+  // Load attendances with person_attendances to calculate percentage
   final response = await supabase
       .from('attendance')
-      .select('*')
+      .select('*, person_attendances(status)')
       .eq('tenantId', tenant!.id!)
       .order('date', ascending: false)
       .limit(50);
 
-  return (response as List)
-      .map((e) => Attendance.fromJson(e as Map<String, dynamic>))
-      .toList();
+  return (response as List).map((e) {
+    final attendance = Attendance.fromJson(e as Map<String, dynamic>);
+
+    // Calculate percentage from person_attendances if not already set
+    if (attendance.percentage == null || attendance.percentage == 0) {
+      final personAttendances = e['person_attendances'] as List?;
+      if (personAttendances != null && personAttendances.isNotEmpty) {
+        final total = personAttendances.length;
+        // Present = status 1, Late = status 4, LateExcused = status 5
+        final present = personAttendances.where((pa) {
+          final status = pa['status'];
+          return status == 1 || status == 4 || status == 5;
+        }).length;
+        final calculatedPercentage = (present / total * 100).roundToDouble();
+        return attendance.copyWith(percentage: calculatedPercentage);
+      }
+    }
+    return attendance;
+  }).toList();
 });
 
 /// Attendance list page
@@ -157,34 +174,33 @@ class AttendanceListPage extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               children: [
-                // Current Attendance Section (like Ionic)
-                if (currentAttendance != null) ...[
-                  _SectionHeader(
+                // Current Attendance Section (like Ionic - collapsible)
+                if (currentAttendance != null)
+                  _CollapsibleSection(
                     title: 'Aktuell',
                     count: 1,
-                    isExpanded: true,
+                    initiallyExpanded: true,
+                    isPrimary: true,
+                    children: [
+                      _AttendanceListItem(
+                        attendance: currentAttendance,
+                        onTap: () => context.push('/attendance/${currentAttendance!.id}'),
+                      ),
+                    ],
                   ),
-                  _AttendanceListItem(
-                    attendance: currentAttendance,
-                    onTap: () => context.push('/attendance/${currentAttendance!.id}'),
-                    highlight: true,
-                  ),
-                  const SizedBox(height: AppDimensions.paddingM),
-                ],
 
-                // Upcoming Attendances Section
-                if (upcomingAttendances.isNotEmpty) ...[
-                  _SectionHeader(
+                // Upcoming Attendances Section (collapsible)
+                if (upcomingAttendances.isNotEmpty)
+                  _CollapsibleSection(
                     title: 'Anstehend',
                     count: upcomingAttendances.length,
-                    isExpanded: true,
+                    initiallyExpanded: true,
+                    isPrimary: true,
+                    children: upcomingAttendances.map((attendance) => _AttendanceListItem(
+                      attendance: attendance,
+                      onTap: () => context.push('/attendance/${attendance.id}'),
+                    )).toList(),
                   ),
-                  ...upcomingAttendances.map((attendance) => _AttendanceListItem(
-                    attendance: attendance,
-                    onTap: () => context.push('/attendance/${attendance.id}'),
-                  )),
-                  const SizedBox(height: AppDimensions.paddingM),
-                ],
 
                 // Past Attendances Section (collapsed by default)
                 if (pastAttendances.isNotEmpty)
@@ -192,6 +208,7 @@ class AttendanceListPage extends ConsumerWidget {
                     title: 'Vergangen',
                     count: pastAttendances.length,
                     initiallyExpanded: false,
+                    isPrimary: false,
                     children: pastAttendances.map((attendance) => _AttendanceListItem(
                       attendance: attendance,
                       onTap: () => context.push('/attendance/${attendance.id}'),
@@ -211,62 +228,6 @@ class AttendanceListPage extends ConsumerWidget {
   }
 }
 
-/// Section header widget (like Ionic accordion header)
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.count,
-    required this.isExpanded,
-  });
-
-  final String title;
-  final int count;
-  final bool isExpanded;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: AppDimensions.paddingS,
-        horizontal: AppDimensions.paddingXS,
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isExpanded ? Icons.expand_more : Icons.chevron_right,
-            color: AppColors.primary,
-            size: 20,
-          ),
-          const SizedBox(width: AppDimensions.paddingXS),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(width: AppDimensions.paddingS),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '$count',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// Collapsible section widget (like Ionic accordion)
 class _CollapsibleSection extends StatefulWidget {
   const _CollapsibleSection({
@@ -274,12 +235,14 @@ class _CollapsibleSection extends StatefulWidget {
     required this.count,
     required this.children,
     this.initiallyExpanded = true,
+    this.isPrimary = true,
   });
 
   final String title;
   final int count;
   final List<Widget> children;
   final bool initiallyExpanded;
+  final bool isPrimary;
 
   @override
   State<_CollapsibleSection> createState() => _CollapsibleSectionState();
@@ -296,6 +259,8 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
 
   @override
   Widget build(BuildContext context) {
+    final color = widget.isPrimary ? AppColors.primary : AppColors.medium;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -310,14 +275,14 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
               children: [
                 Icon(
                   _isExpanded ? Icons.expand_more : Icons.chevron_right,
-                  color: AppColors.medium,
+                  color: color,
                   size: 20,
                 ),
                 const SizedBox(width: AppDimensions.paddingXS),
                 Text(
                   widget.title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.medium,
+                    color: color,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -325,7 +290,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.medium.withValues(alpha: 0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -333,7 +298,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.medium,
+                      color: color,
                     ),
                   ),
                 ),
@@ -342,6 +307,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
           ),
         ),
         if (_isExpanded) ...widget.children,
+        if (_isExpanded) const SizedBox(height: AppDimensions.paddingM),
       ],
     );
   }
@@ -351,54 +317,55 @@ class _AttendanceListItem extends StatelessWidget {
   const _AttendanceListItem({
     required this.attendance,
     required this.onTap,
-    this.highlight = false,
   });
 
   final Attendance attendance;
   final VoidCallback onTap;
-  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
-    final rate = attendance.percentage ?? 0.0;
-    final rateColor = rate >= 80
-        ? AppColors.success
-        : rate >= 60
-            ? AppColors.warning
-            : AppColors.danger;
-
     return Card(
       margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
-      elevation: highlight ? 2 : 1,
-      color: highlight ? AppColors.primary.withValues(alpha: 0.05) : null,
       child: ListTile(
         onTap: onTap,
         leading: Container(
-          width: 48,
-          height: 48,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            color: attendance.isToday || highlight
+            color: attendance.isToday
                 ? AppColors.primary.withValues(alpha: 0.2)
                 : AppColors.primaryLight.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                attendance.weekdayName,
+                _getMonthShort(attendance.date),
                 style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: attendance.isToday || highlight ? AppColors.primary : AppColors.dark,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                  color: attendance.isToday ? AppColors.primary : AppColors.medium,
                 ),
               ),
               Text(
                 _getDayNumber(attendance.date),
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: attendance.isToday || highlight ? AppColors.primary : AppColors.dark,
+                  height: 1.1,
+                  color: attendance.isToday ? AppColors.primary : AppColors.dark,
+                ),
+              ),
+              Text(
+                attendance.weekdayName,
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w500,
+                  height: 1.0,
+                  color: attendance.isToday ? AppColors.primary : AppColors.medium,
                 ),
               ),
             ],
@@ -406,8 +373,8 @@ class _AttendanceListItem extends StatelessWidget {
         ),
         title: Text(
           attendance.displayTitle,
-          style: TextStyle(
-            fontWeight: highlight ? FontWeight.bold : FontWeight.w500,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
           ),
         ),
         subtitle: Column(
@@ -416,7 +383,7 @@ class _AttendanceListItem extends StatelessWidget {
             if (attendance.startTime != null || attendance.endTime != null)
               Text(
                 _formatTimeRange(attendance.startTime, attendance.endTime),
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.medium,
                 ),
@@ -424,7 +391,7 @@ class _AttendanceListItem extends StatelessWidget {
             if (attendance.notes != null && attendance.notes!.isNotEmpty)
               Text(
                 attendance.notes!,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.medium,
                 ),
@@ -433,24 +400,7 @@ class _AttendanceListItem extends StatelessWidget {
               ),
           ],
         ),
-        trailing: attendance.percentage != null
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${rate.round()}%',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: rateColor,
-                    ),
-                  ),
-                ],
-              )
-            : const Icon(
-                Icons.chevron_right,
-                color: AppColors.medium,
-              ),
+        trailing: _PercentageBadge(percentage: attendance.percentage ?? 0),
       ),
     );
   }
@@ -461,11 +411,51 @@ class _AttendanceListItem extends StatelessWidget {
     return date.day.toString();
   }
 
+  String _getMonthShort(String dateString) {
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return '';
+    const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    return months[date.month - 1];
+  }
+
   String _formatTimeRange(String? start, String? end) {
     if (start == null && end == null) return '';
     if (start != null && end != null) return '$start - $end';
     if (start != null) return 'ab $start';
     return 'bis $end';
+  }
+}
+
+/// Percentage badge widget (like Ionic)
+class _PercentageBadge extends StatelessWidget {
+  const _PercentageBadge({required this.percentage});
+
+  final double percentage;
+
+  @override
+  Widget build(BuildContext context) {
+    final rate = percentage.round();
+    final color = rate >= 75
+        ? AppColors.success
+        : rate >= 50
+            ? AppColors.warning
+            : AppColors.danger;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '$rate%',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    );
   }
 }
 
