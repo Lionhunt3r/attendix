@@ -54,10 +54,10 @@ final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, 
   if (tenant == null) return [];
 
   // Get all persons with their attendance status for this attendance
-  // Use person_id as the relation name since that's the foreign key column
+  // Note: groupName is a computed field, not in DB - it's based on instrument relation
   final response = await supabase
       .from('person_attendances')
-      .select('*, player:person_id(firstName, lastName, img, instrument, groupName)')
+      .select('*, player:person_id(firstName, lastName, img, instrument, left, paused)')
       .eq('attendance_id', attendanceId);
 
   return (response as List).map((e) {
@@ -69,27 +69,75 @@ final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, 
       'lastName': playerData?['lastName'],
       'img': playerData?['img'],
       'instrument': playerData?['instrument'],
-      'groupName': playerData?['groupName'],
+      'left': playerData?['left'],
+      'paused': playerData?['paused'],
     });
   }).toList();
+});
+
+/// Provider that returns filtered person attendances based on attendance date
+/// - Past attendances: Show all persons (including archived/paused for historical correctness)
+/// - Future attendances: Only show active persons
+final filteredPersonAttendancesProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
+  final personAttendances = await ref.watch(personAttendancesProvider(attendanceId).future);
+  final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
+
+  if (attendance == null) return personAttendances;
+
+  final attendanceDate = DateTime.tryParse(attendance.date);
+  final isPast = attendanceDate != null &&
+      attendanceDate.isBefore(DateTime.now().subtract(const Duration(hours: 12)));
+
+  if (isPast) {
+    // Past attendances: Show all persons
+    return personAttendances;
+  } else {
+    // Future attendances: Only show active persons
+    return personAttendances.where((pa) => pa.isActive).toList();
+  }
 });
 
 /// Provider for all persons in tenant (for attendance taking)
 final allPersonsForAttendanceProvider = FutureProvider<List<Person>>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
-  
+
   if (tenant == null) return [];
 
   final response = await supabase
       .from('player')
-      .select('*')
+      .select('*, instrument:instrument(id, name)')
       .eq('tenantId', tenant.id!)
       .order('lastName', ascending: true);
 
-  return (response as List)
-      .map((e) => Person.fromJson(e as Map<String, dynamic>))
-      .toList();
+  return (response as List).map((e) {
+    final instrumentData = e['instrument'] as Map<String, dynamic>?;
+    return Person.fromJson(e as Map<String, dynamic>).copyWith(
+      groupName: instrumentData?['name'] as String?,
+    );
+  }).toList();
+});
+
+/// Provider for filtered persons based on attendance date
+/// - Past attendances: Show all persons
+/// - Future attendances: Only show active persons (not left, not paused)
+final filteredPersonsForAttendanceProvider = FutureProvider.family<List<Person>, int>((ref, attendanceId) async {
+  final allPersons = await ref.watch(allPersonsForAttendanceProvider.future);
+  final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
+
+  if (attendance == null) return allPersons;
+
+  final attendanceDate = DateTime.tryParse(attendance.date);
+  final isPast = attendanceDate != null &&
+      attendanceDate.isBefore(DateTime.now().subtract(const Duration(hours: 12)));
+
+  if (isPast) {
+    // Past attendances: Show all persons
+    return allPersons;
+  } else {
+    // Future attendances: Only show active persons
+    return allPersons.where((p) => p.isActive).toList();
+  }
 });
 
 /// Attendance detail/taking page
@@ -118,9 +166,10 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   @override
   void initState() {
     super.initState();
-    // Subscribe to realtime changes after first frame
+    // Subscribe to realtime changes and ensure PersonAttendances exist after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _subscribeToRealtimeChanges();
+      _ensurePersonAttendancesExist();
     });
   }
 
@@ -154,6 +203,49 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     _personAttChannel?.unsubscribe();
   }
 
+  /// Ensures PersonAttendance records exist for this attendance.
+  /// For legacy attendances created before this feature was implemented,
+  /// this creates the missing records with default status.
+  Future<void> _ensurePersonAttendancesExist() async {
+    // IMPORTANT: Wait for the provider to FINISH loading before checking
+    // Using .future instead of .valueOrNull to avoid race condition
+    final personAttendances = await ref.read(personAttendancesProvider(widget.attendanceId).future);
+
+    // If records already exist, nothing to do
+    if (personAttendances.isNotEmpty) return;
+
+    final supabase = ref.read(supabaseClientProvider);
+    final tenant = ref.read(currentTenantProvider);
+
+    if (tenant == null) return;
+
+    // Get default status from AttendanceType or use neutral
+    final attendanceType = ref.read(attendanceTypeForAttendanceProvider(widget.attendanceId)).valueOrNull;
+    final defaultStatus = attendanceType?.defaultStatus ?? AttendanceStatus.neutral;
+
+    // Load all active players
+    final players = await supabase
+        .from('player')
+        .select('id')
+        .eq('tenantId', tenant.id!)
+        .isFilter('left', null);
+
+    final playerList = players as List;
+    if (playerList.isEmpty) return;
+
+    // Create PersonAttendance records
+    final records = playerList.map((p) => {
+      'attendance_id': widget.attendanceId,
+      'person_id': p['id'],
+      'status': defaultStatus.value,  // Use integer value, not string name
+    }).toList();
+
+    await supabase.from('person_attendances').insert(records);
+
+    // Invalidate provider to reload new records
+    ref.invalidate(personAttendancesProvider(widget.attendanceId));
+  }
+
   void _onPersonAttendanceChange(dynamic payload) {
     // Check if this is an update we made ourselves (to avoid double updates)
     if (_hasChanges) return;
@@ -185,16 +277,16 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   @override
   Widget build(BuildContext context) {
     final attendanceAsync = ref.watch(attendanceDetailProvider(widget.attendanceId));
-    final personsAsync = ref.watch(allPersonsForAttendanceProvider);
-    final personAttendancesAsync = ref.watch(personAttendancesProvider(widget.attendanceId));
+    final personsAsync = ref.watch(filteredPersonsForAttendanceProvider(widget.attendanceId));
+    final personAttendancesAsync = ref.watch(filteredPersonAttendancesProvider(widget.attendanceId));
     final attendanceTypeAsync = ref.watch(attendanceTypeForAttendanceProvider(widget.attendanceId));
 
     // Get available statuses from attendance type, or use all statuses as default
     final availableStatuses = attendanceTypeAsync.valueOrNull?.availableStatuses ?? AttendanceStatus.values;
 
     // Merge person attendance data into local state whenever it changes
-    ref.listen(personAttendancesProvider(widget.attendanceId), (previous, next) {
-      if (next.value != null && next.value!.isNotEmpty) {
+    ref.listen(filteredPersonAttendancesProvider(widget.attendanceId), (previous, next) {
+      if (next.value != null) {
         // Only update if we don't have local changes, or this is the first load
         final isFirstLoad = _localStatuses.isEmpty;
         if (isFirstLoad || !_hasChanges) {
@@ -815,7 +907,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       AttendanceStatus.present => AppColors.success,
       AttendanceStatus.absent => AppColors.danger,
       AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => AppColors.warning,
+      AttendanceStatus.late => Colors.deepOrange,
       AttendanceStatus.lateExcused => AppColors.warning,
       AttendanceStatus.neutral => AppColors.medium,
     };
@@ -968,6 +1060,14 @@ class _InstrumentGroupSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Count present persons (present, late, or lateExcused)
+    final presentCount = persons.where((p) {
+      final status = localStatuses[p.id];
+      return status == AttendanceStatus.present ||
+             status == AttendanceStatus.late ||
+             status == AttendanceStatus.lateExcused;
+    }).length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -992,7 +1092,7 @@ class _InstrumentGroupSection extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${persons.length}',
+                  '$presentCount/${persons.length}',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1106,7 +1206,7 @@ class _AttendancePersonTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: AppDimensions.paddingXS),
         color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
         child: InkWell(
-          onTap: isSelectionMode ? onSelectionToggle : () => _cycleStatus(),
+          onTap: isSelectionMode ? onSelectionToggle : () => _showStatusPicker(context),
           onLongPress: isSelectionMode ? null : onLongPress,
           borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
           child: Padding(
@@ -1282,7 +1382,7 @@ class _AttendancePersonTile extends StatelessWidget {
       AttendanceStatus.present => AppColors.success,
       AttendanceStatus.absent => AppColors.danger,
       AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => AppColors.warning,
+      AttendanceStatus.late => Colors.deepOrange,
       AttendanceStatus.lateExcused => AppColors.warning,
       AttendanceStatus.neutral => AppColors.medium,
     };
@@ -1338,21 +1438,7 @@ class _StatusChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
           border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 4),
-            Text(
-              _getStatusShort(status),
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+        child: Icon(icon, size: 20, color: color),
       ),
     );
   }
@@ -1362,7 +1448,7 @@ class _StatusChip extends StatelessWidget {
       AttendanceStatus.present => AppColors.success,
       AttendanceStatus.absent => AppColors.danger,
       AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => AppColors.warning,
+      AttendanceStatus.late => Colors.deepOrange,
       AttendanceStatus.lateExcused => AppColors.warning,
       AttendanceStatus.neutral => AppColors.medium,
     };

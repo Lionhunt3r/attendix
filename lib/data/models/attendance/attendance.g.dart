@@ -88,8 +88,9 @@ _$PersonAttendanceImpl _$$PersonAttendanceImplFromJson(
   attendanceId: const _FlexibleIntConverter().fromJson(json['attendance_id']),
   personId: const _FlexibleIntConverter().fromJson(json['person_id']),
   status:
-      $enumDecodeNullable(_$AttendanceStatusEnumMap, json['status']) ??
-      AttendanceStatus.neutral,
+      json['status'] == null
+          ? AttendanceStatus.neutral
+          : const _FlexibleAttendanceStatusConverter().fromJson(json['status']),
   notes: const _FlexibleStringConverter().fromJson(json['notes']),
   firstName: const _FlexibleStringConverter().fromJson(json['firstName']),
   lastName: const _FlexibleStringConverter().fromJson(json['lastName']),
@@ -107,6 +108,11 @@ _$PersonAttendanceImpl _$$PersonAttendanceImplFromJson(
       json['highlight'] == null
           ? false
           : const _FlexibleBoolConverter().fromJson(json['highlight']),
+  left: const _FlexibleStringConverter().fromJson(json['left']),
+  paused:
+      json['paused'] == null
+          ? false
+          : const _FlexibleBoolConverter().fromJson(json['paused']),
 );
 
 Map<String, dynamic> _$$PersonAttendanceImplToJson(
@@ -115,7 +121,7 @@ Map<String, dynamic> _$$PersonAttendanceImplToJson(
   'id': const _FlexibleStringConverter().toJson(instance.id),
   'attendance_id': const _FlexibleIntConverter().toJson(instance.attendanceId),
   'person_id': const _FlexibleIntConverter().toJson(instance.personId),
-  'status': _$AttendanceStatusEnumMap[instance.status]!,
+  'status': const _FlexibleAttendanceStatusConverter().toJson(instance.status),
   'notes': const _FlexibleStringConverter().toJson(instance.notes),
   'firstName': const _FlexibleStringConverter().toJson(instance.firstName),
   'lastName': const _FlexibleStringConverter().toJson(instance.lastName),
@@ -130,15 +136,8 @@ Map<String, dynamic> _$$PersonAttendanceImplToJson(
   'changed_at': const _FlexibleStringConverter().toJson(instance.changedAt),
   'type_id': const _FlexibleStringConverter().toJson(instance.typeId),
   'highlight': const _FlexibleBoolConverter().toJson(instance.highlight),
-};
-
-const _$AttendanceStatusEnumMap = {
-  AttendanceStatus.neutral: 'neutral',
-  AttendanceStatus.present: 'present',
-  AttendanceStatus.excused: 'excused',
-  AttendanceStatus.late: 'late',
-  AttendanceStatus.absent: 'absent',
-  AttendanceStatus.lateExcused: 'lateExcused',
+  'left': const _FlexibleStringConverter().toJson(instance.left),
+  'paused': const _FlexibleBoolConverter().toJson(instance.paused),
 };
 
 _$ChecklistItemImpl _$$ChecklistItemImplFromJson(Map<String, dynamic> json) =>
@@ -175,8 +174,11 @@ _$AttendanceTypeImpl _$$AttendanceTypeImplFromJson(
           : DateTime.parse(json['created_at'] as String),
   name: json['name'] as String,
   defaultStatus:
-      $enumDecodeNullable(_$AttendanceStatusEnumMap, json['default_status']) ??
-      AttendanceStatus.neutral,
+      json['default_status'] == null
+          ? AttendanceStatus.neutral
+          : const _FlexibleAttendanceStatusConverter().fromJson(
+            json['default_status'],
+          ),
   availableStatuses:
       (json['available_statuses'] as List<dynamic>?)
           ?.map((e) => $enumDecode(_$AttendanceStatusEnumMap, e))
@@ -238,7 +240,9 @@ Map<String, dynamic> _$$AttendanceTypeImplToJson(
   'id': const _FlexibleStringConverter().toJson(instance.id),
   'created_at': instance.createdAt?.toIso8601String(),
   'name': instance.name,
-  'default_status': _$AttendanceStatusEnumMap[instance.defaultStatus]!,
+  'default_status': const _FlexibleAttendanceStatusConverter().toJson(
+    instance.defaultStatus,
+  ),
   'available_statuses':
       instance.availableStatuses
           ?.map((e) => _$AttendanceStatusEnumMap[e]!)
@@ -263,4 +267,13 @@ Map<String, dynamic> _$$AttendanceTypeImplToJson(
   'reminders': instance.reminders,
   'additional_fields_filter': instance.additionalFieldsFilter,
   'checklist': instance.checklist,
+};
+
+const _$AttendanceStatusEnumMap = {
+  AttendanceStatus.neutral: 'neutral',
+  AttendanceStatus.present: 'present',
+  AttendanceStatus.excused: 'excused',
+  AttendanceStatus.late: 'late',
+  AttendanceStatus.absent: 'absent',
+  AttendanceStatus.lateExcused: 'lateExcused',
 };

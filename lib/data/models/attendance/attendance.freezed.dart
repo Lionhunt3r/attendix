@@ -861,6 +861,7 @@ mixin _$PersonAttendance {
   @JsonKey(name: 'person_id')
   @_FlexibleIntConverter()
   int? get personId => throw _privateConstructorUsedError;
+  @_FlexibleAttendanceStatusConverter()
   AttendanceStatus get status => throw _privateConstructorUsedError;
   @_FlexibleStringConverter()
   String? get notes => throw _privateConstructorUsedError;
@@ -893,6 +894,10 @@ mixin _$PersonAttendance {
   String? get typeId => throw _privateConstructorUsedError;
   @_FlexibleBoolConverter()
   bool get highlight => throw _privateConstructorUsedError;
+  @_FlexibleStringConverter()
+  String? get left => throw _privateConstructorUsedError;
+  @_FlexibleBoolConverter()
+  bool get paused => throw _privateConstructorUsedError;
 
   /// Serializes this PersonAttendance to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -915,7 +920,7 @@ abstract class $PersonAttendanceCopyWith<$Res> {
     @_FlexibleStringConverter() String? id,
     @JsonKey(name: 'attendance_id') @_FlexibleIntConverter() int? attendanceId,
     @JsonKey(name: 'person_id') @_FlexibleIntConverter() int? personId,
-    AttendanceStatus status,
+    @_FlexibleAttendanceStatusConverter() AttendanceStatus status,
     @_FlexibleStringConverter() String? notes,
     @_FlexibleStringConverter() String? firstName,
     @_FlexibleStringConverter() String? lastName,
@@ -930,6 +935,8 @@ abstract class $PersonAttendanceCopyWith<$Res> {
     @JsonKey(name: 'changed_at') @_FlexibleStringConverter() String? changedAt,
     @JsonKey(name: 'type_id') @_FlexibleStringConverter() String? typeId,
     @_FlexibleBoolConverter() bool highlight,
+    @_FlexibleStringConverter() String? left,
+    @_FlexibleBoolConverter() bool paused,
   });
 }
 
@@ -966,6 +973,8 @@ class _$PersonAttendanceCopyWithImpl<$Res, $Val extends PersonAttendance>
     Object? changedAt = freezed,
     Object? typeId = freezed,
     Object? highlight = null,
+    Object? left = freezed,
+    Object? paused = null,
   }) {
     return _then(
       _value.copyWith(
@@ -1059,6 +1068,16 @@ class _$PersonAttendanceCopyWithImpl<$Res, $Val extends PersonAttendance>
                     ? _value.highlight
                     : highlight // ignore: cast_nullable_to_non_nullable
                         as bool,
+            left:
+                freezed == left
+                    ? _value.left
+                    : left // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            paused:
+                null == paused
+                    ? _value.paused
+                    : paused // ignore: cast_nullable_to_non_nullable
+                        as bool,
           )
           as $Val,
     );
@@ -1078,7 +1097,7 @@ abstract class _$$PersonAttendanceImplCopyWith<$Res>
     @_FlexibleStringConverter() String? id,
     @JsonKey(name: 'attendance_id') @_FlexibleIntConverter() int? attendanceId,
     @JsonKey(name: 'person_id') @_FlexibleIntConverter() int? personId,
-    AttendanceStatus status,
+    @_FlexibleAttendanceStatusConverter() AttendanceStatus status,
     @_FlexibleStringConverter() String? notes,
     @_FlexibleStringConverter() String? firstName,
     @_FlexibleStringConverter() String? lastName,
@@ -1093,6 +1112,8 @@ abstract class _$$PersonAttendanceImplCopyWith<$Res>
     @JsonKey(name: 'changed_at') @_FlexibleStringConverter() String? changedAt,
     @JsonKey(name: 'type_id') @_FlexibleStringConverter() String? typeId,
     @_FlexibleBoolConverter() bool highlight,
+    @_FlexibleStringConverter() String? left,
+    @_FlexibleBoolConverter() bool paused,
   });
 }
 
@@ -1128,6 +1149,8 @@ class __$$PersonAttendanceImplCopyWithImpl<$Res>
     Object? changedAt = freezed,
     Object? typeId = freezed,
     Object? highlight = null,
+    Object? left = freezed,
+    Object? paused = null,
   }) {
     return _then(
       _$PersonAttendanceImpl(
@@ -1221,6 +1244,16 @@ class __$$PersonAttendanceImplCopyWithImpl<$Res>
                 ? _value.highlight
                 : highlight // ignore: cast_nullable_to_non_nullable
                     as bool,
+        left:
+            freezed == left
+                ? _value.left
+                : left // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        paused:
+            null == paused
+                ? _value.paused
+                : paused // ignore: cast_nullable_to_non_nullable
+                    as bool,
       ),
     );
   }
@@ -1233,6 +1266,7 @@ class _$PersonAttendanceImpl implements _PersonAttendance {
     @_FlexibleStringConverter() this.id,
     @JsonKey(name: 'attendance_id') @_FlexibleIntConverter() this.attendanceId,
     @JsonKey(name: 'person_id') @_FlexibleIntConverter() this.personId,
+    @_FlexibleAttendanceStatusConverter()
     this.status = AttendanceStatus.neutral,
     @_FlexibleStringConverter() this.notes,
     @_FlexibleStringConverter() this.firstName,
@@ -1248,6 +1282,8 @@ class _$PersonAttendanceImpl implements _PersonAttendance {
     @JsonKey(name: 'changed_at') @_FlexibleStringConverter() this.changedAt,
     @JsonKey(name: 'type_id') @_FlexibleStringConverter() this.typeId,
     @_FlexibleBoolConverter() this.highlight = false,
+    @_FlexibleStringConverter() this.left,
+    @_FlexibleBoolConverter() this.paused = false,
   });
 
   factory _$PersonAttendanceImpl.fromJson(Map<String, dynamic> json) =>
@@ -1266,6 +1302,7 @@ class _$PersonAttendanceImpl implements _PersonAttendance {
   final int? personId;
   @override
   @JsonKey()
+  @_FlexibleAttendanceStatusConverter()
   final AttendanceStatus status;
   @override
   @_FlexibleStringConverter()
@@ -1313,10 +1350,17 @@ class _$PersonAttendanceImpl implements _PersonAttendance {
   @JsonKey()
   @_FlexibleBoolConverter()
   final bool highlight;
+  @override
+  @_FlexibleStringConverter()
+  final String? left;
+  @override
+  @JsonKey()
+  @_FlexibleBoolConverter()
+  final bool paused;
 
   @override
   String toString() {
-    return 'PersonAttendance(id: $id, attendanceId: $attendanceId, personId: $personId, status: $status, notes: $notes, firstName: $firstName, lastName: $lastName, img: $img, instrument: $instrument, groupName: $groupName, joined: $joined, date: $date, text: $text, title: $title, changedBy: $changedBy, changedAt: $changedAt, typeId: $typeId, highlight: $highlight)';
+    return 'PersonAttendance(id: $id, attendanceId: $attendanceId, personId: $personId, status: $status, notes: $notes, firstName: $firstName, lastName: $lastName, img: $img, instrument: $instrument, groupName: $groupName, joined: $joined, date: $date, text: $text, title: $title, changedBy: $changedBy, changedAt: $changedAt, typeId: $typeId, highlight: $highlight, left: $left, paused: $paused)';
   }
 
   @override
@@ -1350,12 +1394,14 @@ class _$PersonAttendanceImpl implements _PersonAttendance {
                 other.changedAt == changedAt) &&
             (identical(other.typeId, typeId) || other.typeId == typeId) &&
             (identical(other.highlight, highlight) ||
-                other.highlight == highlight));
+                other.highlight == highlight) &&
+            (identical(other.left, left) || other.left == left) &&
+            (identical(other.paused, paused) || other.paused == paused));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     runtimeType,
     id,
     attendanceId,
@@ -1375,7 +1421,9 @@ class _$PersonAttendanceImpl implements _PersonAttendance {
     changedAt,
     typeId,
     highlight,
-  );
+    left,
+    paused,
+  ]);
 
   /// Create a copy of PersonAttendance
   /// with the given fields replaced by the non-null parameter values.
@@ -1401,7 +1449,7 @@ abstract class _PersonAttendance implements PersonAttendance {
     @_FlexibleIntConverter()
     final int? attendanceId,
     @JsonKey(name: 'person_id') @_FlexibleIntConverter() final int? personId,
-    final AttendanceStatus status,
+    @_FlexibleAttendanceStatusConverter() final AttendanceStatus status,
     @_FlexibleStringConverter() final String? notes,
     @_FlexibleStringConverter() final String? firstName,
     @_FlexibleStringConverter() final String? lastName,
@@ -1420,6 +1468,8 @@ abstract class _PersonAttendance implements PersonAttendance {
     final String? changedAt,
     @JsonKey(name: 'type_id') @_FlexibleStringConverter() final String? typeId,
     @_FlexibleBoolConverter() final bool highlight,
+    @_FlexibleStringConverter() final String? left,
+    @_FlexibleBoolConverter() final bool paused,
   }) = _$PersonAttendanceImpl;
 
   factory _PersonAttendance.fromJson(Map<String, dynamic> json) =
@@ -1437,6 +1487,7 @@ abstract class _PersonAttendance implements PersonAttendance {
   @_FlexibleIntConverter()
   int? get personId;
   @override
+  @_FlexibleAttendanceStatusConverter()
   AttendanceStatus get status;
   @override
   @_FlexibleStringConverter()
@@ -1483,6 +1534,12 @@ abstract class _PersonAttendance implements PersonAttendance {
   @override
   @_FlexibleBoolConverter()
   bool get highlight;
+  @override
+  @_FlexibleStringConverter()
+  String? get left;
+  @override
+  @_FlexibleBoolConverter()
+  bool get paused;
 
   /// Create a copy of PersonAttendance
   /// with the given fields replaced by the non-null parameter values.
@@ -1770,6 +1827,7 @@ mixin _$AttendanceType {
   DateTime? get createdAt => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
   @JsonKey(name: 'default_status')
+  @_FlexibleAttendanceStatusConverter()
   AttendanceStatus get defaultStatus => throw _privateConstructorUsedError;
   @JsonKey(name: 'available_statuses')
   List<AttendanceStatus>? get availableStatuses =>
@@ -1839,7 +1897,9 @@ abstract class $AttendanceTypeCopyWith<$Res> {
     @_FlexibleStringConverter() String? id,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     String name,
-    @JsonKey(name: 'default_status') AttendanceStatus defaultStatus,
+    @JsonKey(name: 'default_status')
+    @_FlexibleAttendanceStatusConverter()
+    AttendanceStatus defaultStatus,
     @JsonKey(name: 'available_statuses')
     List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') Map<String, dynamic>? defaultPlan,
@@ -2041,7 +2101,9 @@ abstract class _$$AttendanceTypeImplCopyWith<$Res>
     @_FlexibleStringConverter() String? id,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     String name,
-    @JsonKey(name: 'default_status') AttendanceStatus defaultStatus,
+    @JsonKey(name: 'default_status')
+    @_FlexibleAttendanceStatusConverter()
+    AttendanceStatus defaultStatus,
     @JsonKey(name: 'available_statuses')
     List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') Map<String, dynamic>? defaultPlan,
@@ -2236,6 +2298,7 @@ class _$AttendanceTypeImpl implements _AttendanceType {
     @JsonKey(name: 'created_at') this.createdAt,
     required this.name,
     @JsonKey(name: 'default_status')
+    @_FlexibleAttendanceStatusConverter()
     this.defaultStatus = AttendanceStatus.neutral,
     @JsonKey(name: 'available_statuses')
     final List<AttendanceStatus>? availableStatuses,
@@ -2282,6 +2345,7 @@ class _$AttendanceTypeImpl implements _AttendanceType {
   final String name;
   @override
   @JsonKey(name: 'default_status')
+  @_FlexibleAttendanceStatusConverter()
   final AttendanceStatus defaultStatus;
   final List<AttendanceStatus>? _availableStatuses;
   @override
@@ -2513,7 +2577,9 @@ abstract class _AttendanceType implements AttendanceType {
     @_FlexibleStringConverter() final String? id,
     @JsonKey(name: 'created_at') final DateTime? createdAt,
     required final String name,
-    @JsonKey(name: 'default_status') final AttendanceStatus defaultStatus,
+    @JsonKey(name: 'default_status')
+    @_FlexibleAttendanceStatusConverter()
+    final AttendanceStatus defaultStatus,
     @JsonKey(name: 'available_statuses')
     final List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') final Map<String, dynamic>? defaultPlan,
@@ -2560,6 +2626,7 @@ abstract class _AttendanceType implements AttendanceType {
   String get name;
   @override
   @JsonKey(name: 'default_status')
+  @_FlexibleAttendanceStatusConverter()
   AttendanceStatus get defaultStatus;
   @override
   @JsonKey(name: 'available_statuses')

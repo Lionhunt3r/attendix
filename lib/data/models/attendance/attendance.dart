@@ -46,6 +46,29 @@ class _FlexibleBoolConverter implements JsonConverter<bool, dynamic> {
   dynamic toJson(bool object) => object;
 }
 
+/// Custom converter for flexible AttendanceStatus handling (int or string)
+class _FlexibleAttendanceStatusConverter implements JsonConverter<AttendanceStatus, dynamic> {
+  const _FlexibleAttendanceStatusConverter();
+  @override
+  AttendanceStatus fromJson(dynamic json) {
+    if (json == null) return AttendanceStatus.neutral;
+    if (json is int) return AttendanceStatus.fromValue(json);
+    if (json is String) {
+      // Try to parse as integer first
+      final intValue = int.tryParse(json);
+      if (intValue != null) return AttendanceStatus.fromValue(intValue);
+      // Try to match enum name
+      return AttendanceStatus.values.firstWhere(
+        (s) => s.name == json,
+        orElse: () => AttendanceStatus.neutral,
+      );
+    }
+    return AttendanceStatus.neutral;
+  }
+  @override
+  dynamic toJson(AttendanceStatus status) => status.value;
+}
+
 /// Attendance model
 @freezed
 class Attendance with _$Attendance {
@@ -86,7 +109,7 @@ class PersonAttendance with _$PersonAttendance {
     @_FlexibleStringConverter() String? id,
     @JsonKey(name: 'attendance_id') @_FlexibleIntConverter() int? attendanceId,
     @JsonKey(name: 'person_id') @_FlexibleIntConverter() int? personId,
-    @Default(AttendanceStatus.neutral) AttendanceStatus status,
+    @_FlexibleAttendanceStatusConverter() @Default(AttendanceStatus.neutral) AttendanceStatus status,
     @_FlexibleStringConverter() String? notes,
     @_FlexibleStringConverter() String? firstName,
     @_FlexibleStringConverter() String? lastName,
@@ -101,6 +124,8 @@ class PersonAttendance with _$PersonAttendance {
     @JsonKey(name: 'changed_at') @_FlexibleStringConverter() String? changedAt,
     @JsonKey(name: 'type_id') @_FlexibleStringConverter() String? typeId,
     @_FlexibleBoolConverter() @Default(false) bool highlight,
+    @_FlexibleStringConverter() String? left,
+    @_FlexibleBoolConverter() @Default(false) bool paused,
   }) = _PersonAttendance;
 
   factory PersonAttendance.fromJson(Map<String, dynamic> json) =>
@@ -129,7 +154,7 @@ class AttendanceType with _$AttendanceType {
     @_FlexibleStringConverter() String? id,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     required String name,
-    @JsonKey(name: 'default_status') @Default(AttendanceStatus.neutral) AttendanceStatus defaultStatus,
+    @JsonKey(name: 'default_status') @_FlexibleAttendanceStatusConverter() @Default(AttendanceStatus.neutral) AttendanceStatus defaultStatus,
     @JsonKey(name: 'available_statuses') List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') Map<String, dynamic>? defaultPlan,
     @JsonKey(name: 'tenant_id') @_FlexibleIntConverter() int? tenantId,
@@ -191,7 +216,7 @@ extension PersonAttendanceExtension on PersonAttendance {
     final last = lastName ?? '';
     return '$first $last'.trim();
   }
-  
+
   /// Status label
   String get statusLabel {
     switch (status) {
@@ -209,4 +234,10 @@ extension PersonAttendanceExtension on PersonAttendance {
         return 'Unbekannt';
     }
   }
+
+  /// Check if person is archived (left the organization)
+  bool get isArchived => left != null && left!.isNotEmpty;
+
+  /// Check if person is active (not archived and not paused)
+  bool get isActive => !isArchived && !paused;
 }
