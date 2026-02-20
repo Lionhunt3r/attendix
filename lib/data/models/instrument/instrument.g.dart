@@ -21,6 +21,14 @@ _$InstrumentImpl _$$InstrumentImplFromJson(Map<String, dynamic> json) =>
           json['created_at'] == null
               ? null
               : DateTime.parse(json['created_at'] as String),
+      category: (json['category'] as num?)?.toInt(),
+      clefs:
+          (json['clefs'] as List<dynamic>?)?.map((e) => e as String).toList(),
+      maingroup: json['maingroup'] as bool? ?? false,
+      notes: json['notes'] as String?,
+      range: json['range'] as String?,
+      synonyms: json['synonyms'] as String?,
+      tuning: json['tuning'] as String?,
     );
 
 Map<String, dynamic> _$$InstrumentImplToJson(_$InstrumentImpl instance) =>
@@ -35,6 +43,13 @@ Map<String, dynamic> _$$InstrumentImplToJson(_$InstrumentImpl instance) =>
       'parentId': instance.parentId,
       'legacyId': instance.legacyId,
       'created_at': instance.createdAt?.toIso8601String(),
+      'category': instance.category,
+      'clefs': instance.clefs,
+      'maingroup': instance.maingroup,
+      'notes': instance.notes,
+      'range': instance.range,
+      'synonyms': instance.synonyms,
+      'tuning': instance.tuning,
     };
 
 _$GroupImpl _$$GroupImplFromJson(Map<String, dynamic> json) => _$GroupImpl(

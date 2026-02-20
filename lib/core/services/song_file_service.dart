@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
-import '../../features/tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../providers/tenant_providers.dart';
 
 /// Service for managing song file uploads to Supabase Storage
 class SongFileService {

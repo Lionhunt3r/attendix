@@ -37,6 +37,8 @@ enum Role {
   responsible(5),
   parent(6),
   applicant(7),
+  voiceLeader(8),
+  voiceLeaderHelper(9),
   none(99);
 
   const Role(this.value);
@@ -49,6 +51,7 @@ enum Role {
     );
   }
 
+  // Individual role checks
   bool get isAdmin => this == Role.admin;
   bool get isPlayer => this == Role.player;
   bool get isViewer => this == Role.viewer;
@@ -56,8 +59,55 @@ enum Role {
   bool get isResponsible => this == Role.responsible;
   bool get isParent => this == Role.parent;
   bool get isApplicant => this == Role.applicant;
-  bool get canEdit => this == Role.admin || this == Role.responsible || this == Role.helper;
+  bool get isVoiceLeader => this == Role.voiceLeader;
+  bool get isVoiceLeaderHelper => this == Role.voiceLeaderHelper;
+
+  // Role categories - determines which UI is shown
+  /// "Conductors" - have full admin access (see people list, attendance management)
+  bool get isConductor =>
+      this == Role.admin || this == Role.responsible || this == Role.viewer;
+
+  /// "Helper roles" - have partial admin access (attendance management but not people list)
+  bool get isHelperRole => this == Role.helper || this == Role.voiceLeaderHelper;
+
+  /// "Player roles" - only see self-service (their own attendances)
+  bool get isPlayerRole =>
+      this == Role.player ||
+      this == Role.voiceLeader ||
+      this == Role.applicant ||
+      this == Role.none;
+
+  // Permission checks
+  bool get canEdit =>
+      this == Role.admin ||
+      this == Role.responsible ||
+      this == Role.helper ||
+      this == Role.voiceLeaderHelper;
   bool get canView => this != Role.none && this != Role.applicant;
+
+  // Tab visibility - determines which navigation tabs are shown
+  /// Can see the "People" tab (people list)
+  bool get canSeePeopleTab => isConductor;
+
+  /// Can see the "Attendance" tab (attendance management)
+  bool get canSeeAttendanceTab => isConductor || isHelperRole;
+
+  /// Can see the "Self-Service" tab (own attendances)
+  bool get canSeeSelfServiceTab => isPlayerRole || isHelperRole;
+
+  /// Can see the "Members" tab (if tenant.showMembersList is enabled)
+  bool get canSeeMembersTab => isPlayerRole || isHelperRole;
+
+  /// Can see voice leader settings in settings page
+  bool get canSeeVoiceLeaderSettings =>
+      this == Role.voiceLeader || this == Role.voiceLeaderHelper;
+
+  /// Get the default route for this role after tenant selection
+  String get defaultRoute {
+    if (isConductor) return '/people';
+    if (isParent) return '/parents';
+    return '/overview';
+  }
 }
 
 /// Attendance status enumeration

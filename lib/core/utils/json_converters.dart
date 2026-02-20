@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../constants/enums.dart';
+
 /// Converter that handles both int and String values from JSON
 /// and converts them to String
 class FlexibleStringConverter implements JsonConverter<String?, dynamic> {
@@ -85,4 +87,42 @@ class FlexibleMapConverter implements JsonConverter<Map<String, dynamic>?, dynam
 
   @override
   dynamic toJson(Map<String, dynamic>? object) => object;
+}
+
+/// Converter for AttendanceStatus that handles both int and String values
+///
+/// The database stores status as integer (0-5), but sometimes it comes as string.
+/// This converter handles both cases and always outputs integer for database writes.
+class FlexibleAttendanceStatusConverter implements JsonConverter<AttendanceStatus, dynamic> {
+  const FlexibleAttendanceStatusConverter();
+
+  @override
+  AttendanceStatus fromJson(dynamic json) {
+    if (json == null) return AttendanceStatus.neutral;
+
+    // Handle integer values (as stored in database)
+    if (json is int) {
+      return AttendanceStatus.fromValue(json);
+    }
+
+    // Handle string values
+    if (json is String) {
+      // Try to parse as integer first
+      final intValue = int.tryParse(json);
+      if (intValue != null) {
+        return AttendanceStatus.fromValue(intValue);
+      }
+
+      // Try to match enum name
+      return AttendanceStatus.values.firstWhere(
+        (s) => s.name.toLowerCase() == json.toLowerCase(),
+        orElse: () => AttendanceStatus.neutral,
+      );
+    }
+
+    return AttendanceStatus.neutral;
+  }
+
+  @override
+  dynamic toJson(AttendanceStatus status) => status.value;
 }

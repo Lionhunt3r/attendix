@@ -9,7 +9,8 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
+import '../../../../data/models/tenant/tenant.dart';
 
 /// German holiday regions
 const _holidayRegions = [
@@ -57,6 +58,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   bool _maintainTeachers = false;
   bool _withExcuses = true;
   bool _parents = false;
+  bool _showMembersList = false;
 
   // Sharing
   bool _songSharingEnabled = false;
@@ -64,6 +66,9 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   bool _registrationEnabled = false;
   String? _registerId;
   bool _autoApproveRegistrations = false;
+
+  // Extra fields
+  List<ExtraField> _extraFields = [];
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -102,11 +107,13 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       _maintainTeachers = tenant.maintainTeachers;
       _withExcuses = tenant.withExcuses;
       _parents = tenant.parents ?? false;
+      _showMembersList = tenant.showMembersList;
       _songSharingEnabled = tenant.songSharingId != null && tenant.songSharingId!.isNotEmpty;
       _songSharingId = tenant.songSharingId;
       _registrationEnabled = tenant.registerId != null && tenant.registerId!.isNotEmpty;
       _registerId = tenant.registerId;
       _autoApproveRegistrations = tenant.autoApproveRegistrations;
+      _extraFields = List.from(tenant.additionalFields ?? []);
 
     } catch (e) {
       if (mounted) {
@@ -147,9 +154,17 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
         'maintainTeachers': _maintainTeachers,
         'withExcuses': _withExcuses,
         'parents': _parents,
+        'show_members_list': _showMembersList,
         'song_sharing_id': _songSharingEnabled ? (_songSharingId ?? const Uuid().v4()) : null,
         'register_id': _registrationEnabled ? (_registerId ?? const Uuid().v4()) : null,
         'auto_approve_registrations': _autoApproveRegistrations,
+        'additional_fields': _extraFields.map((f) => {
+          'id': f.id,
+          'name': f.name,
+          'type': f.type,
+          'defaultValue': f.defaultValue,
+          if (f.options != null) 'options': f.options,
+        }).toList(),
       }).eq('id', tenant!.id!);
 
       // Refresh tenant data
@@ -377,6 +392,16 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                       _markChanged();
                     },
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Mitgliederliste für alle'),
+                    subtitle: const Text('Aktivieren, um Mitgliedern (Spieler, Helfer, Stimmführer) eine Übersicht aller Personen anzuzeigen'),
+                    value: _showMembersList,
+                    onChanged: (v) {
+                      setState(() => _showMembersList = v);
+                      _markChanged();
+                    },
+                  ),
 
                   const SizedBox(height: AppDimensions.paddingXL),
 
@@ -456,6 +481,57 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                   ],
 
                   const SizedBox(height: AppDimensions.paddingXL),
+
+                  // Extra fields section
+                  _buildSectionHeader('Zusatzfelder für Personen'),
+                  Text(
+                    'Definiere zusätzliche Felder für Personendaten.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.medium,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+
+                  // List of extra fields
+                  if (_extraFields.isNotEmpty) ...[
+                    ...List.generate(_extraFields.length, (index) {
+                      final field = _extraFields[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+                        child: ListTile(
+                          leading: Icon(_getFieldTypeIcon(field.type)),
+                          title: Text(field.name),
+                          subtitle: Text(
+                            field.type == 'select' && field.options != null
+                                ? '${_getFieldTypeLabel(field.type)} (${field.options!.length} Optionen)'
+                                : _getFieldTypeLabel(field.type),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () => _showEditExtraFieldDialog(index),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: AppColors.danger),
+                                onPressed: () => _confirmDeleteExtraField(index),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+
+                  // Add field button
+                  OutlinedButton.icon(
+                    onPressed: _showAddExtraFieldDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Feld hinzufügen'),
+                  ),
+
+                  const SizedBox(height: AppDimensions.paddingXL),
                 ],
               ),
             ),
@@ -473,6 +549,437 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
         ),
       ),
     );
+  }
+
+  // Extra field helper methods
+  IconData _getFieldTypeIcon(String type) {
+    switch (type) {
+      case 'text':
+        return Icons.text_fields;
+      case 'textarea':
+        return Icons.notes;
+      case 'number':
+        return Icons.numbers;
+      case 'date':
+        return Icons.calendar_today;
+      case 'boolean':
+        return Icons.toggle_on;
+      case 'select':
+        return Icons.list;
+      default:
+        return Icons.text_fields;
+    }
+  }
+
+  String _getFieldTypeLabel(String type) {
+    switch (type) {
+      case 'text':
+        return 'Text';
+      case 'textarea':
+        return 'Mehrzeiliger Text';
+      case 'number':
+        return 'Zahl';
+      case 'date':
+        return 'Datum';
+      case 'boolean':
+        return 'Ja/Nein';
+      case 'select':
+        return 'Auswahl';
+      default:
+        return type;
+    }
+  }
+
+  String _generateFieldId(String name) {
+    return name.trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '');
+  }
+
+  Future<void> _showAddExtraFieldDialog() async {
+    String selectedType = 'text';
+    final nameController = TextEditingController();
+    List<String> options = [];
+    final optionController = TextEditingController();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: AppDimensions.paddingM,
+            right: AppDimensions.paddingM,
+            top: AppDimensions.paddingM,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Neues Zusatzfeld',
+                    style: Theme.of(ctx).textTheme.titleLarge,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+
+              // Type selector
+              DropdownButtonFormField<String>(
+                value: selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Feldtyp',
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'text', child: Text('Text')),
+                  DropdownMenuItem(value: 'textarea', child: Text('Mehrzeiliger Text')),
+                  DropdownMenuItem(value: 'number', child: Text('Zahl')),
+                  DropdownMenuItem(value: 'date', child: Text('Datum')),
+                  DropdownMenuItem(value: 'boolean', child: Text('Ja/Nein')),
+                  DropdownMenuItem(value: 'select', child: Text('Auswahl')),
+                ],
+                onChanged: (v) {
+                  setSheetState(() {
+                    selectedType = v ?? 'text';
+                    options = [];
+                  });
+                },
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+
+              // Name input
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Feldname *',
+                  hintText: 'z.B. Mitgliedsnummer',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+
+              // Options for select type
+              if (selectedType == 'select') ...[
+                Text(
+                  'Optionen',
+                  style: Theme.of(ctx).textTheme.titleSmall,
+                ),
+                const SizedBox(height: AppDimensions.paddingS),
+                ...options.asMap().entries.map((entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppDimensions.paddingXS),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(entry.value)),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 18),
+                        onPressed: () {
+                          setSheetState(() => options.removeAt(entry.key));
+                        },
+                      ),
+                    ],
+                  ),
+                )),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: optionController,
+                        decoration: const InputDecoration(
+                          hintText: 'Neue Option',
+                          isDense: true,
+                        ),
+                        onSubmitted: (value) {
+                          if (value.trim().isNotEmpty) {
+                            setSheetState(() {
+                              options.add(value.trim());
+                              optionController.clear();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () {
+                        if (optionController.text.trim().isNotEmpty) {
+                          setSheetState(() {
+                            options.add(optionController.text.trim());
+                            optionController.clear();
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppDimensions.paddingM),
+              ],
+
+              // Save button
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) {
+                      ToastHelper.showError(ctx, 'Bitte gib einen Namen ein');
+                      return;
+                    }
+
+                    final id = _generateFieldId(name);
+                    if (_extraFields.any((f) => f.id == id)) {
+                      ToastHelper.showError(ctx, 'Ein Feld mit dieser ID existiert bereits');
+                      return;
+                    }
+
+                    if (selectedType == 'select' && options.isEmpty) {
+                      ToastHelper.showError(ctx, 'Bitte füge mindestens eine Option hinzu');
+                      return;
+                    }
+
+                    dynamic defaultValue;
+                    switch (selectedType) {
+                      case 'text':
+                      case 'textarea':
+                        defaultValue = '';
+                        break;
+                      case 'number':
+                        defaultValue = 0;
+                        break;
+                      case 'boolean':
+                        defaultValue = false;
+                        break;
+                      case 'date':
+                        defaultValue = DateTime.now().toIso8601String().split('T')[0];
+                        break;
+                      case 'select':
+                        defaultValue = options.first;
+                        break;
+                    }
+
+                    setState(() {
+                      _extraFields.add(ExtraField(
+                        id: id,
+                        name: name,
+                        type: selectedType,
+                        defaultValue: defaultValue,
+                        options: selectedType == 'select' ? options : null,
+                      ));
+                      _markChanged();
+                    });
+
+                    Navigator.of(ctx).pop();
+                    ToastHelper.showSuccess(context, 'Feld hinzugefügt');
+                  },
+                  child: const Text('Feld hinzufügen'),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showEditExtraFieldDialog(int index) async {
+    final field = _extraFields[index];
+    final nameController = TextEditingController(text: field.name);
+    List<String> options = List.from(field.options ?? []);
+    final optionController = TextEditingController();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: AppDimensions.paddingM,
+            right: AppDimensions.paddingM,
+            top: AppDimensions.paddingM,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Zusatzfeld bearbeiten',
+                    style: Theme.of(ctx).textTheme.titleLarge,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+
+              // Type (read-only)
+              InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Feldtyp',
+                ),
+                child: Row(
+                  children: [
+                    Icon(_getFieldTypeIcon(field.type), size: 20),
+                    const SizedBox(width: AppDimensions.paddingS),
+                    Text(_getFieldTypeLabel(field.type)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+
+              // Name input
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Feldname *',
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+
+              // Options for select type
+              if (field.type == 'select') ...[
+                Text(
+                  'Optionen',
+                  style: Theme.of(ctx).textTheme.titleSmall,
+                ),
+                const SizedBox(height: AppDimensions.paddingS),
+                ...options.asMap().entries.map((entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppDimensions.paddingXS),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(entry.value)),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 18),
+                        onPressed: options.length > 1 ? () {
+                          setSheetState(() => options.removeAt(entry.key));
+                        } : null,
+                      ),
+                    ],
+                  ),
+                )),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: optionController,
+                        decoration: const InputDecoration(
+                          hintText: 'Neue Option',
+                          isDense: true,
+                        ),
+                        onSubmitted: (value) {
+                          if (value.trim().isNotEmpty) {
+                            setSheetState(() {
+                              options.add(value.trim());
+                              optionController.clear();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () {
+                        if (optionController.text.trim().isNotEmpty) {
+                          setSheetState(() {
+                            options.add(optionController.text.trim());
+                            optionController.clear();
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppDimensions.paddingM),
+              ],
+
+              // Save button
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) {
+                      ToastHelper.showError(ctx, 'Bitte gib einen Namen ein');
+                      return;
+                    }
+
+                    if (field.type == 'select' && options.isEmpty) {
+                      ToastHelper.showError(ctx, 'Mindestens eine Option erforderlich');
+                      return;
+                    }
+
+                    setState(() {
+                      _extraFields[index] = ExtraField(
+                        id: field.id, // Keep original ID
+                        name: name,
+                        type: field.type,
+                        defaultValue: field.type == 'select' ? options.first : field.defaultValue,
+                        options: field.type == 'select' ? options : null,
+                      );
+                      _markChanged();
+                    });
+
+                    Navigator.of(ctx).pop();
+                    ToastHelper.showSuccess(context, 'Feld aktualisiert');
+                  },
+                  child: const Text('Speichern'),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteExtraField(int index) async {
+    final field = _extraFields[index];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Zusatzfeld löschen?'),
+        content: Text('Möchtest du das Feld "${field.name}" wirklich löschen? '
+            'Die Werte dieses Feldes werden bei allen Personen entfernt.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _extraFields.removeAt(index);
+        _markChanged();
+      });
+      if (mounted) {
+        ToastHelper.showSuccess(context, 'Feld gelöscht');
+      }
+    }
   }
 
   Future<void> _showUnsavedChangesDialog() async {

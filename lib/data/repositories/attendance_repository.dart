@@ -252,7 +252,7 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
       await supabase
           .from('person_attendances')
           .update({
-            'status': newStatus.name,
+            'status': newStatus.value,
             'changed_at': DateTime.now().toIso8601String(),
             'changed_by': supabase.auth.currentUser?.id,
           })
@@ -294,19 +294,22 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
           .select('status')
           .eq('attendance_id', attendanceId);
 
-      final statuses = (response as List).map((e) => e['status'] as String).toList();
-      
-      if (statuses.isEmpty) {
+      final statusList = (response as List).map((e) => e['status']).toList();
+
+      if (statusList.isEmpty) {
         await updateAttendance(attendanceId, {'percentage': null});
         return;
       }
 
-      final presentCount = statuses.where((s) => 
-        s == 'present' || s == 'late' || s == 'lateExcused'
-      ).length;
+      final presentCount = statusList.where((s) {
+        final status = _parseStatus(s);
+        return status == AttendanceStatus.present ||
+               status == AttendanceStatus.late ||
+               status == AttendanceStatus.lateExcused;
+      }).length;
 
-      final percentage = (presentCount / statuses.length * 100).round();
-      
+      final percentage = (presentCount / statusList.length * 100).round();
+
       await updateAttendance(attendanceId, {'percentage': percentage.toDouble()});
     } catch (e, stack) {
       handleError(e, stack, 'recalculatePercentage');
@@ -362,10 +365,21 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   AttendanceStatus _parseStatus(dynamic status) {
     if (status == null) return AttendanceStatus.neutral;
     if (status is AttendanceStatus) return status;
-    
-    final statusStr = status.toString().toLowerCase();
+
+    // Handle integer values (as stored in database)
+    if (status is int) {
+      return AttendanceStatus.fromValue(status);
+    }
+
+    // Handle string values (enum names or integer strings)
+    final statusStr = status.toString();
+    final intValue = int.tryParse(statusStr);
+    if (intValue != null) {
+      return AttendanceStatus.fromValue(intValue);
+    }
+
     return AttendanceStatus.values.firstWhere(
-      (s) => s.name.toLowerCase() == statusStr,
+      (s) => s.name.toLowerCase() == statusStr.toLowerCase(),
       orElse: () => AttendanceStatus.neutral,
     );
   }

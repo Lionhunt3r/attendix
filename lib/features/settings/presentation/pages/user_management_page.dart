@@ -584,6 +584,8 @@ class _UserTile extends ConsumerWidget {
       Role.helper => 'Helfer',
       Role.parent => 'Elternteil',
       Role.applicant => 'Bewerber',
+      Role.voiceLeader => 'Stimmführer',
+      Role.voiceLeaderHelper => 'Stimmführer & Helfer',
       Role.none => 'Keine Rolle',
     };
   }

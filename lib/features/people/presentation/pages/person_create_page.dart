@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../data/models/person/person.dart';
+import '../../../../data/models/tenant/tenant.dart';
 import '../../../../data/repositories/player_repository.dart';
 import '../../../instruments/presentation/pages/instruments_list_page.dart';
 import 'people_list_page.dart';
@@ -29,6 +32,38 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
   int? _selectedInstrument;
   DateTime? _birthday;
   bool _isLoading = false;
+  final Map<String, dynamic> _additionalFieldValues = {};
+  bool _extraFieldsInitialized = false;
+
+  /// Returns the default value for a field type (like Utils.getFieldTypeDefaultValue in Ionic)
+  /// For NEW person: defaultValue is NOT used (only type-based defaults)
+  /// For EXISTING person: defaultValue IS used if provided
+  dynamic _getFieldTypeDefaultValue(String fieldType, {dynamic defaultValue, List<String>? options}) {
+    // 1. If explicit defaultValue is provided, use it
+    if (defaultValue != null) {
+      return defaultValue;
+    }
+
+    // 2. SELECT → first option
+    if (fieldType == 'select') {
+      return (options?.isNotEmpty ?? false) ? options!.first : '';
+    }
+
+    // 3. Type-based defaults (matching Ionic behavior)
+    switch (fieldType) {
+      case 'text':
+      case 'textarea':
+        return '';
+      case 'number':
+        return 0;
+      case 'date':
+        return DateTime.now().toIso8601String().split('T')[0];
+      case 'boolean':
+        return true; // Ionic uses TRUE as default!
+      default:
+        return '';
+    }
+  }
 
   @override
   void dispose() {
@@ -43,6 +78,21 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
   @override
   Widget build(BuildContext context) {
     final instrumentsAsync = ref.watch(instrumentsListProvider);
+    final tenant = ref.watch(currentTenantProvider);
+    final extraFields = tenant?.additionalFields ?? [];
+
+    // Initialize additional_fields with defaults (like Ionic lines 166-174)
+    // For NEW person: use type-based defaults only (NO field.defaultValue)
+    if (!_extraFieldsInitialized && extraFields.isNotEmpty) {
+      for (final field in extraFields) {
+        _additionalFieldValues[field.id] ??= _getFieldTypeDefaultValue(
+          field.type,
+          options: field.options,
+          // NOTE: NOT passing field.defaultValue for new person (matches Ionic!)
+        );
+      }
+      _extraFieldsInitialized = true;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -198,10 +248,106 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
               ),
               maxLines: 3,
             ),
+
+            // Extra Fields Section - as ExpansionTile like Ionic Accordion
+            if (extraFields.isNotEmpty)
+              ExpansionTile(
+                title: const Text('Zusatzfelder'),
+                initiallyExpanded: true,
+                tilePadding: EdgeInsets.zero,
+                children: extraFields.map((field) => _buildExtraFieldInput(field)).toList(),
+              ),
+
+            const SizedBox(height: AppDimensions.paddingL),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildExtraFieldInput(ExtraField field) {
+    switch (field.type) {
+      case 'text':
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextFormField(
+            decoration: InputDecoration(labelText: field.name),
+            initialValue: _additionalFieldValues[field.id]?.toString() ?? '',
+            onChanged: (value) => _additionalFieldValues[field.id] = value,
+          ),
+        );
+
+      case 'textarea':
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextFormField(
+            decoration: InputDecoration(
+              labelText: field.name,
+              alignLabelWithHint: true,
+            ),
+            maxLines: 3,
+            initialValue: _additionalFieldValues[field.id]?.toString() ?? '',
+            onChanged: (value) => _additionalFieldValues[field.id] = value,
+          ),
+        );
+
+      case 'number':
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: TextFormField(
+            decoration: InputDecoration(labelText: field.name),
+            keyboardType: TextInputType.number,
+            initialValue: _additionalFieldValues[field.id]?.toString() ?? '0',
+            onChanged: (value) => _additionalFieldValues[field.id] = int.tryParse(value) ?? 0,
+          ),
+        );
+
+      case 'boolean':
+        return SwitchListTile(
+          title: Text(field.name),
+          value: _additionalFieldValues[field.id] as bool? ?? true,
+          onChanged: (value) => setState(() => _additionalFieldValues[field.id] = value),
+        );
+
+      case 'date':
+        final currentValue = _additionalFieldValues[field.id]?.toString();
+        final currentDate = currentValue != null ? DateTime.tryParse(currentValue) : null;
+        return ListTile(
+          title: Text(field.name),
+          subtitle: Text(
+            currentDate != null
+                ? DateFormat('dd.MM.yyyy').format(currentDate)
+                : 'Nicht angegeben',
+          ),
+          trailing: const Icon(Icons.calendar_today),
+          onTap: () async {
+            final date = await showDatePicker(
+              context: context,
+              initialDate: currentDate ?? DateTime.now(),
+              firstDate: DateTime(1900),
+              lastDate: DateTime(2100),
+            );
+            if (date != null) {
+              setState(() => _additionalFieldValues[field.id] = date.toIso8601String().split('T')[0]);
+            }
+          },
+        );
+
+      case 'select':
+        final options = field.options ?? [];
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: DropdownButtonFormField<String>(
+            decoration: InputDecoration(labelText: field.name),
+            value: _additionalFieldValues[field.id]?.toString(),
+            items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
+            onChanged: (value) => setState(() => _additionalFieldValues[field.id] = value),
+          ),
+        );
+
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Future<void> _pickBirthday() async {
@@ -211,7 +357,6 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
       initialDate: _birthday ?? DateTime(now.year - 20),
       firstDate: DateTime(1900),
       lastDate: now,
-      locale: const Locale('de', 'DE'),
     );
     if (picked != null) {
       setState(() => _birthday = picked);
@@ -241,6 +386,7 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
         instrument: _selectedInstrument,
         birthday: _birthday?.toIso8601String().split('T').first,
         joined: DateTime.now().toIso8601String().split('T').first,
+        additionalFields: _additionalFieldValues.isNotEmpty ? _additionalFieldValues : null,
       );
 
       await repo.createPlayer(person);

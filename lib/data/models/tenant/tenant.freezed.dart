@@ -35,6 +35,8 @@ mixin _$Tenant {
   String? get seasonStart => throw _privateConstructorUsedError;
   bool? get parents => throw _privateConstructorUsedError;
   bool get betaProgram => throw _privateConstructorUsedError;
+  @JsonKey(name: 'show_members_list')
+  bool get showMembersList => throw _privateConstructorUsedError;
   String? get region => throw _privateConstructorUsedError;
   int? get role => throw _privateConstructorUsedError;
   @JsonKey(name: 'song_sharing_id')
@@ -82,6 +84,7 @@ abstract class $TenantCopyWith<$Res> {
     String? seasonStart,
     bool? parents,
     bool betaProgram,
+    @JsonKey(name: 'show_members_list') bool showMembersList,
     String? region,
     int? role,
     @JsonKey(name: 'song_sharing_id') String? songSharingId,
@@ -125,6 +128,7 @@ class _$TenantCopyWithImpl<$Res, $Val extends Tenant>
     Object? seasonStart = freezed,
     Object? parents = freezed,
     Object? betaProgram = null,
+    Object? showMembersList = null,
     Object? region = freezed,
     Object? role = freezed,
     Object? songSharingId = freezed,
@@ -204,6 +208,11 @@ class _$TenantCopyWithImpl<$Res, $Val extends Tenant>
                 null == betaProgram
                     ? _value.betaProgram
                     : betaProgram // ignore: cast_nullable_to_non_nullable
+                        as bool,
+            showMembersList:
+                null == showMembersList
+                    ? _value.showMembersList
+                    : showMembersList // ignore: cast_nullable_to_non_nullable
                         as bool,
             region:
                 freezed == region
@@ -293,6 +302,7 @@ abstract class _$$TenantImplCopyWith<$Res> implements $TenantCopyWith<$Res> {
     String? seasonStart,
     bool? parents,
     bool betaProgram,
+    @JsonKey(name: 'show_members_list') bool showMembersList,
     String? region,
     int? role,
     @JsonKey(name: 'song_sharing_id') String? songSharingId,
@@ -335,6 +345,7 @@ class __$$TenantImplCopyWithImpl<$Res>
     Object? seasonStart = freezed,
     Object? parents = freezed,
     Object? betaProgram = null,
+    Object? showMembersList = null,
     Object? region = freezed,
     Object? role = freezed,
     Object? songSharingId = freezed,
@@ -414,6 +425,11 @@ class __$$TenantImplCopyWithImpl<$Res>
             null == betaProgram
                 ? _value.betaProgram
                 : betaProgram // ignore: cast_nullable_to_non_nullable
+                    as bool,
+        showMembersList:
+            null == showMembersList
+                ? _value.showMembersList
+                : showMembersList // ignore: cast_nullable_to_non_nullable
                     as bool,
         region:
             freezed == region
@@ -497,6 +513,7 @@ class _$TenantImpl implements _Tenant {
     this.seasonStart,
     this.parents = false,
     this.betaProgram = false,
+    @JsonKey(name: 'show_members_list') this.showMembersList = false,
     this.region,
     this.role,
     @JsonKey(name: 'song_sharing_id') this.songSharingId,
@@ -552,6 +569,9 @@ class _$TenantImpl implements _Tenant {
   @override
   @JsonKey()
   final bool betaProgram;
+  @override
+  @JsonKey(name: 'show_members_list')
+  final bool showMembersList;
   @override
   final String? region;
   @override
@@ -613,7 +633,7 @@ class _$TenantImpl implements _Tenant {
 
   @override
   String toString() {
-    return 'Tenant(id: $id, createdAt: $createdAt, shortName: $shortName, longName: $longName, maintainTeachers: $maintainTeachers, showHolidays: $showHolidays, type: $type, withExcuses: $withExcuses, practiceStart: $practiceStart, practiceEnd: $practiceEnd, seasonStart: $seasonStart, parents: $parents, betaProgram: $betaProgram, region: $region, role: $role, songSharingId: $songSharingId, additionalFields: $additionalFields, perc: $perc, percColor: $percColor, registerId: $registerId, autoApproveRegistrations: $autoApproveRegistrations, registrationFields: $registrationFields, favorite: $favorite, criticalRules: $criticalRules, timezone: $timezone)';
+    return 'Tenant(id: $id, createdAt: $createdAt, shortName: $shortName, longName: $longName, maintainTeachers: $maintainTeachers, showHolidays: $showHolidays, type: $type, withExcuses: $withExcuses, practiceStart: $practiceStart, practiceEnd: $practiceEnd, seasonStart: $seasonStart, parents: $parents, betaProgram: $betaProgram, showMembersList: $showMembersList, region: $region, role: $role, songSharingId: $songSharingId, additionalFields: $additionalFields, perc: $perc, percColor: $percColor, registerId: $registerId, autoApproveRegistrations: $autoApproveRegistrations, registrationFields: $registrationFields, favorite: $favorite, criticalRules: $criticalRules, timezone: $timezone)';
   }
 
   @override
@@ -644,6 +664,8 @@ class _$TenantImpl implements _Tenant {
             (identical(other.parents, parents) || other.parents == parents) &&
             (identical(other.betaProgram, betaProgram) ||
                 other.betaProgram == betaProgram) &&
+            (identical(other.showMembersList, showMembersList) ||
+                other.showMembersList == showMembersList) &&
             (identical(other.region, region) || other.region == region) &&
             (identical(other.role, role) || other.role == role) &&
             (identical(other.songSharingId, songSharingId) ||
@@ -693,6 +715,7 @@ class _$TenantImpl implements _Tenant {
     seasonStart,
     parents,
     betaProgram,
+    showMembersList,
     region,
     role,
     songSharingId,
@@ -736,6 +759,7 @@ abstract class _Tenant implements Tenant {
     final String? seasonStart,
     final bool? parents,
     final bool betaProgram,
+    @JsonKey(name: 'show_members_list') final bool showMembersList,
     final String? region,
     final int? role,
     @JsonKey(name: 'song_sharing_id') final String? songSharingId,
@@ -782,6 +806,9 @@ abstract class _Tenant implements Tenant {
   bool? get parents;
   @override
   bool get betaProgram;
+  @override
+  @JsonKey(name: 'show_members_list')
+  bool get showMembersList;
   @override
   String? get region;
   @override

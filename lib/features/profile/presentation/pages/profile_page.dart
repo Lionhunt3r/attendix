@@ -6,7 +6,7 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
 
 /// Profile page for viewing and editing user profile
 class ProfilePage extends ConsumerStatefulWidget {

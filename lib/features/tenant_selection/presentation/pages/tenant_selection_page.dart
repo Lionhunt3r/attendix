@@ -1,102 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/tenant/tenant.dart';
-
-/// Provider for current selected tenant - persisted in SharedPreferences
-final currentTenantProvider = StateNotifierProvider<CurrentTenantNotifier, Tenant?>((ref) {
-  return CurrentTenantNotifier(ref);
-});
-
-class CurrentTenantNotifier extends StateNotifier<Tenant?> {
-  CurrentTenantNotifier(this.ref) : super(null) {
-    _loadSavedTenant();
-  }
-
-  final Ref ref;
-  static const _tenantIdKey = 'current_tenant_id';
-
-  Future<void> _loadSavedTenant() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedTenantId = prefs.getInt(_tenantIdKey);
-    
-    if (savedTenantId != null) {
-      // Load the tenant from the server
-      try {
-        final supabase = ref.read(supabaseClientProvider);
-        final response = await supabase
-            .from('tenants')
-            .select('*')
-            .eq('id', savedTenantId)
-            .maybeSingle();
-        
-        if (response != null) {
-          state = Tenant.fromJson(response as Map<String, dynamic>);
-        }
-      } catch (e) {
-        // Ignore errors, user will need to select tenant again
-      }
-    }
-  }
-
-  Future<void> setTenant(Tenant? tenant) async {
-    state = tenant;
-    final prefs = await SharedPreferences.getInstance();
-    if (tenant?.id != null) {
-      await prefs.setInt(_tenantIdKey, tenant!.id!);
-    } else {
-      await prefs.remove(_tenantIdKey);
-    }
-  }
-
-  Future<void> clearTenant() async {
-    state = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tenantIdKey);
-  }
-}
-
-/// Provider for user's tenants list
-final userTenantsProvider = FutureProvider<List<Tenant>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final userId = supabase.auth.currentUser?.id;
-  
-  if (userId == null) return [];
-
-  // First get tenant user records
-  final tenantUsersResponse = await supabase
-      .from('tenantUsers')
-      .select('tenantId')
-      .eq('userId', userId);
-
-  if ((tenantUsersResponse as List).isEmpty) return [];
-
-  // Get tenant IDs
-  final tenantIds = (tenantUsersResponse as List)
-      .map((item) => item['tenantId'] as int)
-      .toList();
-
-  // Then get the tenants
-  final tenantsResponse = await supabase
-      .from('tenants')
-      .select('*')
-      .inFilter('id', tenantIds);
-
-  final List<Tenant> tenants = [];
-  for (final item in tenantsResponse as List) {
-    tenants.add(Tenant.fromJson(item as Map<String, dynamic>));
-  }
-  return tenants;
-});
 
 /// Tenant selection page
 class TenantSelectionPage extends ConsumerWidget {
   const TenantSelectionPage({super.key});
+
+  /// Get the user's role for a specific tenant
+  Future<Role> _getTenantUserRole(WidgetRef ref, int tenantId) async {
+    final supabase = ref.read(supabaseClientProvider);
+    final userId = supabase.auth.currentUser?.id;
+
+    if (userId == null) return Role.none;
+
+    final response = await supabase
+        .from('tenantUsers')
+        .select('role')
+        .eq('tenantId', tenantId)
+        .eq('userId', userId)
+        .maybeSingle();
+
+    if (response == null) return Role.none;
+    return Role.fromValue(response['role'] as int? ?? 99);
+  }
+
+  /// Navigate to the appropriate page based on role
+  Future<void> _selectTenant(
+    BuildContext context,
+    WidgetRef ref,
+    Tenant tenant,
+  ) async {
+    // Set the tenant first
+    await ref.read(currentTenantProvider.notifier).setTenant(tenant);
+
+    // Get the user's role for this tenant
+    final role = await _getTenantUserRole(ref, tenant.id!);
+
+    // Navigate to the appropriate default route for this role
+    if (context.mounted) {
+      context.go(role.defaultRoute);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -173,8 +124,8 @@ class TenantSelectionPage extends ConsumerWidget {
                       'Du bist noch keiner Gruppe zugeordnet. '
                       'Bitte wende dich an einen Administrator oder erstelle eine neue Gruppe.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.medium,
-                      ),
+                            color: AppColors.medium,
+                          ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: AppDimensions.paddingXL),
@@ -192,15 +143,13 @@ class TenantSelectionPage extends ConsumerWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             itemCount: tenants.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppDimensions.paddingS),
+            separatorBuilder: (_, __) =>
+                const SizedBox(height: AppDimensions.paddingS),
             itemBuilder: (context, index) {
               final tenant = tenants[index];
               return _TenantCard(
                 tenant: tenant,
-                onTap: () {
-                  ref.read(currentTenantProvider.notifier).setTenant(tenant);
-                  context.go('/people');
-                },
+                onTap: () => _selectTenant(context, ref, tenant),
               );
             },
           );
@@ -219,9 +168,11 @@ class _TenantCard extends StatelessWidget {
   final Tenant tenant;
   final VoidCallback onTap;
 
-  String get _displayName => tenant.shortName.isNotEmpty ? tenant.shortName : tenant.longName;
-  String? get _description => tenant.longName != tenant.shortName ? tenant.longName : null;
-  String get _initials => _displayName.length >= 2 
+  String get _displayName =>
+      tenant.shortName.isNotEmpty ? tenant.shortName : tenant.longName;
+  String? get _description =>
+      tenant.longName != tenant.shortName ? tenant.longName : null;
+  String get _initials => _displayName.length >= 2
       ? _displayName.substring(0, 2).toUpperCase()
       : _displayName.toUpperCase();
 
@@ -248,7 +199,7 @@ class _TenantCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppDimensions.paddingM),
-              
+
               // Tenant info
               Expanded(
                 child: Column(
@@ -257,16 +208,16 @@ class _TenantCard extends StatelessWidget {
                     Text(
                       _displayName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     if (_description != null) ...[
                       const SizedBox(height: AppDimensions.paddingXS),
                       Text(
                         _description!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.medium,
-                        ),
+                              color: AppColors.medium,
+                            ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -274,7 +225,7 @@ class _TenantCard extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               const Icon(
                 Icons.chevron_right,
                 color: AppColors.medium,

@@ -7,7 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/person/person.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
 
 /// Provider for left (archived) players
 final leftPlayersProvider = FutureProvider<List<Person>>((ref) async {

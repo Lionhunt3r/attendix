@@ -7,7 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/song/song.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
 
 /// Provider for songs list
 final songsListProvider = FutureProvider<List<Song>>((ref) async {

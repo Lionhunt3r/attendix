@@ -31,7 +31,14 @@ mixin _$Instrument {
   int? get parentId => throw _privateConstructorUsedError;
   int? get legacyId => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
-  DateTime? get createdAt => throw _privateConstructorUsedError;
+  DateTime? get createdAt => throw _privateConstructorUsedError; // Fields from Ionic that were missing
+  int? get category => throw _privateConstructorUsedError;
+  List<String>? get clefs => throw _privateConstructorUsedError;
+  bool get maingroup => throw _privateConstructorUsedError;
+  String? get notes => throw _privateConstructorUsedError;
+  String? get range => throw _privateConstructorUsedError;
+  String? get synonyms => throw _privateConstructorUsedError;
+  String? get tuning => throw _privateConstructorUsedError;
 
   /// Serializes this Instrument to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -61,6 +68,13 @@ abstract class $InstrumentCopyWith<$Res> {
     int? parentId,
     int? legacyId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
+    int? category,
+    List<String>? clefs,
+    bool maingroup,
+    String? notes,
+    String? range,
+    String? synonyms,
+    String? tuning,
   });
 }
 
@@ -89,6 +103,13 @@ class _$InstrumentCopyWithImpl<$Res, $Val extends Instrument>
     Object? parentId = freezed,
     Object? legacyId = freezed,
     Object? createdAt = freezed,
+    Object? category = freezed,
+    Object? clefs = freezed,
+    Object? maingroup = null,
+    Object? notes = freezed,
+    Object? range = freezed,
+    Object? synonyms = freezed,
+    Object? tuning = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -142,6 +163,41 @@ class _$InstrumentCopyWithImpl<$Res, $Val extends Instrument>
                     ? _value.createdAt
                     : createdAt // ignore: cast_nullable_to_non_nullable
                         as DateTime?,
+            category:
+                freezed == category
+                    ? _value.category
+                    : category // ignore: cast_nullable_to_non_nullable
+                        as int?,
+            clefs:
+                freezed == clefs
+                    ? _value.clefs
+                    : clefs // ignore: cast_nullable_to_non_nullable
+                        as List<String>?,
+            maingroup:
+                null == maingroup
+                    ? _value.maingroup
+                    : maingroup // ignore: cast_nullable_to_non_nullable
+                        as bool,
+            notes:
+                freezed == notes
+                    ? _value.notes
+                    : notes // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            range:
+                freezed == range
+                    ? _value.range
+                    : range // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            synonyms:
+                freezed == synonyms
+                    ? _value.synonyms
+                    : synonyms // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            tuning:
+                freezed == tuning
+                    ? _value.tuning
+                    : tuning // ignore: cast_nullable_to_non_nullable
+                        as String?,
           )
           as $Val,
     );
@@ -168,6 +224,13 @@ abstract class _$$InstrumentImplCopyWith<$Res>
     int? parentId,
     int? legacyId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
+    int? category,
+    List<String>? clefs,
+    bool maingroup,
+    String? notes,
+    String? range,
+    String? synonyms,
+    String? tuning,
   });
 }
 
@@ -195,6 +258,13 @@ class __$$InstrumentImplCopyWithImpl<$Res>
     Object? parentId = freezed,
     Object? legacyId = freezed,
     Object? createdAt = freezed,
+    Object? category = freezed,
+    Object? clefs = freezed,
+    Object? maingroup = null,
+    Object? notes = freezed,
+    Object? range = freezed,
+    Object? synonyms = freezed,
+    Object? tuning = freezed,
   }) {
     return _then(
       _$InstrumentImpl(
@@ -248,6 +318,41 @@ class __$$InstrumentImplCopyWithImpl<$Res>
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
                     as DateTime?,
+        category:
+            freezed == category
+                ? _value.category
+                : category // ignore: cast_nullable_to_non_nullable
+                    as int?,
+        clefs:
+            freezed == clefs
+                ? _value._clefs
+                : clefs // ignore: cast_nullable_to_non_nullable
+                    as List<String>?,
+        maingroup:
+            null == maingroup
+                ? _value.maingroup
+                : maingroup // ignore: cast_nullable_to_non_nullable
+                    as bool,
+        notes:
+            freezed == notes
+                ? _value.notes
+                : notes // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        range:
+            freezed == range
+                ? _value.range
+                : range // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        synonyms:
+            freezed == synonyms
+                ? _value.synonyms
+                : synonyms // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        tuning:
+            freezed == tuning
+                ? _value.tuning
+                : tuning // ignore: cast_nullable_to_non_nullable
+                    as String?,
       ),
     );
   }
@@ -267,7 +372,14 @@ class _$InstrumentImpl implements _Instrument {
     this.parentId,
     this.legacyId,
     @JsonKey(name: 'created_at') this.createdAt,
-  });
+    this.category,
+    final List<String>? clefs,
+    this.maingroup = false,
+    this.notes,
+    this.range,
+    this.synonyms,
+    this.tuning,
+  }) : _clefs = clefs;
 
   factory _$InstrumentImpl.fromJson(Map<String, dynamic> json) =>
       _$$InstrumentImplFromJson(json);
@@ -294,10 +406,34 @@ class _$InstrumentImpl implements _Instrument {
   @override
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
+  // Fields from Ionic that were missing
+  @override
+  final int? category;
+  final List<String>? _clefs;
+  @override
+  List<String>? get clefs {
+    final value = _clefs;
+    if (value == null) return null;
+    if (_clefs is EqualUnmodifiableListView) return _clefs;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  @override
+  @JsonKey()
+  final bool maingroup;
+  @override
+  final String? notes;
+  @override
+  final String? range;
+  @override
+  final String? synonyms;
+  @override
+  final String? tuning;
 
   @override
   String toString() {
-    return 'Instrument(id: $id, tenantId: $tenantId, name: $name, shortName: $shortName, color: $color, isSection: $isSection, sectionIndex: $sectionIndex, parentId: $parentId, legacyId: $legacyId, createdAt: $createdAt)';
+    return 'Instrument(id: $id, tenantId: $tenantId, name: $name, shortName: $shortName, color: $color, isSection: $isSection, sectionIndex: $sectionIndex, parentId: $parentId, legacyId: $legacyId, createdAt: $createdAt, category: $category, clefs: $clefs, maingroup: $maingroup, notes: $notes, range: $range, synonyms: $synonyms, tuning: $tuning)';
   }
 
   @override
@@ -321,7 +457,17 @@ class _$InstrumentImpl implements _Instrument {
             (identical(other.legacyId, legacyId) ||
                 other.legacyId == legacyId) &&
             (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt));
+                other.createdAt == createdAt) &&
+            (identical(other.category, category) ||
+                other.category == category) &&
+            const DeepCollectionEquality().equals(other._clefs, _clefs) &&
+            (identical(other.maingroup, maingroup) ||
+                other.maingroup == maingroup) &&
+            (identical(other.notes, notes) || other.notes == notes) &&
+            (identical(other.range, range) || other.range == range) &&
+            (identical(other.synonyms, synonyms) ||
+                other.synonyms == synonyms) &&
+            (identical(other.tuning, tuning) || other.tuning == tuning));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -338,6 +484,13 @@ class _$InstrumentImpl implements _Instrument {
     parentId,
     legacyId,
     createdAt,
+    category,
+    const DeepCollectionEquality().hash(_clefs),
+    maingroup,
+    notes,
+    range,
+    synonyms,
+    tuning,
   );
 
   /// Create a copy of Instrument
@@ -366,6 +519,13 @@ abstract class _Instrument implements Instrument {
     final int? parentId,
     final int? legacyId,
     @JsonKey(name: 'created_at') final DateTime? createdAt,
+    final int? category,
+    final List<String>? clefs,
+    final bool maingroup,
+    final String? notes,
+    final String? range,
+    final String? synonyms,
+    final String? tuning,
   }) = _$InstrumentImpl;
 
   factory _Instrument.fromJson(Map<String, dynamic> json) =
@@ -391,7 +551,21 @@ abstract class _Instrument implements Instrument {
   int? get legacyId;
   @override
   @JsonKey(name: 'created_at')
-  DateTime? get createdAt;
+  DateTime? get createdAt; // Fields from Ionic that were missing
+  @override
+  int? get category;
+  @override
+  List<String>? get clefs;
+  @override
+  bool get maingroup;
+  @override
+  String? get notes;
+  @override
+  String? get range;
+  @override
+  String? get synonyms;
+  @override
+  String? get tuning;
 
   /// Create a copy of Instrument
   /// with the given fields replaced by the non-null parameter values.

@@ -17,6 +17,14 @@ class Instrument with _$Instrument {
     int? parentId,
     int? legacyId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
+    // Fields from Ionic that were missing
+    int? category,
+    List<String>? clefs,
+    @Default(false) bool maingroup,
+    String? notes,
+    String? range,
+    String? synonyms,
+    String? tuning,
   }) = _Instrument;
 
   factory Instrument.fromJson(Map<String, dynamic> json) =>

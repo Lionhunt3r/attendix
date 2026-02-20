@@ -9,7 +9,8 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../data/models/tenant/tenant.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import 'people_list_page.dart';
 
 /// Provider for single person with group name
@@ -59,8 +60,14 @@ final personAttendanceStatsProvider =
   final attended = pastAttendances.where((a) => a['attended'] == true).length;
   final percentage = total > 0 ? (attended / total * 100).round() : 0;
   
-  // Count late arrivals
-  final lateCount = pastAttendances.where((a) => a['status'] == 'L').length;
+  // Count late arrivals (status 3 = late, 5 = lateExcused)
+  final lateCount = pastAttendances.where((a) {
+    final status = a['status'];
+    if (status is int) {
+      return status == 3 || status == 5; // AttendanceStatus.late or lateExcused
+    }
+    return false;
+  }).length;
 
   return {
     'total': total,
@@ -92,9 +99,9 @@ final personHistoryProvider =
   List<Map<String, dynamic>> attendanceTypes = [];
   if (tenant != null) {
     final typesResponse = await supabase
-        .from('attendance_type')
+        .from('attendance_types')
         .select('*')
-        .eq('tenantId', tenant.id!);
+        .eq('tenant_id', tenant.id!);
     attendanceTypes = List<Map<String, dynamic>>.from(typesResponse as List);
   }
 
@@ -110,8 +117,9 @@ final personHistoryProvider =
       .map((a) {
     final attendance = a['attendance'] as Map<String, dynamic>?;
     final typeId = attendance?['type_id'];
-    final typeInfo = attendance?['typeInfo'] as Map<String, dynamic>?;
-    
+    // typeInfo is a String in the database, not a Map
+    final typeInfo = attendance?['typeInfo']?.toString();
+
     // Get title from attendance type (like Ionic's Utils.getTypeTitle)
     String meetingName = '';
     final attType = attendanceTypes.firstWhere(
@@ -120,39 +128,52 @@ final personHistoryProvider =
     );
     if (attType.isNotEmpty) {
       final typeName = attType['name']?.toString() ?? '';
-      final typeInfoName = typeInfo?['name']?.toString();
-      meetingName = typeInfoName ?? typeName;
+      // typeInfo is the title if provided, otherwise use type name
+      meetingName = (typeInfo != null && typeInfo.isNotEmpty) ? typeInfo : typeName;
     } else {
-      // Fallback to old type field
-      meetingName = attendance?['type']?.toString() ?? 'Anwesenheit';
+      // Fallback to typeInfo or old type field
+      meetingName = typeInfo ?? attendance?['type']?.toString() ?? 'Anwesenheit';
     }
-    
-    // Determine status text (like Ionic's Utils.getAttText)
-    final status = a['status']?.toString();
+
+    // Determine status text based on integer status value
+    // Status values: 0=neutral, 1=present, 2=excused, 3=late, 4=absent, 5=lateExcused
+    final statusValue = a['status'];
+    int statusInt = 0;
+    if (statusValue is int) {
+      statusInt = statusValue;
+    } else if (statusValue != null) {
+      statusInt = int.tryParse(statusValue.toString()) ?? 0;
+    }
+
     String displayStatus;
-    if (status == 'X') {
-      displayStatus = 'X'; // Present
-    } else if (status == 'L') {
-      displayStatus = 'L'; // Late
-    } else if (status == 'E') {
-      displayStatus = 'E'; // Excused
-    } else if (status == 'N') {
-      displayStatus = 'N'; // Not counted
-    } else if (status == 'A') {
-      displayStatus = 'A'; // Absent
-    } else {
-      // Fallback: check attended boolean
-      final attended = a['attended'] == true;
-      displayStatus = attended ? 'X' : 'A';
+    switch (statusInt) {
+      case 1: // present
+        displayStatus = 'X';
+        break;
+      case 2: // excused
+        displayStatus = 'E';
+        break;
+      case 3: // late
+        displayStatus = 'L';
+        break;
+      case 4: // absent
+        displayStatus = 'A';
+        break;
+      case 5: // lateExcused
+        displayStatus = 'L';
+        break;
+      case 0: // neutral
+      default:
+        displayStatus = 'N';
     }
-    
+
     return {
       'date': attendance?['date']?.toString(),
       'meetingName': meetingName,
       'text': displayStatus,
       'type': PlayerHistoryType.attendance.value,
       'notes': a['notes'],
-      'status': status,
+      'status': statusInt,
     };
   }).toList();
 
@@ -255,7 +276,8 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   late DateTime? _joined;
   late bool _isLeader;
   late bool _hasTeacher;
-  
+  late Map<String, dynamic> _additionalFieldValues;
+
   // Section states
   bool _showAllgemein = false;
   bool _showAccount = false;
@@ -282,6 +304,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     _joined = p.joined != null ? DateTime.tryParse(p.joined!) : null;
     _isLeader = p.isLeader;
     _hasTeacher = p.hasTeacher;
+    _additionalFieldValues = Map.from(p.additionalFields ?? {});
   }
   
   @override
@@ -356,6 +379,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'hasTeacher': _hasTeacher,
         'correctBirthday': true,
         'history': updatedHistory,
+        'additional_fields': _additionalFieldValues.isNotEmpty ? _additionalFieldValues : null,
       }).eq('id', person.id!);
       
       ref.invalidate(personProvider(widget.personId));
@@ -816,6 +840,9 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
   
   Widget _buildEditForm(AsyncValue<Map<int, String>> groupsAsync) {
+    final tenant = ref.watch(currentTenantProvider);
+    final extraFields = tenant?.additionalFields ?? [];
+
     return Card(
       margin: const EdgeInsets.all(AppDimensions.paddingM),
       child: Padding(
@@ -844,7 +871,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               ],
             ),
             const SizedBox(height: AppDimensions.paddingM),
-            
+
             // Notes
             TextField(
               controller: _notesController,
@@ -853,7 +880,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               onChanged: (_) => _markChanged(),
             ),
             const SizedBox(height: AppDimensions.paddingL),
-            
+
             // Group Dropdown
             Text('Gruppe', style: Theme.of(context).textTheme.labelMedium),
             const SizedBox(height: AppDimensions.paddingXS),
@@ -871,7 +898,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               ),
             ),
             const SizedBox(height: AppDimensions.paddingM),
-            
+
             // Phone
             TextField(
               controller: _phoneController,
@@ -880,7 +907,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               onChanged: (_) => _markChanged(),
             ),
             const SizedBox(height: AppDimensions.paddingM),
-            
+
             // Birthday
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -889,7 +916,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               trailing: const Icon(Icons.calendar_today),
               onTap: () => _selectDate('birthday'),
             ),
-            
+
             // Plays Since
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -898,7 +925,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               trailing: const Icon(Icons.calendar_today),
               onTap: () => _selectDate('playsSince'),
             ),
-            
+
             // Joined
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -907,7 +934,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               trailing: const Icon(Icons.calendar_today),
               onTap: () => _selectDate('joined'),
             ),
-            
+
             // Is Leader
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -918,7 +945,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
                 _markChanged();
               },
             ),
-            
+
             // Has Teacher
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -929,16 +956,32 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
                 _markChanged();
               },
             ),
-            
+
             // Other Exercise
             TextField(
               controller: _otherExerciseController,
               decoration: const InputDecoration(labelText: 'Sonstige Dienste'),
               onChanged: (_) => _markChanged(),
             ),
-            
+
+            // Extra Fields Section
+            if (extraFields.isNotEmpty) ...[
+              const SizedBox(height: AppDimensions.paddingL),
+              const Divider(),
+              const SizedBox(height: AppDimensions.paddingS),
+              Text(
+                'Zusatzfelder',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+              ...extraFields.map((field) => _buildExtraFieldInput(field)),
+            ],
+
             const SizedBox(height: AppDimensions.paddingL),
-            
+
             // Cancel button
             OutlinedButton(
               onPressed: () {
@@ -954,6 +997,115 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         ),
       ),
     );
+  }
+
+  Widget _buildExtraFieldInput(ExtraField field) {
+    final currentValue = _additionalFieldValues[field.id] ?? field.defaultValue;
+
+    switch (field.type) {
+      case 'text':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+          child: TextField(
+            decoration: InputDecoration(labelText: field.name),
+            controller: TextEditingController(text: currentValue?.toString() ?? ''),
+            onChanged: (value) {
+              _additionalFieldValues[field.id] = value;
+              _markChanged();
+            },
+          ),
+        );
+
+      case 'textarea':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+          child: TextField(
+            decoration: InputDecoration(labelText: field.name),
+            maxLines: 3,
+            controller: TextEditingController(text: currentValue?.toString() ?? ''),
+            onChanged: (value) {
+              _additionalFieldValues[field.id] = value;
+              _markChanged();
+            },
+          ),
+        );
+
+      case 'number':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+          child: TextField(
+            decoration: InputDecoration(labelText: field.name),
+            keyboardType: TextInputType.number,
+            controller: TextEditingController(text: currentValue?.toString() ?? ''),
+            onChanged: (value) {
+              _additionalFieldValues[field.id] = int.tryParse(value) ?? 0;
+              _markChanged();
+            },
+          ),
+        );
+
+      case 'boolean':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(field.name),
+            value: currentValue == true,
+            onChanged: (value) {
+              setState(() {
+                _additionalFieldValues[field.id] = value;
+              });
+              _markChanged();
+            },
+          ),
+        );
+
+      case 'date':
+        final dateValue = currentValue != null ? DateTime.tryParse(currentValue.toString()) : null;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(field.name),
+            subtitle: Text(dateValue != null ? DateFormat('dd.MM.yyyy').format(dateValue) : 'Nicht angegeben'),
+            trailing: const Icon(Icons.calendar_today),
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: dateValue ?? DateTime.now(),
+                firstDate: DateTime(1900),
+                lastDate: DateTime(2100),
+              );
+              if (date != null) {
+                setState(() {
+                  _additionalFieldValues[field.id] = date.toIso8601String().split('T')[0];
+                });
+                _markChanged();
+              }
+            },
+          ),
+        );
+
+      case 'select':
+        final options = field.options ?? [];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+          child: DropdownButtonFormField<String>(
+            decoration: InputDecoration(labelText: field.name),
+            value: options.contains(currentValue) ? currentValue?.toString() : (options.isNotEmpty ? options.first : null),
+            items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
+            onChanged: (value) {
+              setState(() {
+                _additionalFieldValues[field.id] = value;
+              });
+              _markChanged();
+            },
+          ),
+        );
+
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildHeader(Person person, AsyncValue<Map<String, dynamic>> statsAsync) {
@@ -1070,6 +1222,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Widget _buildAllgemeinContent(Person person) {
+    final tenant = ref.watch(currentTenantProvider);
+    final extraFields = tenant?.additionalFields ?? [];
+    final additionalFieldValues = person.additionalFields ?? {};
+
     return Column(
       children: [
         _InfoRow(icon: Icons.group, label: 'Gruppe', value: person.groupName ?? 'Nicht zugewiesen'),
@@ -1086,8 +1242,68 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         _InfoRow(icon: Icons.star, label: 'Stimmführer', value: person.isLeader ? 'Ja' : 'Nein'),
         if (person.otherExercise != null && person.otherExercise!.isNotEmpty)
           _InfoRow(icon: Icons.work, label: 'Sonstige Dienste', value: person.otherExercise!),
+
+        // Extra Fields Section
+        if (extraFields.isNotEmpty) ...[
+          const Divider(height: 32),
+          Text(
+            'Zusatzfelder',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: AppDimensions.paddingS),
+          ...extraFields.map((field) {
+            final value = additionalFieldValues[field.id];
+            String displayValue = _formatExtraFieldValue(field, value);
+            return _InfoRow(
+              icon: _getExtraFieldIcon(field.type),
+              label: field.name,
+              value: displayValue,
+            );
+          }),
+        ],
       ],
     );
+  }
+
+  IconData _getExtraFieldIcon(String type) {
+    switch (type) {
+      case 'text':
+        return Icons.text_fields;
+      case 'textarea':
+        return Icons.notes;
+      case 'number':
+        return Icons.numbers;
+      case 'date':
+        return Icons.calendar_today;
+      case 'boolean':
+        return Icons.toggle_on;
+      case 'select':
+        return Icons.list;
+      default:
+        return Icons.text_fields;
+    }
+  }
+
+  String _formatExtraFieldValue(ExtraField field, dynamic value) {
+    if (value == null) {
+      return 'Nicht angegeben';
+    }
+
+    switch (field.type) {
+      case 'boolean':
+        return value == true ? 'Ja' : 'Nein';
+      case 'date':
+        final date = DateTime.tryParse(value.toString());
+        if (date != null) {
+          return DateFormat('dd.MM.yyyy').format(date);
+        }
+        return value.toString();
+      default:
+        return value.toString();
+    }
   }
 
   Widget _buildAccountContent(Person person) {

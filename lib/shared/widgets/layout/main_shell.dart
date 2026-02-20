@@ -1,10 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_colors.dart';
+import '../../../core/constants/enums.dart';
+import '../../../core/providers/tenant_providers.dart';
+import '../../../data/models/tenant/tenant.dart';
 
-/// Main shell widget with bottom navigation
-class MainShell extends StatelessWidget {
+/// Represents a navigation destination with its route
+class _NavDestination {
+  final String route;
+  final String label;
+  final IconData icon;
+  final IconData selectedIcon;
+
+  const _NavDestination({
+    required this.route,
+    required this.label,
+    required this.icon,
+    required this.selectedIcon,
+  });
+}
+
+/// Main shell widget with role-based bottom navigation
+class MainShell extends ConsumerWidget {
   const MainShell({
     super.key,
     required this.child,
@@ -12,54 +30,110 @@ class MainShell extends StatelessWidget {
 
   final Widget child;
 
-  int _getSelectedIndex(BuildContext context) {
+  /// Build navigation destinations based on user role and tenant settings
+  List<_NavDestination> _buildDestinations(Role role, Tenant? tenant) {
+    final List<_NavDestination> destinations = [];
+
+    // Conductors (Admin, Responsible, Viewer): People tab
+    if (role.canSeePeopleTab) {
+      destinations.add(const _NavDestination(
+        route: '/people',
+        label: 'Personen',
+        icon: Icons.people_outline,
+        selectedIcon: Icons.people,
+      ));
+    }
+
+    // Players/Helpers: Self-Service tab
+    if (role.canSeeSelfServiceTab) {
+      destinations.add(const _NavDestination(
+        route: '/overview',
+        label: 'Meine Termine',
+        icon: Icons.event_available_outlined,
+        selectedIcon: Icons.event_available,
+      ));
+    }
+
+    // Members tab (if tenant has showMembersList enabled)
+    if (role.canSeeMembersTab && tenant?.showMembersList == true) {
+      destinations.add(const _NavDestination(
+        route: '/members',
+        label: 'Mitglieder',
+        icon: Icons.group_outlined,
+        selectedIcon: Icons.group,
+      ));
+    }
+
+    // Conductors/Helpers: Attendance tab
+    if (role.canSeeAttendanceTab) {
+      destinations.add(const _NavDestination(
+        route: '/attendance',
+        label: 'Anwesenheit',
+        icon: Icons.fact_check_outlined,
+        selectedIcon: Icons.fact_check,
+      ));
+    }
+
+    // Everyone: Settings tab
+    destinations.add(const _NavDestination(
+      route: '/settings',
+      label: 'Einstellungen',
+      icon: Icons.settings_outlined,
+      selectedIcon: Icons.settings,
+    ));
+
+    return destinations;
+  }
+
+  /// Get selected index based on current route and available destinations
+  int _getSelectedIndex(BuildContext context, List<_NavDestination> destinations) {
     final location = GoRouterState.of(context).matchedLocation;
-    if (location.startsWith('/people')) return 0;
-    if (location.startsWith('/attendance')) return 1;
-    if (location.startsWith('/settings')) return 2;
+
+    for (int i = 0; i < destinations.length; i++) {
+      if (location.startsWith(destinations[i].route)) {
+        return i;
+      }
+    }
+
+    // If current route doesn't match any tab, default to first
     return 0;
   }
 
-  void _onItemTapped(BuildContext context, int index) {
-    switch (index) {
-      case 0:
-        context.go('/people');
-        break;
-      case 1:
-        context.go('/attendance');
-        break;
-      case 2:
-        context.go('/settings');
-        break;
+  /// Navigate to destination at index
+  void _onItemTapped(BuildContext context, int index, List<_NavDestination> destinations) {
+    if (index >= 0 && index < destinations.length) {
+      context.go(destinations[index].route);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final selectedIndex = _getSelectedIndex(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(currentRoleProvider);
+    final tenant = ref.watch(currentTenantProvider);
+
+    // Build destinations based on role
+    final destinations = _buildDestinations(role, tenant);
+    final selectedIndex = _getSelectedIndex(context, destinations);
+
+    // Safety check: ensure we have at least one destination
+    if (destinations.isEmpty) {
+      return Scaffold(
+        body: child,
+      );
+    }
 
     return Scaffold(
       body: child,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (index) => _onItemTapped(context, index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Personen',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.fact_check_outlined),
-            selectedIcon: Icon(Icons.fact_check),
-            label: 'Anwesenheit',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Einstellungen',
-          ),
-        ],
+        selectedIndex: selectedIndex.clamp(0, destinations.length - 1),
+        onDestinationSelected: (index) => _onItemTapped(context, index, destinations),
+        destinations: destinations
+            .map((d) => NavigationDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.selectedIcon),
+                  label: d.label,
+                ))
+            .toList(),
       ),
     );
   }
