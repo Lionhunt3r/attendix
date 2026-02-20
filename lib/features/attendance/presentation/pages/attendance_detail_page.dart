@@ -27,7 +27,8 @@ final attendanceDetailProvider = FutureProvider.family<Attendance?, int>((ref, a
       .maybeSingle();
 
   if (response == null) return null;
-  return Attendance.fromJson(response as Map<String, dynamic>);
+  // response is already Map<String, dynamic> from maybeSingle()
+  return Attendance.fromJson(response);
 });
 
 /// Provider for attendance type of a specific attendance
@@ -43,11 +44,13 @@ final attendanceTypeForAttendanceProvider = FutureProvider.family<AttendanceType
       .maybeSingle();
 
   if (response == null) return null;
-  return AttendanceType.fromJson(response as Map<String, dynamic>);
+  return AttendanceType.fromJson(response);
 });
 
 /// Provider for person attendances for a specific attendance
-final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
+/// NOTE: This is different from personAttendancesProvider in attendance_providers.dart
+/// which gets attendances for a specific PERSON. This one gets persons for a specific ATTENDANCE.
+final personAttendancesForAttendanceProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
 
@@ -61,16 +64,17 @@ final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, 
       .eq('attendance_id', attendanceId);
 
   return (response as List).map((e) {
-    // Extract player data from nested structure
-    final playerData = e['player'] as Map<String, dynamic>?;
+    // Extract player data from nested structure - handle potential type mismatch
+    final playerData = e['player'];
+    final playerMap = playerData is Map<String, dynamic> ? playerData : null;
     return PersonAttendance.fromJson({
       ...e,
-      'firstName': playerData?['firstName'],
-      'lastName': playerData?['lastName'],
-      'img': playerData?['img'],
-      'instrument': playerData?['instrument'],
-      'left': playerData?['left'],
-      'paused': playerData?['paused'],
+      'firstName': playerMap?['firstName'],
+      'lastName': playerMap?['lastName'],
+      'img': playerMap?['img'],
+      'instrument': playerMap?['instrument'],
+      'left': playerMap?['left'],
+      'paused': playerMap?['paused'],
     });
   }).toList();
 });
@@ -78,8 +82,8 @@ final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, 
 /// Provider that returns filtered person attendances based on attendance date
 /// - Past attendances: Show all persons (including archived/paused for historical correctness)
 /// - Future attendances: Only show active persons
-final filteredPersonAttendancesProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
-  final personAttendances = await ref.watch(personAttendancesProvider(attendanceId).future);
+final filteredPersonAttendancesForAttendanceProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
+  final personAttendances = await ref.watch(personAttendancesForAttendanceProvider(attendanceId).future);
   final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
 
   if (attendance == null) return personAttendances;
@@ -160,8 +164,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   final Set<int> _selectedPersonIds = {};
   bool _isSelectionMode = false;
 
-  // Realtime channels
-  dynamic _personAttChannel;
+  // Realtime channel - typed for proper cleanup
+  RealtimeChannel? _personAttChannel;
 
   @override
   void initState() {
@@ -200,7 +204,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   }
 
   void _unsubscribeFromRealtimeChanges() {
-    _personAttChannel?.unsubscribe();
+    final channel = _personAttChannel;
+    if (channel != null) {
+      final supabase = ref.read(supabaseClientProvider);
+      supabase.removeChannel(channel);
+      _personAttChannel = null;
+    }
   }
 
   /// Ensures PersonAttendance records exist for this attendance.
@@ -209,7 +218,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   Future<void> _ensurePersonAttendancesExist() async {
     // IMPORTANT: Wait for the provider to FINISH loading before checking
     // Using .future instead of .valueOrNull to avoid race condition
-    final personAttendances = await ref.read(personAttendancesProvider(widget.attendanceId).future);
+    final personAttendances = await ref.read(personAttendancesForAttendanceProvider(widget.attendanceId).future);
 
     // If records already exist, nothing to do
     if (personAttendances.isNotEmpty) return;
@@ -243,7 +252,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     await supabase.from('person_attendances').insert(records);
 
     // Invalidate provider to reload new records
-    ref.invalidate(personAttendancesProvider(widget.attendanceId));
+    ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
   }
 
   void _onPersonAttendanceChange(dynamic payload) {
@@ -289,14 +298,20 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   Widget build(BuildContext context) {
     final attendanceAsync = ref.watch(attendanceDetailProvider(widget.attendanceId));
     final personsAsync = ref.watch(filteredPersonsForAttendanceProvider(widget.attendanceId));
-    final personAttendancesAsync = ref.watch(filteredPersonAttendancesProvider(widget.attendanceId));
+    // Watch the provider to trigger rebuilds when data changes
+    ref.watch(filteredPersonAttendancesForAttendanceProvider(widget.attendanceId));
     final attendanceTypeAsync = ref.watch(attendanceTypeForAttendanceProvider(widget.attendanceId));
 
     // Get available statuses from attendance type, or use all statuses as default
-    final availableStatuses = attendanceTypeAsync.valueOrNull?.availableStatuses ?? AttendanceStatus.values;
+    // Handle empty list case: if list is empty, fallback to all statuses
+    final typeStatuses = attendanceTypeAsync.valueOrNull?.availableStatuses;
+    final availableStatuses = (typeStatuses?.isNotEmpty == true) ? typeStatuses! : AttendanceStatus.values;
 
     // Merge person attendance data into local state whenever it changes
-    ref.listen(filteredPersonAttendancesProvider(widget.attendanceId), (previous, next) {
+    ref.listen(filteredPersonAttendancesForAttendanceProvider(widget.attendanceId), (previous, next) {
+      // Guard against setState after dispose
+      if (!mounted) return;
+
       if (next.value != null) {
         // Only update if we don't have local changes, or this is the first load
         final isFirstLoad = _localStatuses.isEmpty;
@@ -351,7 +366,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(attendance.typeInfo ?? 'Anwesenheit'),
+                Text(attendance.displayTitle),
                 Text(
                   attendance.formattedDate,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -607,7 +622,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     if (mounted) {
       ToastHelper.showSuccess(context, '${_selectedPersonIds.length} Einträge aktualisiert');
       _exitSelectionMode();
-      ref.invalidate(personAttendancesProvider(widget.attendanceId));
+      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
     }
   }
 
@@ -908,7 +923,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     if (mounted) {
       ToastHelper.showSuccess(context, 'Änderungen gespeichert');
       setState(() => _hasChanges = false);
-      ref.invalidate(personAttendancesProvider(widget.attendanceId));
+      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
     }
   }
@@ -1478,10 +1493,16 @@ class _AttendanceStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = persons.length;
-    final present = localStatuses.values.where((s) => s == AttendanceStatus.present).length;
-    final excused = localStatuses.values.where((s) => s.isExcused).length;
+    // Count present (including late as they are physically present)
+    final present = localStatuses.values.where((s) =>
+        s == AttendanceStatus.present ||
+        s == AttendanceStatus.late ||
+        s == AttendanceStatus.lateExcused).length;
+    // Count excused (but not lateExcused as those are counted in present)
+    final excused = localStatuses.values.where((s) => s == AttendanceStatus.excused).length;
     final absent = localStatuses.values.where((s) => s == AttendanceStatus.absent).length;
-    final unknown = total - present - excused - absent;
+    // Unknown = neutral status (not yet recorded)
+    final unknown = localStatuses.values.where((s) => s == AttendanceStatus.neutral).length;
     final percentage = total > 0 ? (present / total * 100) : 0.0;
 
     return Container(

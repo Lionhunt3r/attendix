@@ -263,7 +263,7 @@ extension AttendanceExtension on Attendance {
     if (dateObj == null) return date;
     return '${dateObj.day.toString().padLeft(2, '0')}.${dateObj.month.toString().padLeft(2, '0')}.${dateObj.year}';
   }
-  
+
   /// Weekday name
   String get weekdayName {
     final dateObj = DateTime.tryParse(date);
@@ -271,7 +271,7 @@ extension AttendanceExtension on Attendance {
     const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
     return weekdays[dateObj.weekday - 1];
   }
-  
+
   /// Is today
   bool get isToday {
     final dateObj = DateTime.tryParse(date);
@@ -280,6 +280,38 @@ extension AttendanceExtension on Attendance {
     return dateObj.year == today.year &&
         dateObj.month == today.month &&
         dateObj.day == today.day;
+  }
+
+  /// Display title (like Ionic app logic)
+  /// Returns formatted title: "Wochentag, DD.MM.YYYY | typeInfo/Typ-Name"
+  ///
+  /// Logic:
+  /// 1. If typeInfo is set and not empty → "Datum | typeInfo"
+  /// 2. If hideName=true (e.g. Probe) → only date
+  /// 3. Otherwise → "Datum | Typ-Name"
+  String getDisplayTitle(AttendanceType? attendanceType) {
+    // 1. If typeInfo is set and not empty, show it
+    if (typeInfo != null && typeInfo!.isNotEmpty) {
+      return '$weekdayName, $formattedDate | $typeInfo';
+    }
+
+    // 2. If hideName=true (e.g. for "Probe"), show only date
+    if (attendanceType?.hideName == true) {
+      return '$weekdayName, $formattedDate';
+    }
+
+    // 3. Otherwise show "Datum | Typ-Name"
+    final typeName = attendanceType?.name ?? type ?? 'Anwesenheit';
+    return '$weekdayName, $formattedDate | $typeName';
+  }
+
+  /// Simple display title without AttendanceType
+  /// Uses type field as fallback
+  String get displayTitle {
+    if (typeInfo != null && typeInfo!.isNotEmpty) {
+      return typeInfo!;
+    }
+    return type ?? 'Anwesenheit';
   }
 }
 

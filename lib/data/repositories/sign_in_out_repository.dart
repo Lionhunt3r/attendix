@@ -34,7 +34,7 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
       }
 
       await supabase.from('person_attendances').update({
-        'status': newStatus.name,
+        'status': newStatus.value,
         'notes': notes,
         'changed_at': DateTime.now().toIso8601String(),
         'changed_by': supabase.auth.currentUser?.id,
@@ -56,7 +56,7 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
           isLateComing ? AttendanceStatus.lateExcused : AttendanceStatus.excused;
 
       await supabase.from('person_attendances').update({
-        'status': status.name,
+        'status': status.value,
         'notes': reason,
         'changed_at': DateTime.now().toIso8601String(),
         'changed_by': supabase.auth.currentUser?.id,
@@ -111,7 +111,7 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
             *,
             attendance:attendance_id(
               id, date, type, typeInfo, start_time, end_time, deadline, tenantId,
-              type_id
+              type_id, plan, share_plan
             )
           ''')
           .inFilter('person_id', personIds)
@@ -119,7 +119,7 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
 
       // Get tenant info
       final tenants = await supabase
-          .from('tenant')
+          .from('tenants')
           .select('id, shortName, color')
           .inFilter('id', tenantIds);
 
@@ -151,6 +151,9 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
           tenantId: tenantId,
           tenantName: tenantInfo?['name'] ?? 'Unbekannt',
           tenantColor: tenantInfo?['color'] ?? '#000000',
+          plan: attendance?['plan'] as Map<String, dynamic>?,
+          sharePlan: attendance?['share_plan'] == true,
+          typeId: attendance?['type_id']?.toString(),
         );
       }).toList();
     } catch (e, stack) {
@@ -163,9 +166,20 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
     if (status == null) return AttendanceStatus.neutral;
     if (status is AttendanceStatus) return status;
 
-    final statusStr = status.toString().toLowerCase();
+    // Handle integer values (as stored in database)
+    if (status is int) {
+      return AttendanceStatus.fromValue(status);
+    }
+
+    // Handle string values (enum names or integer strings)
+    final statusStr = status.toString();
+    final intValue = int.tryParse(statusStr);
+    if (intValue != null) {
+      return AttendanceStatus.fromValue(intValue);
+    }
+
     return AttendanceStatus.values.firstWhere(
-      (s) => s.name.toLowerCase() == statusStr,
+      (s) => s.name.toLowerCase() == statusStr.toLowerCase(),
       orElse: () => AttendanceStatus.neutral,
     );
   }
@@ -193,6 +207,9 @@ class CrossTenantPersonAttendance {
   final int tenantId;
   final String tenantName;
   final String tenantColor;
+  final Map<String, dynamic>? plan;
+  final bool sharePlan;
+  final String? typeId;
 
   CrossTenantPersonAttendance({
     this.id,
@@ -208,6 +225,9 @@ class CrossTenantPersonAttendance {
     required this.tenantId,
     required this.tenantName,
     required this.tenantColor,
+    this.plan,
+    this.sharePlan = false,
+    this.typeId,
   });
 
   /// Check if this attendance is in the past
@@ -243,5 +263,44 @@ class CrossTenantPersonAttendance {
     return status == AttendanceStatus.present ||
         status == AttendanceStatus.late ||
         status == AttendanceStatus.lateExcused;
+  }
+
+  /// Check if plan is available for viewing
+  bool get hasPlan {
+    if (!sharePlan || plan == null) return false;
+    final fields = plan?['fields'] as List?;
+    return fields != null && fields.isNotEmpty;
+  }
+
+  /// Get deadline as DateTime
+  DateTime? get deadlineDateTime {
+    if (deadline == null) return null;
+    return DateTime.tryParse(deadline!);
+  }
+
+  /// Get readable deadline text
+  String? get deadlineText {
+    final deadlineDate = deadlineDateTime;
+    if (deadlineDate == null) return null;
+
+    final now = DateTime.now();
+    if (now.isAfter(deadlineDate)) {
+      return 'Anmeldefrist abgelaufen';
+    }
+
+    final day = deadlineDate.day.toString().padLeft(2, '0');
+    final month = deadlineDate.month.toString().padLeft(2, '0');
+    final year = deadlineDate.year;
+    final hour = deadlineDate.hour.toString().padLeft(2, '0');
+    final minute = deadlineDate.minute.toString().padLeft(2, '0');
+    return 'Anmelden bis $day.$month.$year $hour:$minute Uhr';
+  }
+
+  /// Display title - returns typeInfo if not empty, otherwise 'Termin'
+  String get displayTitle {
+    if (typeInfo != null && typeInfo!.isNotEmpty) {
+      return typeInfo!;
+    }
+    return 'Termin';
   }
 }

@@ -6,6 +6,8 @@ import '../../../../core/providers/self_service_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../widgets/plan_viewer_sheet.dart';
+import '../widgets/upcoming_songs_sheet.dart';
 
 /// Self-Service Overview Page
 ///
@@ -35,6 +37,11 @@ class _SelfServiceOverviewPageState
       appBar: AppBar(
         title: const Text('Übersicht'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.library_music),
+            tooltip: 'Aktuelle Stücke',
+            onPressed: () => showUpcomingSongsSheet(context),
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.sort),
             tooltip: 'Gruppierung',
@@ -110,6 +117,9 @@ class _SelfServiceOverviewPageState
                       attendance: currentAttendance,
                       onSignIn: () => _signIn(currentAttendance),
                       onSignOut: () => _showSignOutDialog(currentAttendance),
+                      onShowPlan: currentAttendance.hasPlan
+                          ? () => _showPlanViewer(currentAttendance)
+                          : null,
                     ),
                   ),
 
@@ -217,7 +227,8 @@ class _SelfServiceOverviewPageState
     }
   }
 
-  Future<void> _showSignOutDialog(CrossTenantPersonAttendance attendance) async {
+  Future<void> _showSignOutDialog(CrossTenantPersonAttendance attendance,
+      {bool isLateComing = false}) async {
     if (attendance.id == null) {
       ToastHelper.showError(context, 'Fehler: Keine gültige Anwesenheits-ID');
       return;
@@ -237,12 +248,14 @@ class _SelfServiceOverviewPageState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const ListTile(
+            ListTile(
               title: Text(
-                'Abmelden',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                isLateComing ? 'Verspätung eintragen' : 'Abmelden',
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text('Bitte wähle einen Grund'),
+              subtitle: Text(isLateComing
+                  ? 'Bitte gib einen Grund für die Verspätung an'
+                  : 'Bitte wähle einen Grund'),
             ),
             const Divider(),
             ...reasons.map((reason) => ListTile(
@@ -265,11 +278,15 @@ class _SelfServiceOverviewPageState
       await ref.read(signInOutNotifierProvider.notifier).signOut(
             [attendance.id!],
             selectedReason,
+            isLateComing: isLateComing,
           );
 
       if (mounted) {
         ToastHelper.showSuccess(
-            context, 'Vielen Dank für deine rechtzeitige Abmeldung!');
+            context,
+            isLateComing
+                ? 'Vielen Dank für die Info!'
+                : 'Vielen Dank für deine rechtzeitige Abmeldung!');
       }
     }
   }
@@ -302,7 +319,9 @@ class _SelfServiceOverviewPageState
     );
 
     if (reason != null && reason.isNotEmpty && mounted) {
-      Navigator.of(context).pop(reason);
+      if (context.mounted) {
+        Navigator.of(context).pop(reason);
+      }
     }
   }
 
@@ -321,10 +340,25 @@ class _SelfServiceOverviewPageState
           children: [
             ListTile(
               title: Text(
-                attendance.typeInfo ?? 'Termin',
+                attendance.displayTitle,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text(DateHelper.getReadableDate(attendance.date ?? '')),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(DateHelper.getReadableDate(attendance.date ?? '')),
+                  if (attendance.deadlineText != null)
+                    Text(
+                      attendance.deadlineText!,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: attendance.isDeadlinePassed
+                            ? AppColors.danger
+                            : AppColors.medium,
+                      ),
+                    ),
+                ],
+              ),
             ),
             const Divider(),
             if (isUpcoming && !isDeadlinePassed) ...[
@@ -342,6 +376,14 @@ class _SelfServiceOverviewPageState
                 onTap: () {
                   Navigator.pop(context);
                   _showSignOutDialog(attendance);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.schedule, color: AppColors.warning),
+                title: const Text('Verspätung eintragen'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showSignOutDialog(attendance, isLateComing: true);
                 },
               ),
             ],
@@ -364,10 +406,31 @@ class _SelfServiceOverviewPageState
                 _showNoteDialog(attendance);
               },
             ),
+            if (attendance.hasPlan)
+              ListTile(
+                leading: const Icon(Icons.list_alt, color: AppColors.primary),
+                title: const Text('Ablaufplan anzeigen'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showPlanViewer(attendance);
+                },
+              ),
             const SizedBox(height: AppDimensions.paddingM),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showPlanViewer(CrossTenantPersonAttendance attendance) async {
+    if (!attendance.hasPlan) {
+      ToastHelper.showWarning(context, 'Kein Ablaufplan verfügbar');
+      return;
+    }
+
+    await showPlanViewerSheet(
+      context,
+      attendance: attendance,
     );
   }
 
@@ -522,11 +585,13 @@ class _CurrentAttendanceCard extends StatelessWidget {
     required this.attendance,
     required this.onSignIn,
     required this.onSignOut,
+    this.onShowPlan,
   });
 
   final CrossTenantPersonAttendance attendance;
   final VoidCallback onSignIn;
   final VoidCallback onSignOut;
+  final VoidCallback? onShowPlan;
 
   @override
   Widget build(BuildContext context) {
@@ -561,6 +626,16 @@ class _CurrentAttendanceCard extends StatelessWidget {
                     color: AppColors.medium,
                   ),
                 ),
+                const Spacer(),
+                if (attendance.hasPlan)
+                  IconButton(
+                    icon: const Icon(Icons.list_alt, color: AppColors.primary),
+                    tooltip: 'Ablaufplan anzeigen',
+                    onPressed: onShowPlan,
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                    iconSize: 20,
+                  ),
               ],
             ),
             const SizedBox(height: AppDimensions.paddingS),
@@ -587,6 +662,32 @@ class _CurrentAttendanceCard extends StatelessWidget {
               Text(
                 '${attendance.startTime}${attendance.endTime != null ? ' - ${attendance.endTime}' : ''}',
                 style: TextStyle(color: AppColors.medium, fontSize: 12),
+              ),
+            ],
+            if (attendance.deadlineText != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    attendance.isDeadlinePassed
+                        ? Icons.warning_amber
+                        : Icons.schedule,
+                    size: 14,
+                    color: attendance.isDeadlinePassed
+                        ? AppColors.danger
+                        : AppColors.medium,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    attendance.deadlineText!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: attendance.isDeadlinePassed
+                          ? AppColors.danger
+                          : AppColors.medium,
+                    ),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: AppDimensions.paddingM),
@@ -739,7 +840,22 @@ class _AttendanceListTile extends StatelessWidget {
           ),
         ),
       ),
-      title: Text(DateHelper.getReadableDate(attendance.date ?? '')),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(DateHelper.getReadableDate(attendance.date ?? '')),
+          ),
+          if (attendance.hasPlan)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Icon(
+                Icons.list_alt,
+                size: 16,
+                color: AppColors.primary,
+              ),
+            ),
+        ],
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -752,6 +868,16 @@ class _AttendanceListTile extends StatelessWidget {
             Text(
               attendance.tenantName,
               style: TextStyle(fontSize: 12, color: AppColors.medium),
+            ),
+          if (attendance.deadlineText != null && attendance.isUpcoming)
+            Text(
+              attendance.deadlineText!,
+              style: TextStyle(
+                fontSize: 11,
+                color: attendance.isDeadlinePassed
+                    ? AppColors.danger
+                    : AppColors.medium,
+              ),
             ),
         ],
       ),

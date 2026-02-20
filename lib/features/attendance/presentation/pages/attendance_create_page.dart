@@ -8,19 +8,20 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/attendance/attendance.dart';
-import '../../../tenant_selection/presentation/pages/tenant_selection_page.dart';
+import '../../../../core/providers/tenant_providers.dart';
 
 /// Provider for attendance types
 final attendanceTypesProvider = FutureProvider<List<AttendanceType>>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
-  
-  if (tenant == null) return [];
+
+  // Guard against null tenant or null tenant.id
+  if (tenant?.id == null) return [];
 
   final response = await supabase
       .from('attendance_types')
       .select('*')
-      .eq('tenant_id', tenant.id!)
+      .eq('tenant_id', tenant!.id!)
       .eq('visible', true)
       .order('index', ascending: true);
 
@@ -326,13 +327,14 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     final supabase = ref.read(supabaseClientProvider);
     final tenant = ref.read(currentTenantProvider);
 
-    if (tenant == null) return;
+    // Guard against null tenant or null tenant.id
+    if (tenant?.id == null) return;
 
     // Get all active players (not left, not pending)
     final players = await supabase
         .from('player')
         .select('id')
-        .eq('tenantId', tenant.id!)
+        .eq('tenantId', tenant!.id!)
         .isFilter('left', null);  // null = aktiv
 
     final playerList = players as List;
@@ -345,7 +347,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     final records = playerList.map((p) => {
       'attendance_id': attendanceId,
       'person_id': p['id'],
-      'status': defaultStatus.name,
+      'status': defaultStatus.value,  // Use integer value, not string name
     }).toList();
 
     // Batch insert all records

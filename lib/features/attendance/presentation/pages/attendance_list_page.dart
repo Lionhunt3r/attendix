@@ -14,12 +14,13 @@ final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
 
-  if (tenant == null) return [];
+  // Guard against null tenant or null tenant.id
+  if (tenant?.id == null) return [];
 
   final response = await supabase
       .from('attendance')
       .select('*')
-      .eq('tenantId', tenant.id!)
+      .eq('tenantId', tenant!.id!)
       .order('date', ascending: false)
       .limit(50);
 
@@ -116,48 +117,87 @@ class AttendanceListPage extends ConsumerWidget {
             );
           }
 
-          // Group by date
-          final groupedAttendances = <String, List<Attendance>>{};
+          // Separate into upcoming and past attendances (like Ionic)
+          final now = DateTime.now();
+          final todayStart = DateTime(now.year, now.month, now.day);
+
+          final upcomingAttendances = <Attendance>[];
+          final pastAttendances = <Attendance>[];
+
           for (final attendance in attendances) {
-            final dateKey = attendance.formattedDate;
-            groupedAttendances.putIfAbsent(dateKey, () => []).add(attendance);
+            final date = DateTime.tryParse(attendance.date);
+            if (date == null) {
+              pastAttendances.add(attendance);
+              continue;
+            }
+            final dateOnly = DateTime(date.year, date.month, date.day);
+            if (dateOnly.isBefore(todayStart)) {
+              pastAttendances.add(attendance);
+            } else {
+              upcomingAttendances.add(attendance);
+            }
+          }
+
+          // Sort upcoming by date ascending, past by date descending
+          upcomingAttendances.sort((a, b) => a.date.compareTo(b.date));
+          pastAttendances.sort((a, b) => b.date.compareTo(a.date));
+
+          // Current attendance is the first upcoming one
+          Attendance? currentAttendance;
+          if (upcomingAttendances.isNotEmpty) {
+            currentAttendance = upcomingAttendances.first;
+            upcomingAttendances.removeAt(0);
           }
 
           return RefreshIndicator(
             onRefresh: () async {
+              // ignore: unused_result
               ref.refresh(attendanceListProvider);
             },
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
-              itemCount: groupedAttendances.length,
-              itemBuilder: (context, index) {
-                final dateKey = groupedAttendances.keys.elementAt(index);
-                final items = groupedAttendances[dateKey]!;
-                
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (index > 0) const SizedBox(height: AppDimensions.paddingM),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppDimensions.paddingS,
-                        horizontal: AppDimensions.paddingXS,
-                      ),
-                      child: Text(
-                        _getDateLabel(items.first.date),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppColors.medium,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    ...items.map((attendance) => _AttendanceListItem(
+              children: [
+                // Current Attendance Section (like Ionic)
+                if (currentAttendance != null) ...[
+                  _SectionHeader(
+                    title: 'Aktuell',
+                    count: 1,
+                    isExpanded: true,
+                  ),
+                  _AttendanceListItem(
+                    attendance: currentAttendance,
+                    onTap: () => context.push('/attendance/${currentAttendance!.id}'),
+                    highlight: true,
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+                ],
+
+                // Upcoming Attendances Section
+                if (upcomingAttendances.isNotEmpty) ...[
+                  _SectionHeader(
+                    title: 'Anstehend',
+                    count: upcomingAttendances.length,
+                    isExpanded: true,
+                  ),
+                  ...upcomingAttendances.map((attendance) => _AttendanceListItem(
+                    attendance: attendance,
+                    onTap: () => context.push('/attendance/${attendance.id}'),
+                  )),
+                  const SizedBox(height: AppDimensions.paddingM),
+                ],
+
+                // Past Attendances Section (collapsed by default)
+                if (pastAttendances.isNotEmpty)
+                  _CollapsibleSection(
+                    title: 'Vergangen',
+                    count: pastAttendances.length,
+                    initiallyExpanded: false,
+                    children: pastAttendances.map((attendance) => _AttendanceListItem(
                       attendance: attendance,
                       onTap: () => context.push('/attendance/${attendance.id}'),
-                    )),
-                  ],
-                );
-              },
+                    )).toList(),
+                  ),
+              ],
             ),
           );
         },
@@ -169,25 +209,141 @@ class AttendanceListPage extends ConsumerWidget {
       ),
     );
   }
+}
 
-  String _getDateLabel(String dateString) {
-    final date = DateTime.tryParse(dateString);
-    if (date == null) return dateString;
-    
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final dateOnly = DateTime(date.year, date.month, date.day);
+/// Section header widget (like Ionic accordion header)
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.count,
+    required this.isExpanded,
+  });
 
-    if (dateOnly == today) {
-      return 'Heute';
-    } else if (dateOnly == yesterday) {
-      return 'Gestern';
-    } else {
-      final weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-      final weekday = weekdays[date.weekday - 1];
-      return '$weekday, ${date.day}.${date.month}.${date.year}';
-    }
+  final String title;
+  final int count;
+  final bool isExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: AppDimensions.paddingS,
+        horizontal: AppDimensions.paddingXS,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isExpanded ? Icons.expand_more : Icons.chevron_right,
+            color: AppColors.primary,
+            size: 20,
+          ),
+          const SizedBox(width: AppDimensions.paddingXS),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: AppDimensions.paddingS),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Collapsible section widget (like Ionic accordion)
+class _CollapsibleSection extends StatefulWidget {
+  const _CollapsibleSection({
+    required this.title,
+    required this.count,
+    required this.children,
+    this.initiallyExpanded = true,
+  });
+
+  final String title;
+  final int count;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: AppDimensions.paddingS,
+              horizontal: AppDimensions.paddingXS,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isExpanded ? Icons.expand_more : Icons.chevron_right,
+                  color: AppColors.medium,
+                  size: 20,
+                ),
+                const SizedBox(width: AppDimensions.paddingXS),
+                Text(
+                  widget.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.medium,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.paddingS),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.medium.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${widget.count}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.medium,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_isExpanded) ...widget.children,
+      ],
+    );
   }
 }
 
@@ -195,10 +351,12 @@ class _AttendanceListItem extends StatelessWidget {
   const _AttendanceListItem({
     required this.attendance,
     required this.onTap,
+    this.highlight = false,
   });
 
   final Attendance attendance;
   final VoidCallback onTap;
+  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -211,13 +369,15 @@ class _AttendanceListItem extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+      elevation: highlight ? 2 : 1,
+      color: highlight ? AppColors.primary.withValues(alpha: 0.05) : null,
       child: ListTile(
         onTap: onTap,
         leading: Container(
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: attendance.isToday
+            color: attendance.isToday || highlight
                 ? AppColors.primary.withValues(alpha: 0.2)
                 : AppColors.primaryLight.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
@@ -230,7 +390,7 @@ class _AttendanceListItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: attendance.isToday ? AppColors.primary : AppColors.dark,
+                  color: attendance.isToday || highlight ? AppColors.primary : AppColors.dark,
                 ),
               ),
               Text(
@@ -238,15 +398,17 @@ class _AttendanceListItem extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: attendance.isToday ? AppColors.primary : AppColors.dark,
+                  color: attendance.isToday || highlight ? AppColors.primary : AppColors.dark,
                 ),
               ),
             ],
           ),
         ),
         title: Text(
-          attendance.typeInfo ?? 'Anwesenheit',
-          style: const TextStyle(fontWeight: FontWeight.w500),
+          attendance.displayTitle,
+          style: TextStyle(
+            fontWeight: highlight ? FontWeight.bold : FontWeight.w500,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,7 +515,7 @@ void _showAttendanceSelectionDialog(BuildContext context, List<Attendance> atten
           itemBuilder: (context, index) {
             final attendance = attendances[index];
             return ListTile(
-              title: Text(attendance.typeInfo ?? 'Anwesenheit'),
+              title: Text(attendance.displayTitle),
               subtitle: attendance.startTime != null
                   ? Text(attendance.startTime!)
                   : null,
