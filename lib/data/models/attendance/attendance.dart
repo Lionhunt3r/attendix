@@ -282,6 +282,21 @@ extension AttendanceExtension on Attendance {
         dateObj.day == today.day;
   }
 
+  /// Maps internal type values to display names
+  String _formatTypeForDisplay(String type) {
+    switch (type.toLowerCase()) {
+      case 'uebung':
+        return 'Probe';
+      case 'vortrag':
+        return 'Vortrag';
+      default:
+        // Capitalize first letter for unknown types
+        return type.isNotEmpty
+            ? '${type[0].toUpperCase()}${type.substring(1)}'
+            : type;
+    }
+  }
+
   /// Display title (like Ionic app logic)
   /// Returns formatted title: "Wochentag, DD.MM.YYYY | typeInfo/Typ-Name"
   ///
@@ -301,17 +316,17 @@ extension AttendanceExtension on Attendance {
     }
 
     // 3. Otherwise show "Datum | Typ-Name"
-    final typeName = attendanceType?.name ?? type ?? 'Anwesenheit';
+    final typeName = attendanceType?.name ?? (type != null ? _formatTypeForDisplay(type!) : 'Anwesenheit');
     return '$weekdayName, $formattedDate | $typeName';
   }
 
   /// Simple display title without AttendanceType
-  /// Uses type field as fallback
+  /// Uses type field as fallback (mapped to display name)
   String get displayTitle {
     if (typeInfo != null && typeInfo!.isNotEmpty) {
       return typeInfo!;
     }
-    return type ?? 'Anwesenheit';
+    return type != null ? _formatTypeForDisplay(type!) : 'Anwesenheit';
   }
 }
 
