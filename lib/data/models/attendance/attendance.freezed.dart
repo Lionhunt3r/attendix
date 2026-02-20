@@ -40,6 +40,7 @@ mixin _$Attendance {
   @_FlexibleBoolConverter()
   bool get saveInHistory => throw _privateConstructorUsedError;
   double? get percentage => throw _privateConstructorUsedError;
+  @_FlexibleStringListConverter()
   List<String>? get excused => throw _privateConstructorUsedError;
   @_FlexibleStringConverter()
   String? get typeInfo => throw _privateConstructorUsedError;
@@ -48,8 +49,11 @@ mixin _$Attendance {
   @_FlexibleStringConverter()
   String? get img => throw _privateConstructorUsedError;
   Map<String, dynamic>? get plan => throw _privateConstructorUsedError;
+  @_FlexibleStringListConverter()
   List<String>? get lateExcused => throw _privateConstructorUsedError;
+  @_FlexibleIntListConverter()
   List<int>? get songs => throw _privateConstructorUsedError;
+  @_FlexibleIntListConverter()
   List<int>? get criticalPlayers => throw _privateConstructorUsedError;
   Map<String, dynamic>? get playerNotes => throw _privateConstructorUsedError;
   @JsonKey(name: 'start_time')
@@ -63,7 +67,14 @@ mixin _$Attendance {
   @JsonKey(name: 'duration_days')
   @_FlexibleIntConverter()
   int? get durationDays => throw _privateConstructorUsedError;
-  List<ChecklistItem>? get checklist => throw _privateConstructorUsedError;
+  List<ChecklistItem>? get checklist =>
+      throw _privateConstructorUsedError; // Fields from Ionic that were missing
+  @_FlexibleIntListConverter()
+  List<int>? get conductors => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get players => throw _privateConstructorUsedError;
+  @JsonKey(name: 'share_plan')
+  @_FlexibleBoolConverter()
+  bool get sharePlan => throw _privateConstructorUsedError;
 
   /// Serializes this Attendance to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -94,20 +105,23 @@ abstract class $AttendanceCopyWith<$Res> {
     @_FlexibleBoolConverter()
     bool saveInHistory,
     double? percentage,
-    List<String>? excused,
+    @_FlexibleStringListConverter() List<String>? excused,
     @_FlexibleStringConverter() String? typeInfo,
     @_FlexibleStringConverter() String? notes,
     @_FlexibleStringConverter() String? img,
     Map<String, dynamic>? plan,
-    List<String>? lateExcused,
-    List<int>? songs,
-    List<int>? criticalPlayers,
+    @_FlexibleStringListConverter() List<String>? lateExcused,
+    @_FlexibleIntListConverter() List<int>? songs,
+    @_FlexibleIntListConverter() List<int>? criticalPlayers,
     Map<String, dynamic>? playerNotes,
     @JsonKey(name: 'start_time') @_FlexibleStringConverter() String? startTime,
     @JsonKey(name: 'end_time') @_FlexibleStringConverter() String? endTime,
     @_FlexibleStringConverter() String? deadline,
     @JsonKey(name: 'duration_days') @_FlexibleIntConverter() int? durationDays,
     List<ChecklistItem>? checklist,
+    @_FlexibleIntListConverter() List<int>? conductors,
+    Map<String, dynamic>? players,
+    @JsonKey(name: 'share_plan') @_FlexibleBoolConverter() bool sharePlan,
   });
 }
 
@@ -149,6 +163,9 @@ class _$AttendanceCopyWithImpl<$Res, $Val extends Attendance>
     Object? deadline = freezed,
     Object? durationDays = freezed,
     Object? checklist = freezed,
+    Object? conductors = freezed,
+    Object? players = freezed,
+    Object? sharePlan = null,
   }) {
     return _then(
       _value.copyWith(
@@ -267,6 +284,21 @@ class _$AttendanceCopyWithImpl<$Res, $Val extends Attendance>
                     ? _value.checklist
                     : checklist // ignore: cast_nullable_to_non_nullable
                         as List<ChecklistItem>?,
+            conductors:
+                freezed == conductors
+                    ? _value.conductors
+                    : conductors // ignore: cast_nullable_to_non_nullable
+                        as List<int>?,
+            players:
+                freezed == players
+                    ? _value.players
+                    : players // ignore: cast_nullable_to_non_nullable
+                        as Map<String, dynamic>?,
+            sharePlan:
+                null == sharePlan
+                    ? _value.sharePlan
+                    : sharePlan // ignore: cast_nullable_to_non_nullable
+                        as bool,
           )
           as $Val,
     );
@@ -294,20 +326,23 @@ abstract class _$$AttendanceImplCopyWith<$Res>
     @_FlexibleBoolConverter()
     bool saveInHistory,
     double? percentage,
-    List<String>? excused,
+    @_FlexibleStringListConverter() List<String>? excused,
     @_FlexibleStringConverter() String? typeInfo,
     @_FlexibleStringConverter() String? notes,
     @_FlexibleStringConverter() String? img,
     Map<String, dynamic>? plan,
-    List<String>? lateExcused,
-    List<int>? songs,
-    List<int>? criticalPlayers,
+    @_FlexibleStringListConverter() List<String>? lateExcused,
+    @_FlexibleIntListConverter() List<int>? songs,
+    @_FlexibleIntListConverter() List<int>? criticalPlayers,
     Map<String, dynamic>? playerNotes,
     @JsonKey(name: 'start_time') @_FlexibleStringConverter() String? startTime,
     @JsonKey(name: 'end_time') @_FlexibleStringConverter() String? endTime,
     @_FlexibleStringConverter() String? deadline,
     @JsonKey(name: 'duration_days') @_FlexibleIntConverter() int? durationDays,
     List<ChecklistItem>? checklist,
+    @_FlexibleIntListConverter() List<int>? conductors,
+    Map<String, dynamic>? players,
+    @JsonKey(name: 'share_plan') @_FlexibleBoolConverter() bool sharePlan,
   });
 }
 
@@ -348,6 +383,9 @@ class __$$AttendanceImplCopyWithImpl<$Res>
     Object? deadline = freezed,
     Object? durationDays = freezed,
     Object? checklist = freezed,
+    Object? conductors = freezed,
+    Object? players = freezed,
+    Object? sharePlan = null,
   }) {
     return _then(
       _$AttendanceImpl(
@@ -466,6 +504,21 @@ class __$$AttendanceImplCopyWithImpl<$Res>
                 ? _value._checklist
                 : checklist // ignore: cast_nullable_to_non_nullable
                     as List<ChecklistItem>?,
+        conductors:
+            freezed == conductors
+                ? _value._conductors
+                : conductors // ignore: cast_nullable_to_non_nullable
+                    as List<int>?,
+        players:
+            freezed == players
+                ? _value._players
+                : players // ignore: cast_nullable_to_non_nullable
+                    as Map<String, dynamic>?,
+        sharePlan:
+            null == sharePlan
+                ? _value.sharePlan
+                : sharePlan // ignore: cast_nullable_to_non_nullable
+                    as bool,
       ),
     );
   }
@@ -486,27 +539,34 @@ class _$AttendanceImpl implements _Attendance {
     @_FlexibleBoolConverter()
     this.saveInHistory = false,
     this.percentage,
-    final List<String>? excused,
+    @_FlexibleStringListConverter() final List<String>? excused,
     @_FlexibleStringConverter() this.typeInfo,
     @_FlexibleStringConverter() this.notes,
     @_FlexibleStringConverter() this.img,
     final Map<String, dynamic>? plan,
-    final List<String>? lateExcused,
-    final List<int>? songs,
-    final List<int>? criticalPlayers,
+    @_FlexibleStringListConverter() final List<String>? lateExcused,
+    @_FlexibleIntListConverter() final List<int>? songs,
+    @_FlexibleIntListConverter() final List<int>? criticalPlayers,
     final Map<String, dynamic>? playerNotes,
     @JsonKey(name: 'start_time') @_FlexibleStringConverter() this.startTime,
     @JsonKey(name: 'end_time') @_FlexibleStringConverter() this.endTime,
     @_FlexibleStringConverter() this.deadline,
     @JsonKey(name: 'duration_days') @_FlexibleIntConverter() this.durationDays,
     final List<ChecklistItem>? checklist,
+    @_FlexibleIntListConverter() final List<int>? conductors,
+    final Map<String, dynamic>? players,
+    @JsonKey(name: 'share_plan')
+    @_FlexibleBoolConverter()
+    this.sharePlan = false,
   }) : _excused = excused,
        _plan = plan,
        _lateExcused = lateExcused,
        _songs = songs,
        _criticalPlayers = criticalPlayers,
        _playerNotes = playerNotes,
-       _checklist = checklist;
+       _checklist = checklist,
+       _conductors = conductors,
+       _players = players;
 
   factory _$AttendanceImpl.fromJson(Map<String, dynamic> json) =>
       _$$AttendanceImplFromJson(json);
@@ -541,6 +601,7 @@ class _$AttendanceImpl implements _Attendance {
   final double? percentage;
   final List<String>? _excused;
   @override
+  @_FlexibleStringListConverter()
   List<String>? get excused {
     final value = _excused;
     if (value == null) return null;
@@ -570,6 +631,7 @@ class _$AttendanceImpl implements _Attendance {
 
   final List<String>? _lateExcused;
   @override
+  @_FlexibleStringListConverter()
   List<String>? get lateExcused {
     final value = _lateExcused;
     if (value == null) return null;
@@ -580,6 +642,7 @@ class _$AttendanceImpl implements _Attendance {
 
   final List<int>? _songs;
   @override
+  @_FlexibleIntListConverter()
   List<int>? get songs {
     final value = _songs;
     if (value == null) return null;
@@ -590,6 +653,7 @@ class _$AttendanceImpl implements _Attendance {
 
   final List<int>? _criticalPlayers;
   @override
+  @_FlexibleIntListConverter()
   List<int>? get criticalPlayers {
     final value = _criticalPlayers;
     if (value == null) return null;
@@ -633,9 +697,37 @@ class _$AttendanceImpl implements _Attendance {
     return EqualUnmodifiableListView(value);
   }
 
+  // Fields from Ionic that were missing
+  final List<int>? _conductors;
+  // Fields from Ionic that were missing
+  @override
+  @_FlexibleIntListConverter()
+  List<int>? get conductors {
+    final value = _conductors;
+    if (value == null) return null;
+    if (_conductors is EqualUnmodifiableListView) return _conductors;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  final Map<String, dynamic>? _players;
+  @override
+  Map<String, dynamic>? get players {
+    final value = _players;
+    if (value == null) return null;
+    if (_players is EqualUnmodifiableMapView) return _players;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
+
+  @override
+  @JsonKey(name: 'share_plan')
+  @_FlexibleBoolConverter()
+  final bool sharePlan;
+
   @override
   String toString() {
-    return 'Attendance(id: $id, tenantId: $tenantId, createdAt: $createdAt, createdBy: $createdBy, date: $date, type: $type, typeId: $typeId, saveInHistory: $saveInHistory, percentage: $percentage, excused: $excused, typeInfo: $typeInfo, notes: $notes, img: $img, plan: $plan, lateExcused: $lateExcused, songs: $songs, criticalPlayers: $criticalPlayers, playerNotes: $playerNotes, startTime: $startTime, endTime: $endTime, deadline: $deadline, durationDays: $durationDays, checklist: $checklist)';
+    return 'Attendance(id: $id, tenantId: $tenantId, createdAt: $createdAt, createdBy: $createdBy, date: $date, type: $type, typeId: $typeId, saveInHistory: $saveInHistory, percentage: $percentage, excused: $excused, typeInfo: $typeInfo, notes: $notes, img: $img, plan: $plan, lateExcused: $lateExcused, songs: $songs, criticalPlayers: $criticalPlayers, playerNotes: $playerNotes, startTime: $startTime, endTime: $endTime, deadline: $deadline, durationDays: $durationDays, checklist: $checklist, conductors: $conductors, players: $players, sharePlan: $sharePlan)';
   }
 
   @override
@@ -686,7 +778,14 @@ class _$AttendanceImpl implements _Attendance {
             const DeepCollectionEquality().equals(
               other._checklist,
               _checklist,
-            ));
+            ) &&
+            const DeepCollectionEquality().equals(
+              other._conductors,
+              _conductors,
+            ) &&
+            const DeepCollectionEquality().equals(other._players, _players) &&
+            (identical(other.sharePlan, sharePlan) ||
+                other.sharePlan == sharePlan));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -716,6 +815,9 @@ class _$AttendanceImpl implements _Attendance {
     deadline,
     durationDays,
     const DeepCollectionEquality().hash(_checklist),
+    const DeepCollectionEquality().hash(_conductors),
+    const DeepCollectionEquality().hash(_players),
+    sharePlan,
   ]);
 
   /// Create a copy of Attendance
@@ -747,14 +849,14 @@ abstract class _Attendance implements Attendance {
     @_FlexibleBoolConverter()
     final bool saveInHistory,
     final double? percentage,
-    final List<String>? excused,
+    @_FlexibleStringListConverter() final List<String>? excused,
     @_FlexibleStringConverter() final String? typeInfo,
     @_FlexibleStringConverter() final String? notes,
     @_FlexibleStringConverter() final String? img,
     final Map<String, dynamic>? plan,
-    final List<String>? lateExcused,
-    final List<int>? songs,
-    final List<int>? criticalPlayers,
+    @_FlexibleStringListConverter() final List<String>? lateExcused,
+    @_FlexibleIntListConverter() final List<int>? songs,
+    @_FlexibleIntListConverter() final List<int>? criticalPlayers,
     final Map<String, dynamic>? playerNotes,
     @JsonKey(name: 'start_time')
     @_FlexibleStringConverter()
@@ -767,6 +869,9 @@ abstract class _Attendance implements Attendance {
     @_FlexibleIntConverter()
     final int? durationDays,
     final List<ChecklistItem>? checklist,
+    @_FlexibleIntListConverter() final List<int>? conductors,
+    final Map<String, dynamic>? players,
+    @JsonKey(name: 'share_plan') @_FlexibleBoolConverter() final bool sharePlan,
   }) = _$AttendanceImpl;
 
   factory _Attendance.fromJson(Map<String, dynamic> json) =
@@ -801,6 +906,7 @@ abstract class _Attendance implements Attendance {
   @override
   double? get percentage;
   @override
+  @_FlexibleStringListConverter()
   List<String>? get excused;
   @override
   @_FlexibleStringConverter()
@@ -814,10 +920,13 @@ abstract class _Attendance implements Attendance {
   @override
   Map<String, dynamic>? get plan;
   @override
+  @_FlexibleStringListConverter()
   List<String>? get lateExcused;
   @override
+  @_FlexibleIntListConverter()
   List<int>? get songs;
   @override
+  @_FlexibleIntListConverter()
   List<int>? get criticalPlayers;
   @override
   Map<String, dynamic>? get playerNotes;
@@ -837,7 +946,16 @@ abstract class _Attendance implements Attendance {
   @_FlexibleIntConverter()
   int? get durationDays;
   @override
-  List<ChecklistItem>? get checklist;
+  List<ChecklistItem>? get checklist; // Fields from Ionic that were missing
+  @override
+  @_FlexibleIntListConverter()
+  List<int>? get conductors;
+  @override
+  Map<String, dynamic>? get players;
+  @override
+  @JsonKey(name: 'share_plan')
+  @_FlexibleBoolConverter()
+  bool get sharePlan;
 
   /// Create a copy of Attendance
   /// with the given fields replaced by the non-null parameter values.
@@ -1830,6 +1948,7 @@ mixin _$AttendanceType {
   @_FlexibleAttendanceStatusConverter()
   AttendanceStatus get defaultStatus => throw _privateConstructorUsedError;
   @JsonKey(name: 'available_statuses')
+  @_FlexibleAttendanceStatusListConverter()
   List<AttendanceStatus>? get availableStatuses =>
       throw _privateConstructorUsedError;
   @JsonKey(name: 'default_plan')
@@ -1874,7 +1993,11 @@ mixin _$AttendanceType {
   @JsonKey(name: 'additional_fields_filter')
   Map<String, dynamic>? get additionalFieldsFilter =>
       throw _privateConstructorUsedError;
-  List<ChecklistItem>? get checklist => throw _privateConstructorUsedError;
+  List<ChecklistItem>? get checklist =>
+      throw _privateConstructorUsedError; // Field from Ionic that was missing
+  @JsonKey(name: 'planning_title')
+  @_FlexibleStringConverter()
+  String? get planningTitle => throw _privateConstructorUsedError;
 
   /// Serializes this AttendanceType to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -1901,6 +2024,7 @@ abstract class $AttendanceTypeCopyWith<$Res> {
     @_FlexibleAttendanceStatusConverter()
     AttendanceStatus defaultStatus,
     @JsonKey(name: 'available_statuses')
+    @_FlexibleAttendanceStatusListConverter()
     List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') Map<String, dynamic>? defaultPlan,
     @JsonKey(name: 'tenant_id') @_FlexibleIntConverter() int? tenantId,
@@ -1923,6 +2047,9 @@ abstract class $AttendanceTypeCopyWith<$Res> {
     @JsonKey(name: 'additional_fields_filter')
     Map<String, dynamic>? additionalFieldsFilter,
     List<ChecklistItem>? checklist,
+    @JsonKey(name: 'planning_title')
+    @_FlexibleStringConverter()
+    String? planningTitle,
   });
 }
 
@@ -1964,6 +2091,7 @@ class _$AttendanceTypeCopyWithImpl<$Res, $Val extends AttendanceType>
     Object? reminders = freezed,
     Object? additionalFieldsFilter = freezed,
     Object? checklist = freezed,
+    Object? planningTitle = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -2082,6 +2210,11 @@ class _$AttendanceTypeCopyWithImpl<$Res, $Val extends AttendanceType>
                     ? _value.checklist
                     : checklist // ignore: cast_nullable_to_non_nullable
                         as List<ChecklistItem>?,
+            planningTitle:
+                freezed == planningTitle
+                    ? _value.planningTitle
+                    : planningTitle // ignore: cast_nullable_to_non_nullable
+                        as String?,
           )
           as $Val,
     );
@@ -2105,6 +2238,7 @@ abstract class _$$AttendanceTypeImplCopyWith<$Res>
     @_FlexibleAttendanceStatusConverter()
     AttendanceStatus defaultStatus,
     @JsonKey(name: 'available_statuses')
+    @_FlexibleAttendanceStatusListConverter()
     List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') Map<String, dynamic>? defaultPlan,
     @JsonKey(name: 'tenant_id') @_FlexibleIntConverter() int? tenantId,
@@ -2127,6 +2261,9 @@ abstract class _$$AttendanceTypeImplCopyWith<$Res>
     @JsonKey(name: 'additional_fields_filter')
     Map<String, dynamic>? additionalFieldsFilter,
     List<ChecklistItem>? checklist,
+    @JsonKey(name: 'planning_title')
+    @_FlexibleStringConverter()
+    String? planningTitle,
   });
 }
 
@@ -2167,6 +2304,7 @@ class __$$AttendanceTypeImplCopyWithImpl<$Res>
     Object? reminders = freezed,
     Object? additionalFieldsFilter = freezed,
     Object? checklist = freezed,
+    Object? planningTitle = freezed,
   }) {
     return _then(
       _$AttendanceTypeImpl(
@@ -2285,6 +2423,11 @@ class __$$AttendanceTypeImplCopyWithImpl<$Res>
                 ? _value._checklist
                 : checklist // ignore: cast_nullable_to_non_nullable
                     as List<ChecklistItem>?,
+        planningTitle:
+            freezed == planningTitle
+                ? _value.planningTitle
+                : planningTitle // ignore: cast_nullable_to_non_nullable
+                    as String?,
       ),
     );
   }
@@ -2301,6 +2444,7 @@ class _$AttendanceTypeImpl implements _AttendanceType {
     @_FlexibleAttendanceStatusConverter()
     this.defaultStatus = AttendanceStatus.neutral,
     @JsonKey(name: 'available_statuses')
+    @_FlexibleAttendanceStatusListConverter()
     final List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') final Map<String, dynamic>? defaultPlan,
     @JsonKey(name: 'tenant_id') @_FlexibleIntConverter() this.tenantId,
@@ -2325,6 +2469,9 @@ class _$AttendanceTypeImpl implements _AttendanceType {
     @JsonKey(name: 'additional_fields_filter')
     final Map<String, dynamic>? additionalFieldsFilter,
     final List<ChecklistItem>? checklist,
+    @JsonKey(name: 'planning_title')
+    @_FlexibleStringConverter()
+    this.planningTitle,
   }) : _availableStatuses = availableStatuses,
        _defaultPlan = defaultPlan,
        _relevantGroups = relevantGroups,
@@ -2350,6 +2497,7 @@ class _$AttendanceTypeImpl implements _AttendanceType {
   final List<AttendanceStatus>? _availableStatuses;
   @override
   @JsonKey(name: 'available_statuses')
+  @_FlexibleAttendanceStatusListConverter()
   List<AttendanceStatus>? get availableStatuses {
     final value = _availableStatuses;
     if (value == null) return null;
@@ -2463,9 +2611,15 @@ class _$AttendanceTypeImpl implements _AttendanceType {
     return EqualUnmodifiableListView(value);
   }
 
+  // Field from Ionic that was missing
+  @override
+  @JsonKey(name: 'planning_title')
+  @_FlexibleStringConverter()
+  final String? planningTitle;
+
   @override
   String toString() {
-    return 'AttendanceType(id: $id, createdAt: $createdAt, name: $name, defaultStatus: $defaultStatus, availableStatuses: $availableStatuses, defaultPlan: $defaultPlan, tenantId: $tenantId, relevantGroups: $relevantGroups, startTime: $startTime, endTime: $endTime, manageSongs: $manageSongs, index: $index, visible: $visible, color: $color, highlight: $highlight, hideName: $hideName, includeInAverage: $includeInAverage, allDay: $allDay, durationDays: $durationDays, notification: $notification, reminders: $reminders, additionalFieldsFilter: $additionalFieldsFilter, checklist: $checklist)';
+    return 'AttendanceType(id: $id, createdAt: $createdAt, name: $name, defaultStatus: $defaultStatus, availableStatuses: $availableStatuses, defaultPlan: $defaultPlan, tenantId: $tenantId, relevantGroups: $relevantGroups, startTime: $startTime, endTime: $endTime, manageSongs: $manageSongs, index: $index, visible: $visible, color: $color, highlight: $highlight, hideName: $hideName, includeInAverage: $includeInAverage, allDay: $allDay, durationDays: $durationDays, notification: $notification, reminders: $reminders, additionalFieldsFilter: $additionalFieldsFilter, checklist: $checklist, planningTitle: $planningTitle)';
   }
 
   @override
@@ -2523,7 +2677,9 @@ class _$AttendanceTypeImpl implements _AttendanceType {
             const DeepCollectionEquality().equals(
               other._checklist,
               _checklist,
-            ));
+            ) &&
+            (identical(other.planningTitle, planningTitle) ||
+                other.planningTitle == planningTitle));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -2553,6 +2709,7 @@ class _$AttendanceTypeImpl implements _AttendanceType {
     const DeepCollectionEquality().hash(_reminders),
     const DeepCollectionEquality().hash(_additionalFieldsFilter),
     const DeepCollectionEquality().hash(_checklist),
+    planningTitle,
   ]);
 
   /// Create a copy of AttendanceType
@@ -2581,6 +2738,7 @@ abstract class _AttendanceType implements AttendanceType {
     @_FlexibleAttendanceStatusConverter()
     final AttendanceStatus defaultStatus,
     @JsonKey(name: 'available_statuses')
+    @_FlexibleAttendanceStatusListConverter()
     final List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') final Map<String, dynamic>? defaultPlan,
     @JsonKey(name: 'tenant_id') @_FlexibleIntConverter() final int? tenantId,
@@ -2611,6 +2769,9 @@ abstract class _AttendanceType implements AttendanceType {
     @JsonKey(name: 'additional_fields_filter')
     final Map<String, dynamic>? additionalFieldsFilter,
     final List<ChecklistItem>? checklist,
+    @JsonKey(name: 'planning_title')
+    @_FlexibleStringConverter()
+    final String? planningTitle,
   }) = _$AttendanceTypeImpl;
 
   factory _AttendanceType.fromJson(Map<String, dynamic> json) =
@@ -2630,6 +2791,7 @@ abstract class _AttendanceType implements AttendanceType {
   AttendanceStatus get defaultStatus;
   @override
   @JsonKey(name: 'available_statuses')
+  @_FlexibleAttendanceStatusListConverter()
   List<AttendanceStatus>? get availableStatuses;
   @override
   @JsonKey(name: 'default_plan')
@@ -2690,7 +2852,11 @@ abstract class _AttendanceType implements AttendanceType {
   @JsonKey(name: 'additional_fields_filter')
   Map<String, dynamic>? get additionalFieldsFilter;
   @override
-  List<ChecklistItem>? get checklist;
+  List<ChecklistItem>? get checklist; // Field from Ionic that was missing
+  @override
+  @JsonKey(name: 'planning_title')
+  @_FlexibleStringConverter()
+  String? get planningTitle;
 
   /// Create a copy of AttendanceType
   /// with the given fields replaced by the non-null parameter values.

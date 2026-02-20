@@ -24,22 +24,18 @@ _$AttendanceImpl _$$AttendanceImplFromJson(
           ? false
           : const _FlexibleBoolConverter().fromJson(json['save_in_history']),
   percentage: (json['percentage'] as num?)?.toDouble(),
-  excused:
-      (json['excused'] as List<dynamic>?)?.map((e) => e as String).toList(),
+  excused: const _FlexibleStringListConverter().fromJson(json['excused']),
   typeInfo: const _FlexibleStringConverter().fromJson(json['typeInfo']),
   notes: const _FlexibleStringConverter().fromJson(json['notes']),
   img: const _FlexibleStringConverter().fromJson(json['img']),
   plan: json['plan'] as Map<String, dynamic>?,
-  lateExcused:
-      (json['lateExcused'] as List<dynamic>?)?.map((e) => e as String).toList(),
-  songs:
-      (json['songs'] as List<dynamic>?)
-          ?.map((e) => (e as num).toInt())
-          .toList(),
-  criticalPlayers:
-      (json['criticalPlayers'] as List<dynamic>?)
-          ?.map((e) => (e as num).toInt())
-          .toList(),
+  lateExcused: const _FlexibleStringListConverter().fromJson(
+    json['lateExcused'],
+  ),
+  songs: const _FlexibleIntListConverter().fromJson(json['songs']),
+  criticalPlayers: const _FlexibleIntListConverter().fromJson(
+    json['criticalPlayers'],
+  ),
   playerNotes: json['playerNotes'] as Map<String, dynamic>?,
   startTime: const _FlexibleStringConverter().fromJson(json['start_time']),
   endTime: const _FlexibleStringConverter().fromJson(json['end_time']),
@@ -49,6 +45,12 @@ _$AttendanceImpl _$$AttendanceImplFromJson(
       (json['checklist'] as List<dynamic>?)
           ?.map((e) => ChecklistItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+  conductors: const _FlexibleIntListConverter().fromJson(json['conductors']),
+  players: json['players'] as Map<String, dynamic>?,
+  sharePlan:
+      json['share_plan'] == null
+          ? false
+          : const _FlexibleBoolConverter().fromJson(json['share_plan']),
 );
 
 Map<String, dynamic> _$$AttendanceImplToJson(
@@ -65,20 +67,27 @@ Map<String, dynamic> _$$AttendanceImplToJson(
     instance.saveInHistory,
   ),
   'percentage': instance.percentage,
-  'excused': instance.excused,
+  'excused': const _FlexibleStringListConverter().toJson(instance.excused),
   'typeInfo': const _FlexibleStringConverter().toJson(instance.typeInfo),
   'notes': const _FlexibleStringConverter().toJson(instance.notes),
   'img': const _FlexibleStringConverter().toJson(instance.img),
   'plan': instance.plan,
-  'lateExcused': instance.lateExcused,
-  'songs': instance.songs,
-  'criticalPlayers': instance.criticalPlayers,
+  'lateExcused': const _FlexibleStringListConverter().toJson(
+    instance.lateExcused,
+  ),
+  'songs': const _FlexibleIntListConverter().toJson(instance.songs),
+  'criticalPlayers': const _FlexibleIntListConverter().toJson(
+    instance.criticalPlayers,
+  ),
   'playerNotes': instance.playerNotes,
   'start_time': const _FlexibleStringConverter().toJson(instance.startTime),
   'end_time': const _FlexibleStringConverter().toJson(instance.endTime),
   'deadline': const _FlexibleStringConverter().toJson(instance.deadline),
   'duration_days': const _FlexibleIntConverter().toJson(instance.durationDays),
   'checklist': instance.checklist,
+  'conductors': const _FlexibleIntListConverter().toJson(instance.conductors),
+  'players': instance.players,
+  'share_plan': const _FlexibleBoolConverter().toJson(instance.sharePlan),
 };
 
 _$PersonAttendanceImpl _$$PersonAttendanceImplFromJson(
@@ -179,10 +188,9 @@ _$AttendanceTypeImpl _$$AttendanceTypeImplFromJson(
           : const _FlexibleAttendanceStatusConverter().fromJson(
             json['default_status'],
           ),
-  availableStatuses:
-      (json['available_statuses'] as List<dynamic>?)
-          ?.map((e) => $enumDecode(_$AttendanceStatusEnumMap, e))
-          .toList(),
+  availableStatuses: const _FlexibleAttendanceStatusListConverter().fromJson(
+    json['available_statuses'],
+  ),
   defaultPlan: json['default_plan'] as Map<String, dynamic>?,
   tenantId: const _FlexibleIntConverter().fromJson(json['tenant_id']),
   relevantGroups:
@@ -232,6 +240,9 @@ _$AttendanceTypeImpl _$$AttendanceTypeImplFromJson(
       (json['checklist'] as List<dynamic>?)
           ?.map((e) => ChecklistItem.fromJson(e as Map<String, dynamic>))
           .toList(),
+  planningTitle: const _FlexibleStringConverter().fromJson(
+    json['planning_title'],
+  ),
 );
 
 Map<String, dynamic> _$$AttendanceTypeImplToJson(
@@ -243,10 +254,9 @@ Map<String, dynamic> _$$AttendanceTypeImplToJson(
   'default_status': const _FlexibleAttendanceStatusConverter().toJson(
     instance.defaultStatus,
   ),
-  'available_statuses':
-      instance.availableStatuses
-          ?.map((e) => _$AttendanceStatusEnumMap[e]!)
-          .toList(),
+  'available_statuses': const _FlexibleAttendanceStatusListConverter().toJson(
+    instance.availableStatuses,
+  ),
   'default_plan': instance.defaultPlan,
   'tenant_id': const _FlexibleIntConverter().toJson(instance.tenantId),
   'relevant_groups': instance.relevantGroups,
@@ -267,13 +277,7 @@ Map<String, dynamic> _$$AttendanceTypeImplToJson(
   'reminders': instance.reminders,
   'additional_fields_filter': instance.additionalFieldsFilter,
   'checklist': instance.checklist,
-};
-
-const _$AttendanceStatusEnumMap = {
-  AttendanceStatus.neutral: 'neutral',
-  AttendanceStatus.present: 'present',
-  AttendanceStatus.excused: 'excused',
-  AttendanceStatus.late: 'late',
-  AttendanceStatus.absent: 'absent',
-  AttendanceStatus.lateExcused: 'lateExcused',
+  'planning_title': const _FlexibleStringConverter().toJson(
+    instance.planningTitle,
+  ),
 };

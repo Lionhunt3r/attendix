@@ -69,6 +69,75 @@ class _FlexibleAttendanceStatusConverter implements JsonConverter<AttendanceStat
   dynamic toJson(AttendanceStatus status) => status.value;
 }
 
+/// Custom converter for List<AttendanceStatus> handling (DB stores as int[])
+class _FlexibleAttendanceStatusListConverter
+    implements JsonConverter<List<AttendanceStatus>?, dynamic> {
+  const _FlexibleAttendanceStatusListConverter();
+
+  @override
+  List<AttendanceStatus>? fromJson(dynamic json) {
+    if (json == null) return null;
+    if (json is! List) return null;
+    return json.map((e) {
+      if (e is int) return AttendanceStatus.fromValue(e);
+      if (e is String) {
+        final intValue = int.tryParse(e);
+        if (intValue != null) return AttendanceStatus.fromValue(intValue);
+        return AttendanceStatus.values.firstWhere(
+          (s) => s.name.toLowerCase() == e.toLowerCase(),
+          orElse: () => AttendanceStatus.neutral,
+        );
+      }
+      return AttendanceStatus.neutral;
+    }).toList();
+  }
+
+  @override
+  dynamic toJson(List<AttendanceStatus>? list) {
+    return list?.map((s) => s.value).toList();
+  }
+}
+
+/// Custom converter for List<int> that handles {} (empty object) as empty list
+/// Database sometimes stores empty objects {} instead of empty arrays []
+class _FlexibleIntListConverter implements JsonConverter<List<int>?, dynamic> {
+  const _FlexibleIntListConverter();
+
+  @override
+  List<int>? fromJson(dynamic json) {
+    if (json == null) return null;
+    // Handle empty object {} as empty list
+    if (json is Map) return [];
+    if (json is! List) return null;
+    return json.map((e) {
+      if (e is int) return e;
+      if (e is num) return e.toInt();
+      if (e is String) return int.tryParse(e) ?? 0;
+      return 0;
+    }).toList();
+  }
+
+  @override
+  dynamic toJson(List<int>? list) => list;
+}
+
+/// Custom converter for List<String> that handles {} (empty object) as empty list
+class _FlexibleStringListConverter implements JsonConverter<List<String>?, dynamic> {
+  const _FlexibleStringListConverter();
+
+  @override
+  List<String>? fromJson(dynamic json) {
+    if (json == null) return null;
+    // Handle empty object {} as empty list
+    if (json is Map) return [];
+    if (json is! List) return null;
+    return json.map((e) => e.toString()).toList();
+  }
+
+  @override
+  dynamic toJson(List<String>? list) => list;
+}
+
 /// Attendance model
 @freezed
 class Attendance with _$Attendance {
@@ -82,20 +151,24 @@ class Attendance with _$Attendance {
     @JsonKey(name: 'type_id') @_FlexibleStringConverter() String? typeId,
     @JsonKey(name: 'save_in_history') @_FlexibleBoolConverter() @Default(false) bool saveInHistory,
     double? percentage,
-    List<String>? excused,
+    @_FlexibleStringListConverter() List<String>? excused,
     @_FlexibleStringConverter() String? typeInfo,
     @_FlexibleStringConverter() String? notes,
     @_FlexibleStringConverter() String? img,
     Map<String, dynamic>? plan,
-    List<String>? lateExcused,
-    List<int>? songs,
-    List<int>? criticalPlayers,
+    @_FlexibleStringListConverter() List<String>? lateExcused,
+    @_FlexibleIntListConverter() List<int>? songs,
+    @_FlexibleIntListConverter() List<int>? criticalPlayers,
     Map<String, dynamic>? playerNotes,
     @JsonKey(name: 'start_time') @_FlexibleStringConverter() String? startTime,
     @JsonKey(name: 'end_time') @_FlexibleStringConverter() String? endTime,
     @_FlexibleStringConverter() String? deadline,
     @JsonKey(name: 'duration_days') @_FlexibleIntConverter() int? durationDays,
     List<ChecklistItem>? checklist,
+    // Fields from Ionic that were missing
+    @_FlexibleIntListConverter() List<int>? conductors,
+    Map<String, dynamic>? players,
+    @JsonKey(name: 'share_plan') @_FlexibleBoolConverter() @Default(false) bool sharePlan,
   }) = _Attendance;
 
   factory Attendance.fromJson(Map<String, dynamic> json) =>
@@ -155,7 +228,7 @@ class AttendanceType with _$AttendanceType {
     @JsonKey(name: 'created_at') DateTime? createdAt,
     required String name,
     @JsonKey(name: 'default_status') @_FlexibleAttendanceStatusConverter() @Default(AttendanceStatus.neutral) AttendanceStatus defaultStatus,
-    @JsonKey(name: 'available_statuses') List<AttendanceStatus>? availableStatuses,
+    @JsonKey(name: 'available_statuses') @_FlexibleAttendanceStatusListConverter() List<AttendanceStatus>? availableStatuses,
     @JsonKey(name: 'default_plan') Map<String, dynamic>? defaultPlan,
     @JsonKey(name: 'tenant_id') @_FlexibleIntConverter() int? tenantId,
     @JsonKey(name: 'relevant_groups') List<int>? relevantGroups,
@@ -174,6 +247,8 @@ class AttendanceType with _$AttendanceType {
     List<int>? reminders,
     @JsonKey(name: 'additional_fields_filter') Map<String, dynamic>? additionalFieldsFilter,
     List<ChecklistItem>? checklist,
+    // Field from Ionic that was missing
+    @JsonKey(name: 'planning_title') @_FlexibleStringConverter() String? planningTitle,
   }) = _AttendanceType;
 
   factory AttendanceType.fromJson(Map<String, dynamic> json) =>
