@@ -13,7 +13,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
-  await dotenv.load(fileName: '.env');
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    if (kDebugMode) {
+      print('Warning: Could not load .env file: $e');
+    }
+  }
 
   // Initialize Supabase
   await SupabaseConfig.initialize();
