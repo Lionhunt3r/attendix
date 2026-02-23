@@ -750,23 +750,25 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     final statsAsync = ref.watch(personAttendanceStatsProvider(widget.personId));
     final groupsAsync = ref.watch(groupsMapProvider);
 
-    return WillPopScope(
-      onWillPop: () async {
-        if (_hasChanges) {
-          final result = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Änderungen verwerfen?'),
-              content: const Text('Du hast ungespeicherte Änderungen. Möchtest du diese verwerfen?'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
-                FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwerfen')),
-              ],
-            ),
-          );
-          return result ?? false;
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        // User tried to pop but canPop was false (has unsaved changes)
+        final shouldDiscard = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Änderungen verwerfen?'),
+            content: const Text('Du hast ungespeicherte Änderungen. Möchtest du diese verwerfen?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwerfen')),
+            ],
+          ),
+        );
+        if (shouldDiscard == true && context.mounted) {
+          Navigator.of(context).pop();
         }
-        return true;
       },
       child: Scaffold(
         appBar: AppBar(
