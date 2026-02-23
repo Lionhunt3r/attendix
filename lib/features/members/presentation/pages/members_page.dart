@@ -107,41 +107,49 @@ class MembersPage extends ConsumerWidget {
                     );
                   }
 
-                  return ListView(
+                  return ListView.builder(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppDimensions.paddingM,
                     ),
-                    children: [
-                      // Header with total count
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppDimensions.paddingS,
-                        ),
-                        child: Text(
-                          'Personen ($totalCount)',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: AppColors.medium,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ),
-
-                      // Groups
-                      Card(
+                    // +1 for header, +1 for card wrapper (contains all groups), +1 for footer
+                    itemCount: 3,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        // Header with total count
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: AppDimensions.paddingS,
+                          ),
+                          child: Text(
+                            'Personen ($totalCount)',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: AppColors.medium,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        );
+                      }
+                      if (index == 2) {
+                        // Footer spacing
+                        return const SizedBox(height: AppDimensions.paddingL);
+                      }
+                      // Groups card
+                      return Card(
                         margin: EdgeInsets.zero,
                         child: Column(
                           children: [
                             for (int i = 0; i < groups.length; i++) ...[
-                              _GroupSection(group: groups[i]),
+                              _GroupSection(
+                                key: ValueKey(groups[i].groupName),
+                                group: groups[i],
+                              ),
                               if (i < groups.length - 1)
                                 const Divider(height: 1),
                             ],
                           ],
                         ),
-                      ),
-
-                      const SizedBox(height: AppDimensions.paddingL),
-                    ],
+                      );
+                    },
                   );
                 },
               ),
@@ -155,7 +163,7 @@ class MembersPage extends ConsumerWidget {
 
 /// Section for a single group with its members
 class _GroupSection extends StatelessWidget {
-  const _GroupSection({required this.group});
+  const _GroupSection({super.key, required this.group});
 
   final MembersGroup group;
 
@@ -183,7 +191,7 @@ class _GroupSection extends StatelessWidget {
 
         // Members
         for (final member in group.members)
-          _MemberTile(person: member),
+          _MemberTile(key: ValueKey(member.id), person: member),
       ],
     );
   }
@@ -191,7 +199,7 @@ class _GroupSection extends StatelessWidget {
 
 /// Single member tile
 class _MemberTile extends StatelessWidget {
-  const _MemberTile({required this.person});
+  const _MemberTile({super.key, required this.person});
 
   final Person person;
 

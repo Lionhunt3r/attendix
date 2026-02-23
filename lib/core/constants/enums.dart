@@ -1,3 +1,7 @@
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+
 /// Player history type enumeration
 enum PlayerHistoryType {
   paused(1),
@@ -156,6 +160,36 @@ enum AttendanceStatus {
   bool get isExcused => this == AttendanceStatus.excused || this == AttendanceStatus.lateExcused;
   bool get isLate => this == AttendanceStatus.late || this == AttendanceStatus.lateExcused;
   bool get isNeutral => this == AttendanceStatus.neutral;
+
+  /// UI color for this status
+  Color get color => switch (this) {
+    AttendanceStatus.present => AppColors.success,
+    AttendanceStatus.absent => AppColors.danger,
+    AttendanceStatus.excused => AppColors.info,
+    AttendanceStatus.late => Colors.deepOrange,
+    AttendanceStatus.lateExcused => AppColors.warning,
+    AttendanceStatus.neutral => AppColors.medium,
+  };
+
+  /// UI icon for this status
+  IconData get icon => switch (this) {
+    AttendanceStatus.present => Icons.check_circle,
+    AttendanceStatus.absent => Icons.cancel,
+    AttendanceStatus.excused => Icons.event_busy,
+    AttendanceStatus.late => Icons.schedule,
+    AttendanceStatus.lateExcused => Icons.schedule,
+    AttendanceStatus.neutral => Icons.help_outline,
+  };
+
+  /// Localized label for this status
+  String get label => switch (this) {
+    AttendanceStatus.present => 'Anwesend',
+    AttendanceStatus.absent => 'Abwesend',
+    AttendanceStatus.excused => 'Entschuldigt',
+    AttendanceStatus.late => 'Verspätet',
+    AttendanceStatus.lateExcused => 'Verspätet (entsch.)',
+    AttendanceStatus.neutral => 'Nicht erfasst',
+  };
 }
 
 /// Supabase table names

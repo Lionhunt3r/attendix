@@ -954,38 +954,10 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     }
   }
 
-  Color _getStatusColor(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => AppColors.success,
-      AttendanceStatus.absent => AppColors.danger,
-      AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => Colors.deepOrange,
-      AttendanceStatus.lateExcused => AppColors.warning,
-      AttendanceStatus.neutral => AppColors.medium,
-    };
-  }
-
-  IconData _getStatusIcon(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => Icons.check_circle,
-      AttendanceStatus.absent => Icons.cancel,
-      AttendanceStatus.excused => Icons.event_busy,
-      AttendanceStatus.late => Icons.schedule,
-      AttendanceStatus.lateExcused => Icons.schedule,
-      AttendanceStatus.neutral => Icons.help_outline,
-    };
-  }
-
-  String _getStatusLabel(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => 'Anwesend',
-      AttendanceStatus.absent => 'Abwesend',
-      AttendanceStatus.excused => 'Entschuldigt',
-      AttendanceStatus.late => 'Verspätet',
-      AttendanceStatus.lateExcused => 'Verspätet (entsch.)',
-      AttendanceStatus.neutral => 'Nicht erfasst',
-    };
-  }
+  // Status UI helpers - use extension properties from AttendanceStatus
+  Color _getStatusColor(AttendanceStatus status) => status.color;
+  IconData _getStatusIcon(AttendanceStatus status) => status.icon;
+  String _getStatusLabel(AttendanceStatus status) => status.label;
 }
 
 class _AttendanceGrid extends StatelessWidget {
@@ -1400,7 +1372,7 @@ class _AttendancePersonTile extends StatelessWidget {
                 _getStatusIcon(s),
                 color: _getStatusColor(s),
               ),
-              title: Text(_getStatusLabel(s)),
+              title: Text(s.label),
               selected: s == status,
               onTap: () {
                 onStatusChanged(s);
@@ -1414,38 +1386,9 @@ class _AttendancePersonTile extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => AppColors.success,
-      AttendanceStatus.absent => AppColors.danger,
-      AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => Colors.deepOrange,
-      AttendanceStatus.lateExcused => AppColors.warning,
-      AttendanceStatus.neutral => AppColors.medium,
-    };
-  }
-
-  IconData _getStatusIcon(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => Icons.check_circle,
-      AttendanceStatus.absent => Icons.cancel,
-      AttendanceStatus.excused => Icons.event_busy,
-      AttendanceStatus.late => Icons.schedule,
-      AttendanceStatus.lateExcused => Icons.schedule,
-      AttendanceStatus.neutral => Icons.help_outline,
-    };
-  }
-
-  String _getStatusLabel(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => 'Anwesend',
-      AttendanceStatus.absent => 'Abwesend',
-      AttendanceStatus.excused => 'Entschuldigt',
-      AttendanceStatus.late => 'Verspätet',
-      AttendanceStatus.lateExcused => 'Verspätet (entsch.)',
-      AttendanceStatus.neutral => 'Nicht erfasst',
-    };
-  }
+  // Use extension properties from AttendanceStatus
+  Color _getStatusColor(AttendanceStatus status) => status.color;
+  IconData _getStatusIcon(AttendanceStatus status) => status.icon;
 }
 
 class _StatusChip extends StatelessWidget {
@@ -1459,8 +1402,8 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _getStatusColor(status);
-    final icon = _getStatusIcon(status);
+    final color = status.color;
+    final icon = _getCompactIcon(status);
 
     return InkWell(
       onTap: onTap,
@@ -1480,18 +1423,8 @@ class _StatusChip extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(AttendanceStatus status) {
-    return switch (status) {
-      AttendanceStatus.present => AppColors.success,
-      AttendanceStatus.absent => AppColors.danger,
-      AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => Colors.deepOrange,
-      AttendanceStatus.lateExcused => AppColors.warning,
-      AttendanceStatus.neutral => AppColors.medium,
-    };
-  }
-
-  IconData _getStatusIcon(AttendanceStatus status) {
+  /// Compact icons for status chip (smaller, simpler than full icons)
+  IconData _getCompactIcon(AttendanceStatus status) {
     return switch (status) {
       AttendanceStatus.present => Icons.check,
       AttendanceStatus.absent => Icons.close,

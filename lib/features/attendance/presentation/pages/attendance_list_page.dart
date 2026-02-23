@@ -53,6 +53,60 @@ final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
   }).toList();
 });
 
+/// Data class for categorized attendances (memoized)
+class CategorizedAttendances {
+  final Attendance? current;
+  final List<Attendance> upcoming;
+  final List<Attendance> past;
+
+  const CategorizedAttendances({
+    this.current,
+    required this.upcoming,
+    required this.past,
+  });
+}
+
+/// Provider that categorizes and sorts attendances (computed once per data change)
+final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
+  final attendances = ref.watch(attendanceListProvider).valueOrNull ?? [];
+
+  final now = DateTime.now();
+  final todayStart = DateTime(now.year, now.month, now.day);
+
+  final upcoming = <Attendance>[];
+  final past = <Attendance>[];
+
+  for (final attendance in attendances) {
+    final date = DateTime.tryParse(attendance.date);
+    if (date == null) {
+      past.add(attendance);
+      continue;
+    }
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    if (dateOnly.isBefore(todayStart)) {
+      past.add(attendance);
+    } else {
+      upcoming.add(attendance);
+    }
+  }
+
+  // Sort once
+  upcoming.sort((a, b) => a.date.compareTo(b.date));
+  past.sort((a, b) => b.date.compareTo(a.date));
+
+  // Extract current (first upcoming)
+  Attendance? current;
+  if (upcoming.isNotEmpty) {
+    current = upcoming.removeAt(0);
+  }
+
+  return CategorizedAttendances(
+    current: current,
+    upcoming: upcoming,
+    past: past,
+  );
+});
+
 /// Attendance list page
 class AttendanceListPage extends ConsumerWidget {
   const AttendanceListPage({super.key});
@@ -125,37 +179,8 @@ class AttendanceListPage extends ConsumerWidget {
               .whereType<String>()
               .toSet();
 
-          // Separate into upcoming and past attendances (like Ionic)
-          final now = DateTime.now();
-          final todayStart = DateTime(now.year, now.month, now.day);
-
-          final upcomingAttendances = <Attendance>[];
-          final pastAttendances = <Attendance>[];
-
-          for (final attendance in attendances) {
-            final date = DateTime.tryParse(attendance.date);
-            if (date == null) {
-              pastAttendances.add(attendance);
-              continue;
-            }
-            final dateOnly = DateTime(date.year, date.month, date.day);
-            if (dateOnly.isBefore(todayStart)) {
-              pastAttendances.add(attendance);
-            } else {
-              upcomingAttendances.add(attendance);
-            }
-          }
-
-          // Sort upcoming by date ascending, past by date descending
-          upcomingAttendances.sort((a, b) => a.date.compareTo(b.date));
-          pastAttendances.sort((a, b) => b.date.compareTo(a.date));
-
-          // Current attendance is the first upcoming one
-          Attendance? currentAttendance;
-          if (upcomingAttendances.isNotEmpty) {
-            currentAttendance = upcomingAttendances.first;
-            upcomingAttendances.removeAt(0);
-          }
+          // Use memoized categorized attendances (no more date parsing in build)
+          final categorized = ref.watch(categorizedAttendancesProvider);
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -166,7 +191,7 @@ class AttendanceListPage extends ConsumerWidget {
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               children: [
                 // Current Attendance Section (like Ionic - collapsible)
-                if (currentAttendance != null)
+                if (categorized.current != null)
                   _CollapsibleSection(
                     title: 'Aktuell',
                     count: 1,
@@ -176,25 +201,27 @@ class AttendanceListPage extends ConsumerWidget {
                       AnimatedListItem(
                         index: 0,
                         child: _AttendanceListItem(
-                          attendance: currentAttendance,
-                          onTap: () => context.push('/attendance/${currentAttendance!.id}'),
-                          isHighlighted: highlightedTypeIds.contains(currentAttendance.typeId),
+                          key: ValueKey(categorized.current!.id),
+                          attendance: categorized.current!,
+                          onTap: () => context.push('/attendance/${categorized.current!.id}'),
+                          isHighlighted: highlightedTypeIds.contains(categorized.current!.typeId),
                         ),
                       ),
                     ],
                   ),
 
                 // Upcoming Attendances Section (collapsible)
-                if (upcomingAttendances.isNotEmpty)
+                if (categorized.upcoming.isNotEmpty)
                   _CollapsibleSection(
                     title: 'Anstehend',
-                    count: upcomingAttendances.length,
+                    count: categorized.upcoming.length,
                     initiallyExpanded: true,
                     isPrimary: true,
-                    children: upcomingAttendances.asMap().entries.map((entry) =>
+                    children: categorized.upcoming.asMap().entries.map((entry) =>
                       AnimatedListItem(
                         index: entry.key,
                         child: _AttendanceListItem(
+                          key: ValueKey(entry.value.id),
                           attendance: entry.value,
                           onTap: () => context.push('/attendance/${entry.value.id}'),
                           isHighlighted: highlightedTypeIds.contains(entry.value.typeId),
@@ -204,16 +231,17 @@ class AttendanceListPage extends ConsumerWidget {
                   ),
 
                 // Past Attendances Section (collapsed by default)
-                if (pastAttendances.isNotEmpty)
+                if (categorized.past.isNotEmpty)
                   _CollapsibleSection(
                     title: 'Vergangen',
-                    count: pastAttendances.length,
+                    count: categorized.past.length,
                     initiallyExpanded: false,
                     isPrimary: false,
-                    children: pastAttendances.asMap().entries.map((entry) =>
+                    children: categorized.past.asMap().entries.map((entry) =>
                       AnimatedListItem(
                         index: entry.key,
                         child: _AttendanceListItem(
+                          key: ValueKey(entry.value.id),
                           attendance: entry.value,
                           onTap: () => context.push('/attendance/${entry.value.id}'),
                           isHighlighted: highlightedTypeIds.contains(entry.value.typeId),
@@ -325,6 +353,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
 
 class _AttendanceListItem extends StatelessWidget {
   const _AttendanceListItem({
+    super.key,
     required this.attendance,
     required this.onTap,
     this.isHighlighted = false,
