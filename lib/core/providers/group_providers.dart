@@ -18,19 +18,25 @@ final groupRepositoryWithTenantProvider = Provider<GroupRepository>((ref) {
 
 /// Provider for groups/instruments list
 final groupsProvider = FutureProvider<List<Group>>((ref) async {
+  // Keep data in memory - groups rarely change during a session
+  ref.keepAlive();
+
   final repo = ref.watch(groupRepositoryWithTenantProvider);
-  
+
   if (!repo.hasTenantId) return [];
-  
+
   return repo.getGroups();
 });
 
 /// Provider for groups as a map (id -> name)
 final groupsMapProvider = FutureProvider<Map<int, String>>((ref) async {
+  // Keep data in memory - groups rarely change during a session
+  ref.keepAlive();
+
   final repo = ref.watch(groupRepositoryWithTenantProvider);
-  
+
   if (!repo.hasTenantId) return {};
-  
+
   return repo.getGroupsMap();
 });
 

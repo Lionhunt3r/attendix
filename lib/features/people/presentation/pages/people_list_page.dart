@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/player_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
@@ -14,30 +15,12 @@ import '../../../../shared/widgets/loading/loading.dart';
 import '../../../../shared/widgets/common/empty_state.dart';
 import '../../../../shared/widgets/animations/animated_list_item.dart';
 
-/// Provider for groups/instruments
-final groupsProvider = FutureProvider<Map<int, String>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-  
-  if (tenant == null) return {};
-
-  final response = await supabase
-      .from('instruments')
-      .select('id, name')
-      .eq('tenantId', tenant.id!);
-
-  final map = <int, String>{};
-  for (final row in response as List) {
-    map[row['id'] as int] = row['name'] as String;
-  }
-  return map;
-});
-
 /// Provider for people list (active players only)
 final peopleListProvider = FutureProvider<List<Person>>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
-  final groups = await ref.watch(groupsProvider.future);
+  // Use centralized groupsMapProvider (cached with keepAlive)
+  final groups = await ref.watch(groupsMapProvider.future);
   final repository = ref.watch(playerRepositoryWithTenantProvider);
 
   if (tenant == null) return [];

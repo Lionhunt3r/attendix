@@ -18,6 +18,9 @@ final attendanceTypeRepositoryWithTenantProvider = Provider<AttendanceTypeReposi
 
 /// Provider for attendance types list
 final attendanceTypesProvider = FutureProvider<List<AttendanceType>>((ref) async {
+  // Keep data in memory - attendance types rarely change during a session
+  ref.keepAlive();
+
   final repo = ref.watch(attendanceTypeRepositoryWithTenantProvider);
 
   if (!repo.hasTenantId) return [];
