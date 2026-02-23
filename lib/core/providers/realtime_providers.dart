@@ -50,9 +50,13 @@ final realtimePlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) a
           // Fetch fresh data when changes occur
           try {
             final freshData = await playerRepo.getPlayers();
-            controller.add(freshData);
+            if (!controller.isClosed) {
+              controller.add(freshData);
+            }
           } catch (e) {
-            controller.addError(e);
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
           }
         },
       )
@@ -109,9 +113,13 @@ final realtimeAttendancesProvider = StreamProvider.autoDispose<List<Attendance>>
         callback: (payload) async {
           try {
             final freshData = await attendanceRepo.getAttendances();
-            controller.add(freshData);
+            if (!controller.isClosed) {
+              controller.add(freshData);
+            }
           } catch (e) {
-            controller.addError(e);
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
           }
         },
       )
@@ -165,9 +173,13 @@ final realtimeAttendanceDetailProvider = StreamProvider.autoDispose
         callback: (payload) async {
           try {
             final freshData = await attendanceRepo.getAttendanceById(attendanceId);
-            controller.add(freshData);
+            if (!controller.isClosed) {
+              controller.add(freshData);
+            }
           } catch (e) {
-            controller.addError(e);
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
           }
         },
       )

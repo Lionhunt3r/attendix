@@ -37,7 +37,9 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       if (user != null) {
         final telegramService = ref.read(telegramServiceProvider);
         final config = await telegramService.getNotificationConfig(user.id);
-        setState(() => _config = config);
+        if (mounted) {
+          setState(() => _config = config);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -319,9 +321,11 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       final telegramService = ref.read(telegramServiceProvider);
       await telegramService.disconnectTelegram(_config!.id);
 
-      setState(() {
-        _config = _config!.copyWith(telegramChatId: '');
-      });
+      if (mounted) {
+        setState(() {
+          _config = _config!.copyWith(telegramChatId: '');
+        });
+      }
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Verbindung getrennt');
