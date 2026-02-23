@@ -122,7 +122,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/people',
             name: 'people',
-            pageBuilder: (context, state) => AppPageTransitions.fade(
+            pageBuilder: (context, state) => AppPageTransitions.none(
               child: const PeopleListPage(),
               state: state,
             ),
@@ -152,7 +152,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/attendance',
             name: 'attendance',
-            pageBuilder: (context, state) => AppPageTransitions.fade(
+            pageBuilder: (context, state) => AppPageTransitions.none(
               child: const AttendanceListPage(),
               state: state,
             ),
@@ -182,7 +182,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/overview',
             name: 'selfServiceOverview',
-            pageBuilder: (context, state) => AppPageTransitions.fade(
+            pageBuilder: (context, state) => AppPageTransitions.none(
               child: const SelfServiceOverviewPage(),
               state: state,
             ),
@@ -192,7 +192,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/members',
             name: 'members',
-            pageBuilder: (context, state) => AppPageTransitions.fade(
+            pageBuilder: (context, state) => AppPageTransitions.none(
               child: const MembersPage(),
               state: state,
             ),
@@ -202,7 +202,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/parents',
             name: 'parentsPortal',
-            pageBuilder: (context, state) => AppPageTransitions.fade(
+            pageBuilder: (context, state) => AppPageTransitions.none(
               child: const ParentsPortalPage(),
               state: state,
             ),
@@ -245,7 +245,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             name: 'settings',
-            pageBuilder: (context, state) => AppPageTransitions.fade(
+            pageBuilder: (context, state) => AppPageTransitions.none(
               child: const SettingsPage(),
               state: state,
             ),
