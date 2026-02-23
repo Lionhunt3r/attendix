@@ -43,6 +43,41 @@
     cMapPacked: true,
   }
   </script>
+  <!-- Service Worker Update Detection -->
+  <script>
+    // Store update status for Dart to access
+    window.appUpdateAvailable = false;
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then(registration => {
+        // Check for updates on page load
+        registration.update();
+
+        // Check for updates periodically (every 30 seconds)
+        setInterval(() => registration.update(), 30000);
+
+        // Listen for new service worker waiting
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New version available
+                window.appUpdateAvailable = true;
+                window.dispatchEvent(new CustomEvent('flutter-update-available'));
+              }
+            });
+          }
+        });
+      });
+
+      // Handle controller change (after skipWaiting)
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+    }
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

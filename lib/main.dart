@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/supabase_config.dart';
 import 'core/router/app_router.dart';
+import 'core/services/app_update_service.dart';
 import 'core/theme/app_theme.dart';
+import 'shared/widgets/dialogs/update_available_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,12 +26,38 @@ void main() async {
 }
 
 /// Main application widget
-class AttendixApp extends ConsumerWidget {
+class AttendixApp extends ConsumerStatefulWidget {
   const AttendixApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AttendixApp> createState() => _AttendixAppState();
+}
+
+class _AttendixAppState extends ConsumerState<AttendixApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Start update listener (web only)
+    if (kIsWeb) {
+      ref.read(appUpdateServiceProvider).startListening();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final updateAvailable = ref.watch(appUpdateAvailableProvider);
+    final updateService = ref.read(appUpdateServiceProvider);
+
+    // Show update dialog when available (only once)
+    if (updateAvailable && !updateService.wasDialogShown) {
+      updateService.markDialogShown();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showUpdateDialog();
+        }
+      });
+    }
 
     return MaterialApp.router(
       title: 'Attendix',
@@ -37,6 +66,22 @@ class AttendixApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       routerConfig: router,
+    );
+  }
+
+  void _showUpdateDialog() {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    UpdateAvailableDialog.show(
+      context,
+      onUpdate: () {
+        ref.read(appUpdateServiceProvider).applyUpdate();
+      },
+      onLater: () {
+        navigator.pop();
+        // Reset state so dialog can be shown again later
+        ref.read(appUpdateAvailableProvider.notifier).state = false;
+        ref.read(appUpdateServiceProvider).resetDialogShown();
+      },
     );
   }
 }
