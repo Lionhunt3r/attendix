@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/app_constants.dart';
-
 /// Animated list item with staggered fade-in and slide-up animation
 class AnimatedListItem extends StatefulWidget {
   const AnimatedListItem({
@@ -12,6 +10,7 @@ class AnimatedListItem extends StatefulWidget {
     this.duration = const Duration(milliseconds: 300),
     this.curve = Curves.easeOutCubic,
     this.slideOffset = 0.1,
+    this.maxStaggerIndex = 10,
   });
 
   /// The child widget to animate
@@ -31,6 +30,11 @@ class AnimatedListItem extends StatefulWidget {
 
   /// Vertical offset for slide animation (as fraction of height)
   final double slideOffset;
+
+  /// Maximum index for staggered animation (items beyond this appear instantly)
+  /// This improves performance for long lists by not creating staggered delays
+  /// for items that would animate too late anyway.
+  final int maxStaggerIndex;
 
   @override
   State<AnimatedListItem> createState() => _AnimatedListItemState();
@@ -67,15 +71,22 @@ class _AnimatedListItemState extends State<AnimatedListItem>
       curve: widget.curve,
     ));
 
-    // Start animation with stagger delay
-    Future.delayed(
-      Duration(milliseconds: widget.delay.inMilliseconds * widget.index),
-      () {
-        if (mounted) {
-          _controller.forward();
-        }
-      },
-    );
+    // Limit stagger effect to first N items for better performance
+    // Items beyond maxStaggerIndex appear instantly
+    if (widget.index < widget.maxStaggerIndex) {
+      // Start animation with stagger delay
+      Future.delayed(
+        Duration(milliseconds: widget.delay.inMilliseconds * widget.index),
+        () {
+          if (mounted) {
+            _controller.forward();
+          }
+        },
+      );
+    } else {
+      // Items beyond max index appear instantly (no animation delay)
+      _controller.value = 1.0;
+    }
   }
 
   @override

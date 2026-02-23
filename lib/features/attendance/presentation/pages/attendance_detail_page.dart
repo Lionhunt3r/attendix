@@ -17,7 +17,7 @@ import '../../../../data/models/person/person.dart';
 import '../../../../core/providers/tenant_providers.dart';
 
 /// Provider for attendance detail
-final attendanceDetailProvider = FutureProvider.family<Attendance?, int>((ref, attendanceId) async {
+final attendanceDetailProvider = FutureProvider.autoDispose.family<Attendance?, int>((ref, attendanceId) async {
   final supabase = ref.watch(supabaseClientProvider);
 
   final response = await supabase
@@ -32,7 +32,7 @@ final attendanceDetailProvider = FutureProvider.family<Attendance?, int>((ref, a
 });
 
 /// Provider for attendance type of a specific attendance
-final attendanceTypeForAttendanceProvider = FutureProvider.family<AttendanceType?, int>((ref, attendanceId) async {
+final attendanceTypeForAttendanceProvider = FutureProvider.autoDispose.family<AttendanceType?, int>((ref, attendanceId) async {
   final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
   if (attendance?.typeId == null) return null;
 
@@ -50,7 +50,7 @@ final attendanceTypeForAttendanceProvider = FutureProvider.family<AttendanceType
 /// Provider for person attendances for a specific attendance
 /// NOTE: This is different from personAttendancesProvider in attendance_providers.dart
 /// which gets attendances for a specific PERSON. This one gets persons for a specific ATTENDANCE.
-final personAttendancesForAttendanceProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
+final personAttendancesForAttendanceProvider = FutureProvider.autoDispose.family<List<PersonAttendance>, int>((ref, attendanceId) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
 
@@ -82,7 +82,7 @@ final personAttendancesForAttendanceProvider = FutureProvider.family<List<Person
 /// Provider that returns filtered person attendances based on attendance date
 /// - Past attendances: Show all persons (including archived/paused for historical correctness)
 /// - Future attendances: Only show active persons
-final filteredPersonAttendancesForAttendanceProvider = FutureProvider.family<List<PersonAttendance>, int>((ref, attendanceId) async {
+final filteredPersonAttendancesForAttendanceProvider = FutureProvider.autoDispose.family<List<PersonAttendance>, int>((ref, attendanceId) async {
   final personAttendances = await ref.watch(personAttendancesForAttendanceProvider(attendanceId).future);
   final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
 
@@ -102,7 +102,7 @@ final filteredPersonAttendancesForAttendanceProvider = FutureProvider.family<Lis
 });
 
 /// Provider for all persons in tenant (for attendance taking)
-final allPersonsForAttendanceProvider = FutureProvider<List<Person>>((ref) async {
+final allPersonsForAttendanceProvider = FutureProvider.autoDispose<List<Person>>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
 
@@ -125,7 +125,7 @@ final allPersonsForAttendanceProvider = FutureProvider<List<Person>>((ref) async
 /// Provider for filtered persons based on attendance date
 /// - Past attendances: Show all persons
 /// - Future attendances: Only show active persons (not left, not paused)
-final filteredPersonsForAttendanceProvider = FutureProvider.family<List<Person>, int>((ref, attendanceId) async {
+final filteredPersonsForAttendanceProvider = FutureProvider.autoDispose.family<List<Person>, int>((ref, attendanceId) async {
   final allPersons = await ref.watch(allPersonsForAttendanceProvider.future);
   final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
 
@@ -168,6 +168,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   // Realtime channel - typed for proper cleanup
   RealtimeChannel? _personAttChannel;
 
+  // Provider subscription - managed separately from realtime
+  ProviderSubscription? _providerSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -175,14 +178,48 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _subscribeToRealtimeChanges();
       _ensurePersonAttendancesExist();
+      _setupProviderListener();
     });
   }
 
   @override
   void dispose() {
     _isDisposed = true; // Mark as disposed BEFORE unsubscribing
+    _providerSubscription?.close();
     _unsubscribeFromRealtimeChanges();
     super.dispose();
+  }
+
+  /// Setup provider listener to sync data from server to local state.
+  /// This is called once in initState() instead of in build() to avoid
+  /// registering multiple listeners on each rebuild.
+  void _setupProviderListener() {
+    _providerSubscription = ref.listenManual(
+      filteredPersonAttendancesForAttendanceProvider(widget.attendanceId),
+      (previous, next) {
+        // Guard against setState after dispose
+        if (!mounted || _isDisposed) return;
+
+        if (next.value != null) {
+          // Only update if we don't have local changes, or this is the first load
+          final isFirstLoad = _localStatuses.isEmpty;
+          if (isFirstLoad || !_hasChanges) {
+            setState(() {
+              for (final pa in next.value!) {
+                if (pa.personId != null) {
+                  _localStatuses[pa.personId!] = pa.status;
+                  _personAttendanceIds[pa.personId!] = pa.id;
+                  _personNotes[pa.personId!] = pa.notes;
+                  _changedBy[pa.personId!] = pa.changedBy;
+                  _changedAt[pa.personId!] = pa.changedAt;
+                }
+              }
+            });
+          }
+        }
+      },
+      fireImmediately: true,
+    );
   }
 
   void _subscribeToRealtimeChanges() {
@@ -319,30 +356,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     // Handle empty list case: if list is empty, fallback to all statuses
     final typeStatuses = attendanceTypeAsync.valueOrNull?.availableStatuses;
     final availableStatuses = (typeStatuses?.isNotEmpty == true) ? typeStatuses! : AttendanceStatus.values;
-
-    // Merge person attendance data into local state whenever it changes
-    ref.listen(filteredPersonAttendancesForAttendanceProvider(widget.attendanceId), (previous, next) {
-      // Guard against setState after dispose
-      if (!mounted) return;
-
-      if (next.value != null) {
-        // Only update if we don't have local changes, or this is the first load
-        final isFirstLoad = _localStatuses.isEmpty;
-        if (isFirstLoad || !_hasChanges) {
-          setState(() {
-            for (final pa in next.value!) {
-              if (pa.personId != null) {
-                _localStatuses[pa.personId!] = pa.status;
-                _personAttendanceIds[pa.personId!] = pa.id;
-                _personNotes[pa.personId!] = pa.notes;
-                _changedBy[pa.personId!] = pa.changedBy;
-                _changedAt[pa.personId!] = pa.changedAt;
-              }
-            }
-          });
-        }
-      }
-    });
 
     return attendanceAsync.when(
       loading: () => Scaffold(
