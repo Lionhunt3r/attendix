@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/player_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -35,8 +38,12 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
   final groups = await ref.watch(groupsProvider.future);
-  
+  final repository = ref.watch(playerRepositoryWithTenantProvider);
+
   if (tenant == null) return [];
+
+  // Check for auto-unpause (players whose pause period has ended)
+  await repository.checkAndUnpausePlayers();
 
   try {
     final response = await supabase
@@ -406,6 +413,9 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                                 child: _PersonListItem(
                                   person: person,
                                   onTap: () => context.push('/people/${person.id}'),
+                                  onPause: () => _showPauseDialog(person),
+                                  onUnpause: () => _unpausePerson(person),
+                                  onArchive: () => _showArchiveDialog(person),
                                 ),
                               );
                             }),
@@ -432,6 +442,9 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                         child: _PersonListItem(
                           person: person,
                           onTap: () => context.push('/people/${person.id}'),
+                          onPause: () => _showPauseDialog(person),
+                          onUnpause: () => _unpausePerson(person),
+                          onArchive: () => _showArchiveDialog(person),
                         ),
                       );
                     },
@@ -458,96 +471,436 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
       _ => 'Alle',
     };
   }
+
+  /// Show pause dialog for a person
+  Future<void> _showPauseDialog(Person person) async {
+    final reasonController = TextEditingController();
+    DateTime? pauseUntil;
+
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: AppDimensions.paddingL,
+            right: AppDimensions.paddingL,
+            top: AppDimensions.paddingL,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.pause_circle, color: AppColors.warning, size: 28),
+                  const SizedBox(width: AppDimensions.paddingS),
+                  Expanded(
+                    child: Text(
+                      '${person.firstName} pausieren',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Grund *',
+                  hintText: 'Warum wird pausiert?',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+                autofocus: true,
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today, color: AppColors.primary),
+                title: const Text('Pausiert bis (optional)'),
+                subtitle: Text(
+                  pauseUntil != null
+                      ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
+                      : 'Kein Enddatum',
+                  style: TextStyle(
+                    color: pauseUntil != null ? AppColors.primary : AppColors.medium,
+                  ),
+                ),
+                trailing: pauseUntil != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: AppColors.medium),
+                        onPressed: () => setDialogState(() => pauseUntil = null),
+                      )
+                    : null,
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now().add(const Duration(days: 30)),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (date != null) {
+                    setDialogState(() => pauseUntil = date);
+                  }
+                },
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
+              FilledButton.icon(
+                onPressed: () {
+                  if (reasonController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Bitte Grund angeben')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, {
+                    'reason': reasonController.text,
+                    'until': pauseUntil?.toIso8601String(),
+                  });
+                },
+                icon: const Icon(Icons.pause),
+                label: const Text('Pausieren'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _pausePerson(person, result['reason'], result['until']);
+    }
+  }
+
+  /// Pause a person
+  Future<void> _pausePerson(Person person, String reason, String? until) async {
+    final repository = ref.read(playerRepositoryWithTenantProvider);
+    // Cache ScaffoldMessenger before async gap to avoid disposed context issues
+    final messenger = ScaffoldMessenger.of(context);
+
+    // Format reason with date if provided
+    final reasonText = until != null
+        ? '$reason (bis ${DateFormat('dd.MM.yyyy').format(DateTime.parse(until))})'
+        : reason;
+
+    try {
+      await repository.pausePlayer(person, until, reasonText);
+      ref.invalidate(peopleListProvider);
+
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('${person.firstName} wurde pausiert'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  /// Unpause a person
+  Future<void> _unpausePerson(Person person) async {
+    final repository = ref.read(playerRepositoryWithTenantProvider);
+    // Cache ScaffoldMessenger before async gap to avoid disposed context issues
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await repository.unpausePlayer(person);
+      ref.invalidate(peopleListProvider);
+
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('${person.firstName} wurde reaktiviert'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  /// Show archive confirmation dialog
+  Future<void> _showArchiveDialog(Person person) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${person.firstName} archivieren?'),
+        content: const Text(
+          'Die Person wird als "ausgetreten" markiert und erscheint nicht mehr in der aktiven Liste.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Archivieren'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _archivePerson(person);
+    }
+  }
+
+  /// Archive a person
+  Future<void> _archivePerson(Person person) async {
+    final repository = ref.read(playerRepositoryWithTenantProvider);
+
+    try {
+      await repository.archivePlayer(
+        person,
+        DateTime.now().toIso8601String(),
+        null,
+      );
+      ref.invalidate(peopleListProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${person.firstName} wurde archiviert'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
 }
 
 class _PersonListItem extends StatelessWidget {
   const _PersonListItem({
     required this.person,
     required this.onTap,
+    this.onPause,
+    this.onUnpause,
+    this.onArchive,
   });
 
   final Person person;
   final VoidCallback onTap;
+  final VoidCallback? onPause;
+  final VoidCallback? onUnpause;
+  final VoidCallback? onArchive;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
-      child: ListTile(
-        onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: person.critical
-              ? AppColors.danger.withValues(alpha: 0.2)
-              : person.paused
-                  ? AppColors.warning.withValues(alpha: 0.2)
-                  : AppColors.primaryLight.withValues(alpha: 0.2),
-          backgroundImage: (person.imageUrl != null && 
-              !person.imageUrl!.contains('.svg'))
-              ? NetworkImage(person.imageUrl!)
-              : null,
-          child: (person.imageUrl == null || person.imageUrl!.contains('.svg'))
-              ? Text(
-                  person.initials,
-                  style: TextStyle(
-                    color: person.critical
-                        ? AppColors.danger
-                        : person.paused
-                            ? AppColors.warning
-                            : AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                )
-              : null,
-        ),
-        title: Row(
+    final theme = Theme.of(context);
+    final cardShape = theme.cardTheme.shape as RoundedRectangleBorder? ??
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.borderRadiusL),
+        );
+    final cardBorderRadius = cardShape.borderRadius.resolve(Directionality.of(context));
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+      child: Slidable(
+        key: ValueKey(person.id),
+        // Swipe left for pause/unpause
+        endActionPane: ActionPane(
+          motion: const BehindMotion(),
+          extentRatio: 0.25,
           children: [
-            Expanded(
-              child: Text(
-                person.fullName,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+            CustomSlidableAction(
+              onPressed: (slideContext) {
+                // Close the slidable first
+                Slidable.of(slideContext)?.close();
+                if (!person.paused && onPause != null) {
+                  onPause!();
+                } else if (person.paused && onUnpause != null) {
+                  onUnpause!();
+                }
+              },
+              backgroundColor: Colors.transparent,
+              padding: EdgeInsets.zero,
+              child: Container(
+                margin: const EdgeInsets.only(left: AppDimensions.paddingS),
+                decoration: BoxDecoration(
+                  color: person.paused ? AppColors.success : AppColors.warning,
+                  borderRadius: cardBorderRadius,
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        person.paused ? Icons.play_arrow : Icons.pause,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        person.paused ? 'Aktiv' : 'Pause',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            if (person.isLeader)
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Icon(
-                  Icons.star,
-                  size: 18,
-                  color: AppColors.primary,
-                ),
-              ),
-            if (person.paused)
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Icon(
-                  Icons.pause_circle_outline,
-                  size: 18,
-                  color: AppColors.warning,
-                ),
-              ),
-            if (person.critical)
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Icon(
-                  Icons.warning_amber,
-                  size: 18,
-                  color: AppColors.danger,
-                ),
-              ),
           ],
         ),
-        subtitle: person.groupName != null
-            ? Text(
-                person.groupName!,
-                style: const TextStyle(
-                  color: AppColors.medium,
-                  fontSize: 13,
-                ),
+        // Swipe right for archive
+        startActionPane: onArchive != null
+            ? ActionPane(
+                motion: const BehindMotion(),
+                extentRatio: 0.25,
+                children: [
+                  CustomSlidableAction(
+                    onPressed: (slideContext) {
+                      Slidable.of(slideContext)?.close();
+                      onArchive!();
+                    },
+                    backgroundColor: Colors.transparent,
+                    padding: EdgeInsets.zero,
+                    child: Container(
+                      margin: const EdgeInsets.only(right: AppDimensions.paddingS),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger,
+                        borderRadius: cardBorderRadius,
+                      ),
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.archive,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Archiv',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               )
             : null,
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: AppColors.medium,
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: ListTile(
+            onTap: onTap,
+            leading: CircleAvatar(
+              backgroundColor: person.critical
+                  ? AppColors.danger.withValues(alpha: 0.2)
+                  : person.paused
+                      ? AppColors.warning.withValues(alpha: 0.2)
+                      : AppColors.primaryLight.withValues(alpha: 0.2),
+              backgroundImage: (person.imageUrl != null &&
+                  !person.imageUrl!.contains('.svg'))
+                  ? NetworkImage(person.imageUrl!)
+                  : null,
+              child: (person.imageUrl == null || person.imageUrl!.contains('.svg'))
+                  ? Text(
+                      person.initials,
+                      style: TextStyle(
+                        color: person.critical
+                            ? AppColors.danger
+                            : person.paused
+                                ? AppColors.warning
+                                : AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  : null,
+            ),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    person.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+                if (person.isLeader)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Icon(
+                      Icons.star,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                if (person.paused)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Icon(
+                      Icons.pause_circle_outline,
+                      size: 18,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                if (person.critical)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Icon(
+                      Icons.warning_amber,
+                      size: 18,
+                      color: AppColors.danger,
+                    ),
+                  ),
+              ],
+            ),
+            subtitle: person.groupName != null
+                ? Text(
+                    person.groupName!,
+                    style: const TextStyle(
+                      color: AppColors.medium,
+                      fontSize: 13,
+                    ),
+                  )
+                : null,
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: AppColors.medium,
+            ),
+          ),
         ),
       ),
     );

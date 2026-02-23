@@ -330,12 +330,13 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     // Guard against null tenant or null tenant.id
     if (tenant?.id == null) return;
 
-    // Get all active players (not left, not pending)
+    // Get all active players (not left, not pending, not paused)
     final players = await supabase
         .from('player')
         .select('id')
         .eq('tenantId', tenant!.id!)
-        .isFilter('left', null);  // null = aktiv
+        .isFilter('left', null)  // null = nicht archiviert
+        .eq('paused', false);    // nicht pausiert
 
     final playerList = players as List;
     if (playerList.isEmpty) return;

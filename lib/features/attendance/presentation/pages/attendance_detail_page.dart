@@ -163,6 +163,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   bool _hasChanges = false;
   final Set<int> _selectedPersonIds = {};
   bool _isSelectionMode = false;
+  bool _isDisposed = false; // Track disposal state for realtime callbacks
 
   // Realtime channel - typed for proper cleanup
   RealtimeChannel? _personAttChannel;
@@ -179,6 +180,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   @override
   void dispose() {
+    _isDisposed = true; // Mark as disposed BEFORE unsubscribing
     _unsubscribeFromRealtimeChanges();
     super.dispose();
   }
@@ -232,12 +234,13 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     final attendanceType = ref.read(attendanceTypeForAttendanceProvider(widget.attendanceId)).valueOrNull;
     final defaultStatus = attendanceType?.defaultStatus ?? AttendanceStatus.neutral;
 
-    // Load all active players
+    // Load all active players (not left and not paused)
     final players = await supabase
         .from('player')
         .select('id')
         .eq('tenantId', tenant.id!)
-        .isFilter('left', null);
+        .isFilter('left', null)
+        .eq('paused', false);
 
     final playerList = players as List;
     if (playerList.isEmpty) return;
@@ -256,6 +259,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   }
 
   void _onPersonAttendanceChange(dynamic payload) {
+    // Guard against setState after dispose - check _isDisposed first (more reliable than mounted)
+    if (_isDisposed) return;
+
     // Check if this is an update we made ourselves (to avoid double updates)
     if (_hasChanges) return;
 
@@ -285,12 +291,19 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
         }
       }
 
-      setState(() {
-        _localStatuses[personId] = status;
-        _personNotes[personId] = notes;
-        _changedBy[personId] = changedBy;
-        _changedAt[personId] = changedAt;
-      });
+      // Double-check mounted and disposed state before setState
+      if (_isDisposed || !mounted) return;
+
+      try {
+        setState(() {
+          _localStatuses[personId] = status;
+          _personNotes[personId] = notes;
+          _changedBy[personId] = changedBy;
+          _changedAt[personId] = changedAt;
+        });
+      } catch (e) {
+        // Ignore setState errors if widget was disposed during callback
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/enums.dart';
 import '../models/person/person.dart';
 import 'base_repository.dart';
 
@@ -251,7 +252,7 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       history.add({
         'date': DateTime.now().toIso8601String(),
         'text': reason ?? 'Kein Grund angegeben',
-        'type': 'ARCHIVED',
+        'type': PlayerHistoryType.archived.value,
       });
 
       await supabase
@@ -285,7 +286,7 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       history.add({
         'date': DateTime.now().toIso8601String(),
         'text': 'Person wurde reaktiviert',
-        'type': 'RETURNED',
+        'type': PlayerHistoryType.returned.value,
       });
 
       await supabase
@@ -331,7 +332,7 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       history.add({
         'date': DateTime.now().toIso8601String(),
         'text': reason,
-        'type': 'PAUSED',
+        'type': PlayerHistoryType.paused.value,
       });
 
       await supabase
@@ -342,6 +343,9 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
             'history': history,
           })
           .eq('id', player.id!);
+
+      // Remove from upcoming attendances
+      await removeFromUpcomingAttendances(player.id!);
     } catch (e, stack) {
       handleError(e, stack, 'pausePlayer');
       rethrow;
@@ -365,7 +369,7 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       history.add({
         'date': DateTime.now().toIso8601String(),
         'text': 'Pause beendet',
-        'type': 'UNPAUSED',
+        'type': PlayerHistoryType.unpaused.value,
       });
 
       await supabase
@@ -376,9 +380,172 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
             'history': history,
           })
           .eq('id', player.id!);
+
+      // Add to upcoming attendances
+      await addToUpcomingAttendances(player);
     } catch (e, stack) {
       handleError(e, stack, 'unpausePlayer');
       rethrow;
+    }
+  }
+
+  /// Remove player from all upcoming (future) attendances
+  Future<void> removeFromUpcomingAttendances(int playerId) async {
+    try {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+
+      // Get upcoming attendance IDs for this tenant
+      final upcomingAttendances = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .gte('date', today);
+
+      final attendanceIds = (upcomingAttendances as List)
+          .map((a) => a['id']) // Can be int or String (UUID)
+          .toList();
+
+      if (attendanceIds.isEmpty) return;
+
+      // Delete person_attendances for these attendances
+      await supabase
+          .from('person_attendances')
+          .delete()
+          .eq('person_id', playerId)
+          .inFilter('attendance_id', attendanceIds);
+    } catch (e, stack) {
+      handleError(e, stack, 'removeFromUpcomingAttendances');
+      // Don't rethrow - this is a secondary operation
+    }
+  }
+
+  /// Add player to all upcoming attendances (based on relevant groups)
+  Future<void> addToUpcomingAttendances(Person player) async {
+    if (player.id == null) return;
+
+    try {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+
+      // Get upcoming attendances for this tenant
+      final upcomingAttendances = await supabase
+          .from('attendance')
+          .select('id, type_id')
+          .eq('tenantId', currentTenantId)
+          .gte('date', today);
+
+      if ((upcomingAttendances as List).isEmpty) return;
+
+      // Get attendance types to check relevant_groups and default_status
+      final types = await supabase
+          .from('attendance_types')
+          .select('id, relevant_groups, default_status')
+          .eq('tenant_id', currentTenantId);
+
+      final typeMap = <dynamic, Map<String, dynamic>>{};
+      for (final t in types as List) {
+        final id = t['id']; // Can be int or String
+        final groups = t['relevant_groups'];
+        final defaultStatusRaw = t['default_status'];
+
+        // Convert String name to Integer value (DB stores "present", "neutral", etc.)
+        int defaultStatusInt;
+        if (defaultStatusRaw is int) {
+          defaultStatusInt = defaultStatusRaw;
+        } else if (defaultStatusRaw is String) {
+          defaultStatusInt = AttendanceStatus.values
+              .firstWhere(
+                (s) => s.name == defaultStatusRaw,
+                orElse: () => AttendanceStatus.neutral,
+              )
+              .value;
+        } else {
+          defaultStatusInt = AttendanceStatus.neutral.value;
+        }
+
+        typeMap[id] = {
+          'relevant_groups': groups is List ? groups : [],
+          'default_status': defaultStatusInt,
+        };
+      }
+
+      for (final attendance in upcomingAttendances) {
+        final attendanceId = attendance['id']; // Can be int or String (UUID)
+        final typeId = attendance['type_id'];
+        final typeData = typeId != null ? typeMap[typeId] : null;
+        final relevantGroups = (typeData?['relevant_groups'] as List?) ?? [];
+        final defaultStatus = typeData?['default_status'] ?? 0;
+
+        // Check if player's instrument is in relevant groups (or all groups allowed)
+        final isRelevant = relevantGroups.isEmpty ||
+            relevantGroups.contains(player.instrument);
+
+        if (isRelevant) {
+          // Check if entry already exists
+          final existing = await supabase
+              .from('person_attendances')
+              .select('id')
+              .eq('attendance_id', attendanceId)
+              .eq('person_id', player.id!)
+              .maybeSingle();
+
+          if (existing == null) {
+            await supabase.from('person_attendances').insert({
+              'attendance_id': attendanceId,
+              'person_id': player.id,
+              'status': defaultStatus, // Use default status from attendance type
+            });
+          }
+        }
+      }
+    } catch (e, stack) {
+      handleError(e, stack, 'addToUpcomingAttendances');
+      rethrow; // Rethrow to see error in UI
+    }
+  }
+
+  /// Check for players whose pause period has ended and unpause them
+  Future<void> checkAndUnpausePlayers() async {
+    // Skip if tenant is not set yet
+    if (!hasTenantId) return;
+
+    try {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+
+      // Get players where paused_until has passed
+      final pausedPlayers = await supabase
+          .from('player')
+          .select('*')
+          .eq('tenantId', currentTenantId)
+          .eq('paused', true)
+          .not('paused_until', 'is', null)
+          .lte('paused_until', today);
+
+      for (final playerData in pausedPlayers as List) {
+        final player = Person.fromJson(playerData as Map<String, dynamic>);
+
+        // Add history entry
+        final history = List<Map<String, dynamic>>.from(
+          player.history.map((e) => e.toJson()),
+        );
+        history.add({
+          'date': DateTime.now().toIso8601String(),
+          'text': 'Automatisch reaktiviert (Pausenzeit abgelaufen)',
+          'type': PlayerHistoryType.unpaused.value,
+        });
+
+        // Update player
+        await supabase.from('player').update({
+          'paused': false,
+          'paused_until': null,
+          'history': history,
+        }).eq('id', player.id!);
+
+        // Add to upcoming attendances
+        await addToUpcomingAttendances(player);
+      }
+    } catch (e, stack) {
+      handleError(e, stack, 'checkAndUnpausePlayers');
+      // Don't rethrow - this runs in the background
     }
   }
 
@@ -416,7 +583,7 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       history.add({
         'date': DateTime.now().toIso8601String(),
         'text': reason ?? 'Instrument gewechselt',
-        'type': 'INSTRUMENT_CHANGE',
+        'type': PlayerHistoryType.instrumentChange.value,
       });
 
       await supabase
