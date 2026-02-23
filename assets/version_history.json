@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "0.1.1",
+      "date": "23.2.2026",
+      "changes": [
+        "⚡ Performance-Verbesserungen beim Listen-Rendering",
+        "🗂️ Gruppen und Anwesenheitstypen werden gecacht",
+        "📝 Neue Dokumentation für Entwickler (CLAUDE.md)"
+      ]
+    },
+    {
       "version": "0.1.0",
       "date": "23.2.2026",
       "changes": [
