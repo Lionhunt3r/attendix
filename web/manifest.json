@@ -3,7 +3,7 @@
     "short_name": "attendix",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#FFFFFF",
+    "background_color": "#3880FF",
     "theme_color": "#3880FF",
     "description": "A new Flutter project.",
     "orientation": "portrait-primary",
