@@ -5,11 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/supabase_config.dart';
 import '../../data/models/tenant/tenant.dart';
 import '../constants/enums.dart';
+import 'user_preferences_provider.dart';
 
 const _tenantIdKey = 'current_tenant_id';
 
 /// Provider for current selected tenant
-final currentTenantProvider = StateNotifierProvider<CurrentTenantNotifier, Tenant?>((ref) {
+final currentTenantProvider =
+    StateNotifierProvider<CurrentTenantNotifier, Tenant?>((ref) {
   return CurrentTenantNotifier(ref);
 });
 
@@ -19,51 +21,113 @@ final currentTenantIdProvider = Provider<int?>((ref) {
 });
 
 /// Notifier for current tenant
+/// Uses dual-storage strategy:
+/// - SharedPreferences for fast local cache
+/// - Supabase user_metadata for cross-device sync
 class CurrentTenantNotifier extends StateNotifier<Tenant?> {
   CurrentTenantNotifier(this.ref) : super(null) {
-    _loadSavedTenant();
+    _initializeTenant();
   }
 
   final Ref ref;
 
-  Future<void> _loadSavedTenant() async {
+  /// Initialize tenant from local cache and sync with server
+  Future<void> _initializeTenant() async {
+    // Step 1: Load from SharedPreferences (fast, instant)
     final prefs = await SharedPreferences.getInstance();
-    final savedTenantId = prefs.getInt(_tenantIdKey);
-    
-    if (savedTenantId != null) {
-      try {
-        final supabase = ref.read(supabaseClientProvider);
-        final response = await supabase
-            .from('tenants')
-            .select('*')
-            .eq('id', savedTenantId)
-            .maybeSingle();
-        
-        if (response != null) {
-          state = Tenant.fromJson(response);
-        }
-      } catch (e, stack) {
-        // Log error but continue - user will need to select tenant again
-        debugPrint('Failed to load saved tenant: $e');
-        debugPrint('$stack');
+    final cachedTenantId = prefs.getInt(_tenantIdKey);
+
+    // Step 2: Get authoritative value from user_metadata
+    final auth = ref.read(supabaseAuthProvider);
+    final userMetadata = auth.currentUser?.userMetadata;
+    final serverTenantId = userMetadata?['currentTenantId'] as int?;
+
+    // Step 3: Determine which tenant ID to use (server takes precedence)
+    final tenantIdToLoad = serverTenantId ?? cachedTenantId;
+
+    if (tenantIdToLoad != null) {
+      await _loadAndValidateTenant(tenantIdToLoad);
+
+      // Sync cache if server had different value
+      if (serverTenantId != null && serverTenantId != cachedTenantId) {
+        await prefs.setInt(_tenantIdKey, serverTenantId);
       }
     }
   }
 
+  /// Load tenant by ID and validate user still has access
+  Future<void> _loadAndValidateTenant(int tenantId) async {
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final userId = supabase.auth.currentUser?.id;
+
+      if (userId == null) return;
+
+      // Verify user still has access to this tenant
+      final tenantUserResponse = await supabase
+          .from('tenantUsers')
+          .select('tenantId')
+          .eq('tenantId', tenantId)
+          .eq('userId', userId)
+          .maybeSingle();
+
+      // User no longer has access to this tenant
+      if (tenantUserResponse == null) {
+        debugPrint('User no longer has access to tenant $tenantId');
+        await _clearAllStorage();
+        return;
+      }
+
+      // Load the tenant data
+      final response = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('id', tenantId)
+          .maybeSingle();
+
+      if (response != null) {
+        state = Tenant.fromJson(response);
+      } else {
+        // Tenant doesn't exist anymore
+        await _clearAllStorage();
+      }
+    } catch (e, stack) {
+      debugPrint('Failed to load saved tenant: $e');
+      debugPrint('$stack');
+    }
+  }
+
+  /// Set the current tenant and persist to both storages
   Future<void> setTenant(Tenant? tenant) async {
     state = tenant;
+
     final prefs = await SharedPreferences.getInstance();
     if (tenant?.id != null) {
+      // Save to SharedPreferences immediately (fast)
       await prefs.setInt(_tenantIdKey, tenant!.id!);
+
+      // Update user_metadata asynchronously (fire and forget for cross-device sync)
+      ref
+          .read(userPreferencesNotifierProvider.notifier)
+          .updateCurrentTenantId(tenant.id!);
     } else {
       await prefs.remove(_tenantIdKey);
     }
   }
 
+  /// Clear tenant from state and all storage
   Future<void> clearTenant() async {
     state = null;
+    await _clearAllStorage();
+  }
+
+  /// Clear tenant from both SharedPreferences and user_metadata
+  Future<void> _clearAllStorage() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tenantIdKey);
+
+    // Also clear from user_metadata
+    ref.read(userPreferencesNotifierProvider.notifier).clearCurrentTenantId();
   }
 }
 

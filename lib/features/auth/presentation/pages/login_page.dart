@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/providers/user_preferences_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 
 /// Login page
@@ -43,12 +46,29 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      
+
       if (response.user != null && mounted) {
-        context.go('/tenants');
+        // Check if user wants to skip tenant selection
+        final userPrefs =
+            UserPreferences.fromUserMetadata(response.user!.userMetadata);
+
+        if (!userPrefs.wantInstanceSelection &&
+            userPrefs.currentTenantId != null) {
+          // Try to auto-navigate to saved tenant
+          final navigated = await _tryAutoNavigateToTenant(
+            userPrefs.currentTenantId!,
+          );
+          if (navigated) return;
+        }
+
+        // Default: show tenant selection
+        if (mounted) {
+          context.go('/tenants');
+        }
       } else if (mounted) {
         setState(() {
-          _errorMessage = 'Login fehlgeschlagen. Benutzer konnte nicht authentifiziert werden.';
+          _errorMessage =
+              'Login fehlgeschlagen. Benutzer konnte nicht authentifiziert werden.';
         });
       }
     } catch (e) {
@@ -63,6 +83,54 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         });
       }
     }
+  }
+
+  /// Try to auto-navigate to the saved tenant
+  /// Returns true if navigation was successful, false otherwise
+  Future<bool> _tryAutoNavigateToTenant(int tenantId) async {
+    try {
+      // Load user's tenants to verify access
+      final tenants = await ref.read(userTenantsProvider.future);
+      final savedTenant = tenants.where((t) => t.id == tenantId).firstOrNull;
+
+      if (savedTenant == null) {
+        // User no longer has access to this tenant
+        return false;
+      }
+
+      // Set the tenant
+      await ref.read(currentTenantProvider.notifier).setTenant(savedTenant);
+
+      // Get user's role for this tenant
+      final role = await _getTenantUserRole(tenantId);
+
+      // Navigate to role-based default route
+      if (mounted) {
+        context.go(role.defaultRoute);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Auto-navigation failed: $e');
+      return false;
+    }
+  }
+
+  /// Get the user's role for a specific tenant
+  Future<Role> _getTenantUserRole(int tenantId) async {
+    final supabase = ref.read(supabaseClientProvider);
+    final userId = supabase.auth.currentUser?.id;
+
+    if (userId == null) return Role.none;
+
+    final response = await supabase
+        .from('tenantUsers')
+        .select('role')
+        .eq('tenantId', tenantId)
+        .eq('userId', userId)
+        .maybeSingle();
+
+    if (response == null) return Role.none;
+    return Role.fromValue(response['role'] as int? ?? 99);
   }
 
   @override

@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "0.1.2",
+      "date": "23.2.2026",
+      "changes": [
+        "🔄 Zuletzt verwendete Gruppe wird gemerkt und automatisch gewählt",
+        "☁️ Gruppenauswahl synchronisiert über alle Geräte",
+        "⚙️ Neue Einstellung: Gruppenauswahl beim Start aktivieren/deaktivieren"
+      ]
+    },
+    {
       "version": "0.1.1",
       "date": "23.2.2026",
       "changes": [

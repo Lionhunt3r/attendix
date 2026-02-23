@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/providers/user_preferences_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
-import '../../../../core/providers/tenant_providers.dart';
 
 /// Profile page for viewing and editing user profile
 class ProfilePage extends ConsumerStatefulWidget {
@@ -339,6 +340,56 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                     subtitle: const Text('Sende einen Reset-Link an deine E-Mail'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _changePassword,
+                  ),
+
+                  const SizedBox(height: AppDimensions.paddingXL),
+                  const Divider(),
+                  const SizedBox(height: AppDimensions.paddingM),
+
+                  // App Settings section
+                  Text(
+                    'App-Einstellungen',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+
+                  // Instance Selection Toggle
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final prefs = ref.watch(userPreferencesProvider);
+                      return SwitchListTile(
+                        secondary: const Icon(Icons.swap_horiz),
+                        title: const Text('Gruppenauswahl beim Start'),
+                        subtitle: const Text(
+                          'Immer beim Öffnen der App nach der Gruppe fragen',
+                        ),
+                        value: prefs.wantInstanceSelection,
+                        onChanged: (value) async {
+                          try {
+                            await ref
+                                .read(userPreferencesNotifierProvider.notifier)
+                                .updatePreferences(wantInstanceSelection: value);
+                            if (context.mounted) {
+                              ToastHelper.showSuccess(
+                                context,
+                                value
+                                    ? 'Gruppenauswahl aktiviert'
+                                    : 'Gruppenauswahl deaktiviert',
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ToastHelper.showError(
+                                context,
+                                'Einstellung konnte nicht gespeichert werden',
+                              );
+                            }
+                          }
+                        },
+                      );
+                    },
                   ),
                 ],
               ),
