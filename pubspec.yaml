@@ -82,4 +82,5 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/version_history.json
     - .env

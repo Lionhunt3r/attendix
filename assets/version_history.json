@@ -1,0 +1,19 @@
+{
+  "versions": [
+    {
+      "version": "0.1.0",
+      "date": "23.2.2026",
+      "changes": [
+        "🎉 Flutter-Version von Attendix!",
+        "📱 Native Performance für iOS und Android",
+        "🔄 Echtzeit-Synchronisation der Anwesenheiten",
+        "👥 Personen- und Gruppenverwaltung",
+        "📅 Terminplanung und -übersicht",
+        "⏸️ Pausieren und Archivieren von Personen",
+        "📊 Anwesenheitsstatistiken",
+        "🔔 Telegram-Benachrichtigungen",
+        "👨‍👩‍👧 Eltern-Ansicht für Kinder"
+      ]
+    }
+  ]
+}

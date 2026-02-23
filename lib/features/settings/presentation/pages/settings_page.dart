@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/sheets/version_history_sheet.dart';
 
 /// Settings page with role-based menu filtering
 class SettingsPage extends ConsumerWidget {
@@ -307,24 +308,46 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: AppDimensions.paddingL),
           ],
 
-          // App info
-          Center(
-            child: Column(
-              children: [
-                Text(
-                  'Attendix',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.medium,
+          // App info - tappable to show version history
+          GestureDetector(
+            onTap: () => showVersionHistorySheet(context),
+            child: Center(
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.auto_awesome,
+                          size: 16, color: AppColors.warning),
+                      const SizedBox(width: AppDimensions.paddingXS),
+                      Text(
+                        'Was ist neu?',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
-                ),
-                const SizedBox(height: AppDimensions.paddingXS),
-                Text(
-                  'Version ${AppConstants.appVersion}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.medium,
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.paddingXS),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'v${AppConstants.appVersion}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
-                ),
-              ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: AppDimensions.paddingL),
