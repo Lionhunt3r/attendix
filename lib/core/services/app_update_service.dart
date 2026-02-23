@@ -51,7 +51,12 @@ class AppUpdateService {
   /// Reload the app to apply update
   void applyUpdate() {
     if (kIsWeb) {
-      web.window.location.reload();
+      try {
+        _jsApplyServiceWorkerUpdate();
+      } catch (_) {
+        // Fallback: direct reload
+        web.window.location.reload();
+      }
     }
   }
 
@@ -78,6 +83,10 @@ class AppUpdateService {
 /// JS interop to get window.appUpdateAvailable
 @JS('window.appUpdateAvailable')
 external bool? get _jsAppUpdateAvailable;
+
+/// JS interop to call window.applyServiceWorkerUpdate
+@JS('window.applyServiceWorkerUpdate')
+external void _jsApplyServiceWorkerUpdate();
 
 bool _getAppUpdateAvailable() {
   try {

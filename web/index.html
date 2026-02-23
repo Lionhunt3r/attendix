@@ -48,6 +48,9 @@
     // Store update status for Dart to access
     window.appUpdateAvailable = false;
 
+    // Track if user explicitly requested update
+    let userRequestedUpdate = false;
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then(registration => {
         // Check for updates on page load
@@ -72,10 +75,21 @@
       });
 
       // Handle controller change (after skipWaiting)
+      // Only reload if user explicitly clicked "Update"
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
+        if (userRequestedUpdate) {
+          window.location.reload();
+        }
+        // Otherwise: update is ready but don't force reload
+        // The user will see the dialog and can choose when to update
       });
     }
+
+    // Function for Dart to call when user clicks "Update"
+    window.applyServiceWorkerUpdate = function() {
+      userRequestedUpdate = true;
+      window.location.reload();
+    };
   </script>
 
   <script src="flutter_bootstrap.js" async></script>
