@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 /// Helper class for showing toast messages (SnackBars)
 ///
 /// Based on Ionic Utils.ts showToast method
@@ -40,6 +42,37 @@ class ToastHelper {
       message,
       backgroundColor: Colors.orange,
       icon: Icons.warning,
+    );
+  }
+
+  /// Shows a persistent update available snackbar (does not auto-dismiss)
+  static void showUpdateAvailable(
+    BuildContext context, {
+    required VoidCallback onUpdate,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.system_update, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Neue Version verfügbar',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(days: 365), // Persistent - won't auto-dismiss
+        action: SnackBarAction(
+          label: 'Aktualisieren',
+          textColor: Colors.white,
+          onPressed: onUpdate,
+        ),
+      ),
     );
   }
 

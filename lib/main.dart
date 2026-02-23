@@ -7,7 +7,7 @@ import 'core/config/supabase_config.dart';
 import 'core/router/app_router.dart';
 import 'core/services/app_update_service.dart';
 import 'core/theme/app_theme.dart';
-import 'shared/widgets/dialogs/update_available_dialog.dart';
+import 'core/utils/toast_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,12 +49,12 @@ class _AttendixAppState extends ConsumerState<AttendixApp> {
     final updateAvailable = ref.watch(appUpdateAvailableProvider);
     final updateService = ref.read(appUpdateServiceProvider);
 
-    // Show update dialog when available (only once)
+    // Show update snackbar when available (only once)
     if (updateAvailable && !updateService.wasDialogShown) {
       updateService.markDialogShown();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _showUpdateDialog();
+          _showUpdateSnackbar();
         }
       });
     }
@@ -69,18 +69,11 @@ class _AttendixAppState extends ConsumerState<AttendixApp> {
     );
   }
 
-  void _showUpdateDialog() {
-    final navigator = Navigator.of(context, rootNavigator: true);
-    UpdateAvailableDialog.show(
+  void _showUpdateSnackbar() {
+    ToastHelper.showUpdateAvailable(
       context,
       onUpdate: () {
         ref.read(appUpdateServiceProvider).applyUpdate();
-      },
-      onLater: () {
-        navigator.pop();
-        // Reset state so dialog can be shown again later
-        ref.read(appUpdateAvailableProvider.notifier).state = false;
-        ref.read(appUpdateServiceProvider).resetDialogShown();
       },
     );
   }
