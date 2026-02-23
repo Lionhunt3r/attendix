@@ -108,6 +108,11 @@ flutter run -d chrome
    }
    ```
 
+3. **App-Version Badge aktualisieren** in `lib/core/constants/app_constants.dart`:
+   ```dart
+   static const String appVersion = '1.0.0';
+   ```
+
 Dies sorgt dafür, dass Benutzer in der App sehen, dass es eine neue Version gibt.
 
 ## Rollen-System
@@ -117,6 +122,49 @@ Dies sorgt dafür, dass Benutzer in der App sehen, dass es eine neue Version gib
 - **Spieler (player):** Nur eigene Daten
 
 Prüfung via `role.isConductor`, `role.canSeePeopleTab`, etc.
+
+## App auf Geräte deployen
+
+### iPhone (iOS)
+
+```bash
+# 1. Release-Build erstellen
+flutter build ios --release
+
+# 2. Auf iPhone installieren und starten (Device-ID anpassen)
+xcrun devicectl device install app --device 00008120-000C4D5C0205A01E build/ios/iphoneos/Runner.app
+xcrun devicectl device process launch --device 00008120-000C4D5C0205A01E de.attendix.attendix
+```
+
+**Voraussetzungen:**
+- iPhone per USB verbunden
+- Entwicklermodus auf iPhone aktiviert (Einstellungen → Datenschutz & Sicherheit → Entwicklermodus)
+- Code Signing in Xcode konfiguriert (Team ausgewählt)
+- Beim ersten Mal: Zertifikat auf iPhone vertrauen (Einstellungen → Allgemein → VPN & Geräteverwaltung)
+
+**Wichtig:** Debug-Builds funktionieren nur über Flutter CLI oder Xcode direkt. Für standalone: immer `--release` verwenden.
+
+**Device-ID finden:**
+```bash
+flutter devices
+```
+
+### macOS
+
+```bash
+# 1. Release-Build erstellen
+flutter build macos --release
+
+# 2. In Applications installieren und starten
+cp -r build/macos/Build/Products/Release/attendix.app /Applications/
+open /Applications/attendix.app
+```
+
+**Wichtig:** Die Datei `macos/Runner/Release.entitlements` muss `com.apple.security.network.client` enthalten für Netzwerkzugriff:
+```xml
+<key>com.apple.security.network.client</key>
+<true/>
+```
 
 ## Weiterführende Dokumentation
 
