@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/group_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
@@ -19,7 +20,7 @@ final personProvider =
     FutureProvider.family<Person?, int>((ref, personId) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
-  final groups = await ref.watch(groupsProvider.future);
+  final groups = await ref.watch(groupsMapProvider.future);
 
   if (tenant == null) return null;
 
@@ -344,7 +345,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       // Build history entry if group changed
       final List<Map<String, dynamic>> newHistoryEntries = [];
       if (_selectedGroupId != person.instrument) {
-        final groups = await ref.read(groupsProvider.future);
+        final groups = await ref.read(groupsMapProvider.future);
         final oldGroupName = groups[person.instrument] ?? 'Unbekannt';
         final newGroupName = groups[_selectedGroupId] ?? 'Unbekannt';
         newHistoryEntries.add({
@@ -747,7 +748,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   Widget build(BuildContext context) {
     final person = widget.person;
     final statsAsync = ref.watch(personAttendanceStatsProvider(widget.personId));
-    final groupsAsync = ref.watch(groupsProvider);
+    final groupsAsync = ref.watch(groupsMapProvider);
 
     return WillPopScope(
       onWillPop: () async {
