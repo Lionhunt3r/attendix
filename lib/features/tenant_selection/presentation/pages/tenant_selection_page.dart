@@ -6,15 +6,78 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/providers/user_preferences_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/tenant/tenant.dart';
 
 /// Tenant selection page
-class TenantSelectionPage extends ConsumerWidget {
+class TenantSelectionPage extends ConsumerStatefulWidget {
   const TenantSelectionPage({super.key});
 
+  @override
+  ConsumerState<TenantSelectionPage> createState() =>
+      _TenantSelectionPageState();
+}
+
+class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
+  bool _isAutoNavigating = false;
+  bool _hasAttemptedAutoNav = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Try auto-navigation after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryAutoNavigation();
+    });
+  }
+
+  /// Try to auto-navigate to saved tenant on cold start
+  Future<void> _tryAutoNavigation() async {
+    // Only try once
+    if (_hasAttemptedAutoNav) return;
+    _hasAttemptedAutoNav = true;
+
+    final userPrefs = ref.read(userPreferencesProvider);
+
+    // If user wants to see selection, don't auto-navigate
+    if (userPrefs.wantInstanceSelection) return;
+
+    // If no saved tenant, don't auto-navigate
+    if (userPrefs.currentTenantId == null) return;
+
+    setState(() => _isAutoNavigating = true);
+
+    try {
+      // Wait for tenants to load
+      final tenants = await ref.read(userTenantsProvider.future);
+      final savedTenant = tenants
+          .where((t) => t.id == userPrefs.currentTenantId)
+          .firstOrNull;
+
+      // User no longer has access to saved tenant
+      if (savedTenant == null) {
+        setState(() => _isAutoNavigating = false);
+        return;
+      }
+
+      // Set tenant and navigate
+      await ref.read(currentTenantProvider.notifier).setTenant(savedTenant);
+      final role = await _getTenantUserRole(savedTenant.id!);
+
+      if (mounted) {
+        context.go(role.defaultRoute);
+      }
+    } catch (e) {
+      debugPrint('Auto-navigation failed: $e');
+      if (mounted) {
+        setState(() => _isAutoNavigating = false);
+      }
+    }
+  }
+
   /// Get the user's role for a specific tenant
-  Future<Role> _getTenantUserRole(WidgetRef ref, int tenantId) async {
+  Future<Role> _getTenantUserRole(int tenantId) async {
     final supabase = ref.read(supabaseClientProvider);
     final userId = supabase.auth.currentUser?.id;
 
@@ -32,25 +95,30 @@ class TenantSelectionPage extends ConsumerWidget {
   }
 
   /// Navigate to the appropriate page based on role
-  Future<void> _selectTenant(
-    BuildContext context,
-    WidgetRef ref,
-    Tenant tenant,
-  ) async {
+  Future<void> _selectTenant(Tenant tenant) async {
     // Set the tenant first
     await ref.read(currentTenantProvider.notifier).setTenant(tenant);
 
     // Get the user's role for this tenant
-    final role = await _getTenantUserRole(ref, tenant.id!);
+    final role = await _getTenantUserRole(tenant.id!);
 
     // Navigate to the appropriate default route for this role
-    if (context.mounted) {
+    if (mounted) {
       context.go(role.defaultRoute);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    // Show loading while auto-navigating
+    if (_isAutoNavigating) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     final tenantsAsync = ref.watch(userTenantsProvider);
 
     return Scaffold(
@@ -61,6 +129,7 @@ class TenantSelectionPage extends ConsumerWidget {
             icon: const Icon(Icons.logout),
             onPressed: () async {
               final supabase = ref.read(supabaseClientProvider);
+              await ref.read(currentTenantProvider.notifier).clearTenant();
               await supabase.auth.signOut();
               if (context.mounted) {
                 context.go('/login');
@@ -149,7 +218,7 @@ class TenantSelectionPage extends ConsumerWidget {
               final tenant = tenants[index];
               return _TenantCard(
                 tenant: tenant,
-                onTap: () => _selectTenant(context, ref, tenant),
+                onTap: () => _selectTenant(tenant),
               );
             },
           );
