@@ -42,66 +42,76 @@ class AnimatedListItem extends StatefulWidget {
 
 class _AnimatedListItemState extends State<AnimatedListItem>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  // Nullable - only created for items that actually animate
+  AnimationController? _controller;
+  Animation<double>? _fadeAnimation;
+  Animation<Offset>? _slideAnimation;
+
+  /// Whether this item should animate (index < maxStaggerIndex)
+  bool get _shouldAnimate => widget.index < widget.maxStaggerIndex;
 
   @override
   void initState() {
     super.initState();
 
-    _controller = AnimationController(
-      duration: widget.duration,
-      vsync: this,
-    );
+    // Only create animation infrastructure for items that will animate
+    // Items beyond maxStaggerIndex skip all animation overhead
+    if (_shouldAnimate) {
+      _controller = AnimationController(
+        duration: widget.duration,
+        vsync: this,
+      );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: widget.curve,
-    ));
+      _fadeAnimation = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: _controller!,
+        curve: widget.curve,
+      ));
 
-    _slideAnimation = Tween<Offset>(
-      begin: Offset(0, widget.slideOffset),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: widget.curve,
-    ));
+      _slideAnimation = Tween<Offset>(
+        begin: Offset(0, widget.slideOffset),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _controller!,
+        curve: widget.curve,
+      ));
 
-    // Limit stagger effect to first N items for better performance
-    // Items beyond maxStaggerIndex appear instantly
-    if (widget.index < widget.maxStaggerIndex) {
       // Start animation with stagger delay
       Future.delayed(
         Duration(milliseconds: widget.delay.inMilliseconds * widget.index),
         () {
           if (mounted) {
-            _controller.forward();
+            _controller?.forward();
           }
         },
       );
-    } else {
-      // Items beyond max index appear instantly (no animation delay)
-      _controller.value = 1.0;
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
+    // Items beyond maxStaggerIndex: return child directly without any wrapper
+    // This eliminates all animation overhead for these items
+    if (!_shouldAnimate) {
+      return widget.child;
+    }
+
+    // Items with animation: wrap in RepaintBoundary for isolated repaints
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: _fadeAnimation!,
+        child: SlideTransition(
+          position: _slideAnimation!,
+          child: widget.child,
+        ),
       ),
     );
   }
