@@ -188,10 +188,7 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: AppDimensions.paddingM),
 
           // App settings section - for users with notification permission
-          if (role.isAdmin ||
-              role.isResponsible ||
-              role.isHelperRole ||
-              role.isPlayerRole) ...[
+          if (role.canSeeNotifications) ...[
             _SettingsSection(
               title: 'App-Einstellungen',
               children: [

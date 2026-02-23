@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
+import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -60,6 +61,8 @@ class AttendanceListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tenant = ref.watch(currentTenantProvider);
     final attendanceAsync = ref.watch(attendanceListProvider);
+    // Use effectiveRoleProvider to support debug role override
+    final role = ref.watch(effectiveRoleProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -223,11 +226,14 @@ class AttendanceListPage extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/attendance/new'),
-        icon: const Icon(Icons.add),
-        label: const Text('Neue Anwesenheit'),
-      ),
+      // FAB only for roles that can add attendances (not VIEWER)
+      floatingActionButton: role.canAddAttendance
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push('/attendance/new'),
+              icon: const Icon(Icons.add),
+              label: const Text('Neue Anwesenheit'),
+            )
+          : null,
     );
   }
 }

@@ -96,11 +96,33 @@ enum Role {
   bool get canSeeSelfServiceTab => isPlayerRole || isHelperRole;
 
   /// Can see the "Members" tab (if tenant.showMembersList is enabled)
-  bool get canSeeMembersTab => isPlayerRole || isHelperRole;
+  /// Note: APPLICANT is explicitly excluded (unlike isPlayerRole which includes it)
+  bool get canSeeMembersTab =>
+      this == Role.player ||
+      this == Role.helper ||
+      this == Role.voiceLeader ||
+      this == Role.voiceLeaderHelper ||
+      this == Role.none;
 
   /// Can see voice leader settings in settings page
   bool get canSeeVoiceLeaderSettings =>
       this == Role.voiceLeader || this == Role.voiceLeaderHelper;
+
+  /// Can see notifications settings (excludes VIEWER, APPLICANT, PARENT, NONE)
+  bool get canSeeNotifications =>
+      this == Role.admin ||
+      this == Role.responsible ||
+      this == Role.helper ||
+      this == Role.player ||
+      this == Role.voiceLeader ||
+      this == Role.voiceLeaderHelper;
+
+  /// Can add/edit attendances (not VIEWER - view only)
+  bool get canAddAttendance =>
+      this == Role.admin ||
+      this == Role.responsible ||
+      this == Role.helper ||
+      this == Role.voiceLeaderHelper;
 
   /// Get the default route for this role after tenant selection
   String get defaultRoute {
