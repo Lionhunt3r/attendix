@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/supabase_config.dart';
+import 'page_transitions.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
@@ -121,7 +122,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/people',
             name: 'people',
-            builder: (context, state) => const PeopleListPage(),
+            pageBuilder: (context, state) => AppPageTransitions.fade(
+              child: const PeopleListPage(),
+              state: state,
+            ),
             routes: [
               GoRoute(
                 path: 'new',
@@ -148,7 +152,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/attendance',
             name: 'attendance',
-            builder: (context, state) => const AttendanceListPage(),
+            pageBuilder: (context, state) => AppPageTransitions.fade(
+              child: const AttendanceListPage(),
+              state: state,
+            ),
             routes: [
               GoRoute(
                 path: 'new',
@@ -175,21 +182,30 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/overview',
             name: 'selfServiceOverview',
-            builder: (context, state) => const SelfServiceOverviewPage(),
+            pageBuilder: (context, state) => AppPageTransitions.fade(
+              child: const SelfServiceOverviewPage(),
+              state: state,
+            ),
           ),
 
           // Members (for players/helpers when showMembersList is enabled)
           GoRoute(
             path: '/members',
             name: 'members',
-            builder: (context, state) => const MembersPage(),
+            pageBuilder: (context, state) => AppPageTransitions.fade(
+              child: const MembersPage(),
+              state: state,
+            ),
           ),
 
           // Parents Portal (for parents to manage children's attendance)
           GoRoute(
             path: '/parents',
             name: 'parentsPortal',
-            builder: (context, state) => const ParentsPortalPage(),
+            pageBuilder: (context, state) => AppPageTransitions.fade(
+              child: const ParentsPortalPage(),
+              state: state,
+            ),
           ),
 
           // Statistics
@@ -229,7 +245,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             name: 'settings',
-            builder: (context, state) => const SettingsPage(),
+            pageBuilder: (context, state) => AppPageTransitions.fade(
+              child: const SettingsPage(),
+              state: state,
+            ),
             routes: [
               GoRoute(
                 path: 'profile',
