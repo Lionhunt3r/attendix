@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -14,7 +15,8 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tenant = ref.watch(currentTenantProvider);
-    final role = ref.watch(currentRoleProvider);
+    // Use effectiveRoleProvider to support debug role override
+    final role = ref.watch(effectiveRoleProvider);
 
     return Scaffold(
       appBar: AppBar(

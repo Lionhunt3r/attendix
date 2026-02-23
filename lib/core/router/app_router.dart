@@ -38,6 +38,7 @@ import '../../features/meetings/presentation/pages/meetings_list_page.dart';
 import '../../features/voice_leader/presentation/pages/voice_leader_page.dart';
 import '../../features/members/presentation/pages/members_page.dart';
 import '../../features/registration/presentation/pages/tenant_registration_page.dart';
+import '../../features/parents/presentation/pages/parents_portal_page.dart';
 
 /// Router provider
 final routerProvider = Provider<GoRouter>((ref) {
@@ -182,6 +183,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/members',
             name: 'members',
             builder: (context, state) => const MembersPage(),
+          ),
+
+          // Parents Portal (for parents to manage children's attendance)
+          GoRoute(
+            path: '/parents',
+            name: 'parentsPortal',
+            builder: (context, state) => const ParentsPortalPage(),
           ),
 
           // Statistics

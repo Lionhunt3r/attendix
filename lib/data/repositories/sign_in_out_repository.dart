@@ -12,6 +12,34 @@ final signInOutRepositoryProvider = Provider<SignInOutRepository>((ref) {
 class SignInOutRepository extends BaseRepository with TenantAwareRepository {
   SignInOutRepository(super.ref);
 
+  /// Predefined distinct colors for tenant visual separation (from Ionic app)
+  static const _distinctColors = [
+    '#E53935', // Red
+    '#1E88E5', // Blue
+    '#43A047', // Green
+    '#FB8C00', // Orange
+    '#8E24AA', // Purple
+    '#00ACC1', // Cyan
+    '#F4511E', // Deep Orange
+    '#3949AB', // Indigo
+    '#7CB342', // Light Green
+    '#C2185B', // Pink
+    '#00897B', // Teal
+    '#6D4C41', // Brown
+    '#5E35B1', // Deep Purple
+    '#039BE5', // Light Blue
+    '#D81B60', // Pink Dark
+  ];
+
+  /// Get color for tenant based on index (like Ionic app)
+  String _getTenantColor(int tenantId, List<dynamic> tenantIds) {
+    final index = tenantIds.indexOf(tenantId);
+    final colorIndex = index >= 0
+        ? index % _distinctColors.length
+        : tenantId.abs() % _distinctColors.length;
+    return _distinctColors[colorIndex];
+  }
+
   /// Sign in to an attendance
   Future<void> signIn(
     String personAttendanceId,
@@ -117,17 +145,19 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
           .inFilter('person_id', personIds)
           .order('attendance(date)', ascending: false);
 
-      // Get tenant info
+      // Get tenant info (no color column - we generate colors programmatically)
       final tenants = await supabase
           .from('tenants')
-          .select('id, shortName, color')
+          .select('id, shortName')
           .inFilter('id', tenantIds);
 
+      // Build tenant map with programmatically generated colors
+      final tenantIdsList = tenantIds.toList();
       final tenantMap = {
         for (final t in tenants as List)
           t['id'] as int: {
             'name': t['shortName'] as String,
-            'color': t['color'] as String? ?? '#000000',
+            'color': _getTenantColor(t['id'] as int, tenantIdsList),
           }
       };
 

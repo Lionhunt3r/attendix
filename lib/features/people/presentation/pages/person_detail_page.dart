@@ -11,6 +11,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../data/repositories/player_repository.dart';
 import 'people_list_page.dart';
 
 /// Provider for single person with group name
@@ -418,30 +419,68 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     final reasonController = TextEditingController();
     DateTime? pauseUntil;
 
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Person pausieren'),
-          content: Column(
+        builder: (context, setDialogState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: AppDimensions.paddingL,
+            right: AppDimensions.paddingL,
+            top: AppDimensions.paddingL,
+          ),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Row(
+                children: [
+                  const Icon(Icons.pause_circle, color: AppColors.warning, size: 28),
+                  const SizedBox(width: AppDimensions.paddingS),
+                  Expanded(
+                    child: Text(
+                      '${widget.person.firstName} pausieren',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
               TextField(
                 controller: reasonController,
                 decoration: const InputDecoration(
                   labelText: 'Grund *',
                   hintText: 'Warum wird pausiert?',
+                  border: OutlineInputBorder(),
                 ),
                 maxLines: 2,
+                autofocus: true,
               ),
               const SizedBox(height: AppDimensions.paddingM),
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today, color: AppColors.primary),
                 title: const Text('Pausiert bis (optional)'),
-                subtitle: Text(pauseUntil != null
-                    ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
-                    : 'Kein Enddatum'),
-                trailing: const Icon(Icons.calendar_today),
+                subtitle: Text(
+                  pauseUntil != null
+                      ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
+                      : 'Kein Enddatum',
+                  style: TextStyle(
+                    color: pauseUntil != null ? AppColors.primary : AppColors.medium,
+                  ),
+                ),
+                trailing: pauseUntil != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: AppColors.medium),
+                        onPressed: () => setDialogState(() => pauseUntil = null),
+                      )
+                    : null,
                 onTap: () async {
                   final date = await showDatePicker(
                     context: context,
@@ -454,29 +493,30 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
                   }
                 },
               ),
+              const SizedBox(height: AppDimensions.paddingL),
+              FilledButton.icon(
+                onPressed: () {
+                  if (reasonController.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Bitte Grund angeben')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, {
+                    'reason': reasonController.text,
+                    'until': pauseUntil?.toIso8601String(),
+                  });
+                },
+                icon: const Icon(Icons.pause),
+                label: const Text('Pausieren'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Abbrechen'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (reasonController.text.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Bitte Grund angeben')),
-                  );
-                  return;
-                }
-                Navigator.pop(context, {
-                  'reason': reasonController.text,
-                  'until': pauseUntil?.toIso8601String(),
-                });
-              },
-              child: const Text('Pausieren'),
-            ),
-          ],
         ),
       ),
     );
@@ -487,26 +527,16 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Future<void> _pausePerson(String reason, String? until) async {
-    final supabase = ref.read(supabaseClientProvider);
+    final repository = ref.read(playerRepositoryProvider);
     final person = widget.person;
 
-    final newHistory = [
-      ...person.history,
-      PlayerHistoryEntry(
-        date: DateTime.now().toIso8601String(),
-        text: until != null
-            ? '$reason (bis ${DateFormat('dd.MM.yyyy').format(DateTime.parse(until))})'
-            : reason,
-        type: PlayerHistoryType.paused.value,
-      ),
-    ];
+    // Format reason with date if provided
+    final reasonText = until != null
+        ? '$reason (bis ${DateFormat('dd.MM.yyyy').format(DateTime.parse(until))})'
+        : reason;
 
     try {
-      await supabase.from('player').update({
-        'paused': true,
-        'paused_until': until,
-        'history': newHistory.map((h) => h.toJson()).toList(),
-      }).eq('id', person.id!);
+      await repository.pausePlayer(person, until, reasonText);
 
       ref.invalidate(personProvider(widget.personId));
       ref.invalidate(peopleListProvider);
@@ -529,24 +559,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Future<void> _unpausePerson() async {
-    final supabase = ref.read(supabaseClientProvider);
+    final repository = ref.read(playerRepositoryProvider);
     final person = widget.person;
 
-    final newHistory = [
-      ...person.history,
-      PlayerHistoryEntry(
-        date: DateTime.now().toIso8601String(),
-        text: 'Person wieder aktiv',
-        type: PlayerHistoryType.unpaused.value,
-      ),
-    ];
-
     try {
-      await supabase.from('player').update({
-        'paused': false,
-        'paused_until': null,
-        'history': newHistory.map((h) => h.toJson()).toList(),
-      }).eq('id', person.id!);
+      await repository.unpausePlayer(person);
 
       ref.invalidate(personProvider(widget.personId));
       ref.invalidate(peopleListProvider);
@@ -625,24 +642,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Future<void> _archivePerson(String date, String note) async {
-    final supabase = ref.read(supabaseClientProvider);
+    final repository = ref.read(playerRepositoryProvider);
     final person = widget.person;
 
-    final newHistory = [
-      ...person.history,
-      PlayerHistoryEntry(
-        date: DateTime.now().toIso8601String(),
-        text: note.isNotEmpty ? note : 'Kein Grund angegeben',
-        type: PlayerHistoryType.archived.value,
-      ),
-    ];
-
     try {
-      await supabase.from('player').update({
-        'left': date,
-        'appId': null,
-        'history': newHistory.map((h) => h.toJson()).toList(),
-      }).eq('id', person.id!);
+      await repository.archivePlayer(person, date, note.isNotEmpty ? note : null);
 
       ref.invalidate(personProvider(widget.personId));
       ref.invalidate(peopleListProvider);

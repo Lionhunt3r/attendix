@@ -2,28 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/person/person.dart';
-import '../../../../core/providers/tenant_providers.dart';
+import '../../../../data/repositories/player_repository.dart';
+import '../../../people/presentation/pages/people_list_page.dart';
 
-/// Provider for left (archived) players
+/// Provider for left (archived) players using repository
 final leftPlayersProvider = FutureProvider<List<Person>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('players')
-      .select('*, instruments(id, name)')
-      .eq('tenantId', tenant.id!)
-      .not('left', 'is', null)
-      .order('lastName');
-
-  return (response as List).map((e) => Person.fromJson(e as Map<String, dynamic>)).toList();
+  final repository = ref.watch(playerRepositoryProvider);
+  return repository.getArchivedPlayers();
 });
 
 /// Left Players Page - shows archived/former members
@@ -122,13 +111,11 @@ class LeftPlayersPage extends ConsumerWidget {
 
     if (confirmed == true && context.mounted) {
       try {
-        final supabase = ref.read(supabaseClientProvider);
-        await supabase
-            .from('players')
-            .update({'left': null})
-            .eq('id', player.id!);
+        final repository = ref.read(playerRepositoryProvider);
+        await repository.reactivatePlayer(player);
 
         ref.invalidate(leftPlayersProvider);
+        ref.invalidate(peopleListProvider);
 
         if (context.mounted) {
           ToastHelper.showSuccess(context, '${player.fullName} wurde reaktiviert');

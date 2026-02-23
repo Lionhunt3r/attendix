@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/enums.dart';
+import '../../../core/providers/debug_providers.dart';
 import '../../../core/providers/tenant_providers.dart';
 import '../../../data/models/tenant/tenant.dart';
+import '../debug/debug_role_fab.dart';
 
 /// Represents a navigation destination with its route
 class _NavDestination {
@@ -41,6 +44,16 @@ class MainShell extends ConsumerWidget {
         label: 'Personen',
         icon: Icons.people_outline,
         selectedIcon: Icons.people,
+      ));
+    }
+
+    // Parents: Parents Portal tab
+    if (role.isParent) {
+      destinations.add(const _NavDestination(
+        route: '/parents',
+        label: 'Termine',
+        icon: Icons.family_restroom_outlined,
+        selectedIcon: Icons.family_restroom,
       ));
     }
 
@@ -108,7 +121,8 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final role = ref.watch(currentRoleProvider);
+    // Use effectiveRoleProvider to support debug role override
+    final role = ref.watch(effectiveRoleProvider);
     final tenant = ref.watch(currentTenantProvider);
 
     // Build destinations based on role
@@ -124,6 +138,8 @@ class MainShell extends ConsumerWidget {
 
     return Scaffold(
       body: child,
+      // Debug FAB only visible in debug mode
+      floatingActionButton: kDebugMode ? const DebugRoleFab() : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex.clamp(0, destinations.length - 1),
         onDestinationSelected: (index) => _onItemTapped(context, index, destinations),
