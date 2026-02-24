@@ -38,6 +38,7 @@ import '../../features/planning/presentation/pages/planning_page.dart';
 import '../../features/history/presentation/pages/history_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/meetings/presentation/pages/meetings_list_page.dart';
+import '../../features/meetings/presentation/pages/meeting_detail_page.dart';
 import '../../features/voice_leader/presentation/pages/voice_leader_page.dart';
 import '../../features/members/presentation/pages/members_page.dart';
 import '../../features/registration/presentation/pages/tenant_registration_page.dart';
@@ -303,6 +304,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'meetings',
                 name: 'meetings',
                 builder: (context, state) => const MeetingsListPage(),
+                routes: [
+                  GoRoute(
+                    path: ':id',
+                    name: 'meetingDetail',
+                    builder: (context, state) {
+                      final id = int.tryParse(state.pathParameters['id'] ?? '');
+                      if (id == null) return const MeetingsListPage();
+                      return MeetingDetailPage(meetingId: id);
+                    },
+                  ),
+                ],
               ),
               GoRoute(
                 path: 'notifications',
@@ -403,6 +415,7 @@ class AppRoutes {
   static const String instruments = 'instruments';
   static const String teachers = 'teachers';
   static const String meetings = 'meetings';
+  static const String meetingDetail = 'meetingDetail';
   static const String notifications = 'notifications';
   static const String general = 'general';
   static const String statistics = 'statistics';

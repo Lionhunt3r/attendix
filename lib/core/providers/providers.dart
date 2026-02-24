@@ -9,3 +9,4 @@ export 'song_providers.dart';
 export 'song_filter_providers.dart';
 export 'holiday_providers.dart';
 export 'conductor_providers.dart';
+export 'meeting_providers.dart';

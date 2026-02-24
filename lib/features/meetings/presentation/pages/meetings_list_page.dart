@@ -3,63 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/meeting_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
-import '../../../../core/providers/tenant_providers.dart';
-
-/// Simple meeting data class (avoiding code generation for simplicity)
-class MeetingData {
-  final int? id;
-  final int tenantId;
-  final String date;
-  final String? notes;
-
-  MeetingData({
-    this.id,
-    required this.tenantId,
-    required this.date,
-    this.notes,
-  });
-
-  factory MeetingData.fromJson(Map<String, dynamic> json) {
-    return MeetingData(
-      id: json['id'] as int?,
-      tenantId: json['tenantId'] as int,
-      date: json['date'] as String,
-      notes: json['notes'] as String?,
-    );
-  }
-
-  String get formattedDate {
-    final d = DateTime.tryParse(date);
-    if (d == null) return date;
-    return DateFormat('dd.MM.yyyy').format(d);
-  }
-
-  String get weekdayName {
-    final d = DateTime.tryParse(date);
-    if (d == null) return '';
-    return DateFormat('E', 'de_DE').format(d);
-  }
-}
-
-/// Provider for meetings list
-final meetingsListProvider = FutureProvider<List<MeetingData>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('meetings')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .order('date', ascending: false);
-
-  return (response as List).map((e) => MeetingData.fromJson(e as Map<String, dynamic>)).toList();
-});
+import '../../../../data/models/meeting/meeting.dart';
 
 /// Meetings list page
 class MeetingsListPage extends ConsumerWidget {
@@ -67,7 +16,7 @@ class MeetingsListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final meetingsAsync = ref.watch(meetingsListProvider);
+    final meetingsAsync = ref.watch(meetingsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -88,7 +37,7 @@ class MeetingsListPage extends ConsumerWidget {
               Text('Fehler: $e'),
               const SizedBox(height: AppDimensions.paddingM),
               ElevatedButton(
-                onPressed: () => ref.invalidate(meetingsListProvider),
+                onPressed: () => ref.invalidate(meetingsProvider),
                 child: const Text('Erneut versuchen'),
               ),
             ],
@@ -117,7 +66,7 @@ class MeetingsListPage extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(meetingsListProvider),
+            onRefresh: () async => ref.invalidate(meetingsProvider),
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               itemCount: meetings.length,
@@ -125,7 +74,7 @@ class MeetingsListPage extends ConsumerWidget {
                 final meeting = meetings[index];
                 return _MeetingListItem(
                   meeting: meeting,
-                  onTap: () => _showMeetingDialog(context, ref, meeting),
+                  onTap: () => context.push('/settings/meetings/${meeting.id}'),
                   onDelete: () => _deleteMeeting(context, ref, meeting),
                 );
               },
@@ -134,60 +83,44 @@ class MeetingsListPage extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showMeetingDialog(context, ref, null),
+        onPressed: () => _showCreateMeetingDialog(context, ref),
         icon: const Icon(Icons.add),
         label: const Text('Neue Sitzung'),
       ),
     );
   }
 
-  Future<void> _showMeetingDialog(BuildContext context, WidgetRef ref, MeetingData? meeting) async {
-    final result = await showDialog<MeetingData>(
+  Future<void> _showCreateMeetingDialog(BuildContext context, WidgetRef ref) async {
+    final result = await showDialog<DateTime>(
       context: context,
-      builder: (ctx) => _MeetingEditDialog(meeting: meeting),
+      builder: (ctx) => const _MeetingCreateDialog(),
     );
 
     if (result != null && context.mounted) {
-      try {
-        final supabase = ref.read(supabaseClientProvider);
-        final tenant = ref.read(currentTenantProvider);
+      final tenant = ref.read(currentTenantProvider);
+      if (tenant == null) {
+        ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+        return;
+      }
 
-        if (tenant == null) {
-          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
-          return;
-        }
+      final notifier = ref.read(meetingNotifierProvider.notifier);
+      final newMeeting = Meeting(
+        tenantId: tenant.id!,
+        date: result.toIso8601String().split('T')[0],
+      );
 
-        if (meeting == null) {
-          // Create new
-          await supabase.from('meetings').insert({
-            'tenantId': tenant.id,
-            'date': result.date,
-            'notes': result.notes,
-          });
-          if (context.mounted) {
-            ToastHelper.showSuccess(context, 'Sitzung erstellt');
-          }
-        } else {
-          // Update existing
-          await supabase.from('meetings').update({
-            'date': result.date,
-            'notes': result.notes,
-          }).eq('id', meeting.id!);
-          if (context.mounted) {
-            ToastHelper.showSuccess(context, 'Sitzung aktualisiert');
-          }
-        }
-
-        ref.invalidate(meetingsListProvider);
-      } catch (e) {
-        if (context.mounted) {
-          ToastHelper.showError(context, 'Fehler: $e');
-        }
+      final created = await notifier.createMeeting(newMeeting);
+      if (created != null && context.mounted) {
+        ToastHelper.showSuccess(context, 'Sitzung erstellt');
+        // Navigate to detail page to edit
+        context.push('/settings/meetings/${created.id}');
+      } else if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Erstellen');
       }
     }
   }
 
-  Future<void> _deleteMeeting(BuildContext context, WidgetRef ref, MeetingData meeting) async {
+  Future<void> _deleteMeeting(BuildContext context, WidgetRef ref, Meeting meeting) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -208,17 +141,10 @@ class MeetingsListPage extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      try {
-        final supabase = ref.read(supabaseClientProvider);
-        await supabase.from('meetings').delete().eq('id', meeting.id!);
-        ref.invalidate(meetingsListProvider);
-        if (context.mounted) {
-          ToastHelper.showSuccess(context, 'Sitzung gelöscht');
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ToastHelper.showError(context, 'Fehler: $e');
-        }
+      final notifier = ref.read(meetingNotifierProvider.notifier);
+      await notifier.deleteMeeting(meeting.id!);
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Sitzung gelöscht');
       }
     }
   }
@@ -231,7 +157,7 @@ class _MeetingListItem extends StatelessWidget {
     required this.onDelete,
   });
 
-  final MeetingData meeting;
+  final Meeting meeting;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -276,14 +202,7 @@ class _MeetingListItem extends StatelessWidget {
           meeting.formattedDate,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        subtitle: meeting.notes != null && meeting.notes!.isNotEmpty
-            ? Text(
-                meeting.notes!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: AppColors.medium),
-              )
-            : null,
+        subtitle: _buildSubtitle(),
         trailing: IconButton(
           icon: const Icon(Icons.delete_outline, color: AppColors.danger),
           onPressed: onDelete,
@@ -291,35 +210,42 @@ class _MeetingListItem extends StatelessWidget {
       ),
     );
   }
+
+  Widget? _buildSubtitle() {
+    final hasNotes = meeting.notes != null && meeting.notes!.isNotEmpty;
+    final hasAttendees = meeting.attendeeIds != null && meeting.attendeeIds!.isNotEmpty;
+
+    if (!hasNotes && !hasAttendees) return null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasAttendees)
+          Text(
+            '${meeting.attendeeIds!.length} Teilnehmer',
+            style: TextStyle(color: AppColors.medium, fontSize: 12),
+          ),
+        if (hasNotes)
+          Text(
+            meeting.notes!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: AppColors.medium),
+          ),
+      ],
+    );
+  }
 }
 
-class _MeetingEditDialog extends StatefulWidget {
-  const _MeetingEditDialog({this.meeting});
-
-  final MeetingData? meeting;
+class _MeetingCreateDialog extends StatefulWidget {
+  const _MeetingCreateDialog();
 
   @override
-  State<_MeetingEditDialog> createState() => _MeetingEditDialogState();
+  State<_MeetingCreateDialog> createState() => _MeetingCreateDialogState();
 }
 
-class _MeetingEditDialogState extends State<_MeetingEditDialog> {
-  late DateTime _selectedDate;
-  final _notesController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedDate = widget.meeting != null
-        ? DateTime.tryParse(widget.meeting!.date) ?? DateTime.now()
-        : DateTime.now();
-    _notesController.text = widget.meeting?.notes ?? '';
-  }
-
-  @override
-  void dispose() {
-    _notesController.dispose();
-    super.dispose();
-  }
+class _MeetingCreateDialogState extends State<_MeetingCreateDialog> {
+  DateTime _selectedDate = DateTime.now();
 
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
@@ -336,36 +262,14 @@ class _MeetingEditDialogState extends State<_MeetingEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = widget.meeting != null;
-
     return AlertDialog(
-      title: Text(isEditing ? 'Sitzung bearbeiten' : 'Neue Sitzung'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Date picker
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Datum'),
-              subtitle: Text(DateFormat('EEEE, dd.MM.yyyy', 'de_DE').format(_selectedDate)),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _selectDate,
-            ),
-            const SizedBox(height: AppDimensions.paddingM),
-
-            // Notes
-            TextField(
-              controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'Notizen (optional)',
-                alignLabelWithHint: true,
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
+      title: const Text('Neue Sitzung'),
+      content: ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Datum'),
+        subtitle: Text(DateFormat('EEEE, dd.MM.yyyy', 'de_DE').format(_selectedDate)),
+        trailing: const Icon(Icons.calendar_today),
+        onTap: _selectDate,
       ),
       actions: [
         TextButton(
@@ -373,15 +277,8 @@ class _MeetingEditDialogState extends State<_MeetingEditDialog> {
           child: const Text('Abbrechen'),
         ),
         ElevatedButton(
-          onPressed: () {
-            Navigator.of(context).pop(MeetingData(
-              id: widget.meeting?.id,
-              tenantId: widget.meeting?.tenantId ?? 0,
-              date: _selectedDate.toIso8601String().split('T')[0],
-              notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-            ));
-          },
-          child: Text(isEditing ? 'Speichern' : 'Erstellen'),
+          onPressed: () => Navigator.of(context).pop(_selectedDate),
+          child: const Text('Erstellen'),
         ),
       ],
     );

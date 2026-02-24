@@ -50,6 +50,7 @@
 | History | ✅ |
 | Export | ✅ |
 | Planning (Basis) | ✅ |
+| Meeting Detail | ✅ |
 
 ---
 
@@ -59,7 +60,6 @@
 
 | Feature | Ionic-Dateien | Komplexität | Beschreibung |
 |---------|---------------|-------------|--------------|
-| Meeting Detail | `meeting.page.ts` | Niedrig | Notizen bearbeiten, Teilnehmer verwalten |
 | Song Viewer (PDF) | `song-viewer.page.ts` | Mittel | PDF-Anzeige für Noten |
 | Telegram Integration | `telegram.service.ts` | Mittel | Plan per Telegram senden |
 
@@ -94,7 +94,7 @@
 | `sign-in-out.service.ts` | `sign_in_out_repository.dart` | ✅ |
 | `song.service.ts` | `song_repository.dart` | ✅ |
 | `holiday.service.ts` | `holiday_service.dart` | ✅ |
-| `meeting.service.ts` | - | ⚠️ Inline |
+| `meeting.service.ts` | `meeting_repository.dart` | ✅ |
 | `shift.service.ts` | - | ❌ |
 | `handover.service.ts` | - | ❌ |
 | `telegram.service.ts` | `telegram_service.dart` | ⚠️ Teilweise |
@@ -143,7 +143,7 @@ Diese Dateien wurden kürzlich erstellt:
 
 ## Nächste Schritte
 
-- [ ] Meeting Detail Page erstellen (`/meetings/:id`)
+- [x] Meeting Detail Page erstellen (`/meetings/:id`)
 - [ ] PDF-Viewer evaluieren (flutter_pdfview vs syncfusion)
 - [ ] Telegram-Versand vervollständigen
 - [ ] Untracked Dateien committen
