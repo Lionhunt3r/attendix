@@ -24,6 +24,8 @@ import '../../features/settings/presentation/pages/user_management_page.dart';
 import '../../features/settings/presentation/pages/pending_players_page.dart';
 import '../../features/settings/presentation/pages/left_players_page.dart';
 import '../../features/settings/presentation/pages/calendar_subscription_page.dart';
+import '../../features/settings/presentation/pages/viewers_page.dart';
+import '../../features/settings/presentation/pages/parents_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/teachers/presentation/pages/teachers_list_page.dart';
 import '../../features/export/presentation/pages/export_page.dart';
@@ -384,6 +386,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                     },
                   ),
                 ],
+              ),
+              GoRoute(
+                path: 'viewers',
+                name: 'viewers',
+                builder: (context, state) => const ViewersPage(),
+              ),
+              GoRoute(
+                path: 'parents',
+                name: 'parentsManagement',
+                builder: (context, state) => const ParentsPage(),
               ),
             ],
           ),
