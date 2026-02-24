@@ -117,6 +117,30 @@ class CalendarSubscriptionPage extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppDimensions.paddingXL),
+          ] else ...[
+            // Show hint when no tenant selected (Issue #17)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                child: Column(
+                  children: [
+                    Icon(Icons.info_outline, color: AppColors.warning, size: 40),
+                    const SizedBox(height: AppDimensions.paddingS),
+                    Text(
+                      'Kein Ensemble ausgewählt',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    Text(
+                      'Bitte wähle zuerst ein Ensemble aus, um den Kalender-Link zu erhalten.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.medium),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingXL),
           ],
 
           // Instructions
@@ -167,7 +191,7 @@ class CalendarSubscriptionPage extends ConsumerWidget {
           const SizedBox(height: AppDimensions.paddingXL),
 
           // Platform-specific instructions
-          _PlatformInstructions(),
+          const _PlatformInstructions(),
         ],
       ),
     );
@@ -244,6 +268,8 @@ class _InstructionItem extends StatelessWidget {
 }
 
 class _PlatformInstructions extends StatelessWidget {
+  const _PlatformInstructions();
+
   @override
   Widget build(BuildContext context) {
     return Column(

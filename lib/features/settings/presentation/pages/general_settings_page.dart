@@ -138,7 +138,9 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       final supabase = ref.read(supabaseClientProvider);
       final tenant = ref.read(currentTenantProvider);
 
-      if (tenant?.id == null) {
+      // Safe tenant.id access (Issue #16 RT-004)
+      final tenantId = tenant?.id;
+      if (tenantId == null) {
         throw Exception('Kein Tenant ausgewählt');
       }
 
@@ -165,7 +167,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
           'defaultValue': f.defaultValue,
           if (f.options != null) 'options': f.options,
         }).toList(),
-      }).eq('id', tenant!.id!);
+      }).eq('id', tenantId);
 
       // Refresh tenant data
       ref.invalidate(currentTenantProvider);
@@ -201,9 +203,10 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       locale: const Locale('de', 'DE'),
     );
     if (picked != null) {
+      // Fix double setState (Issue #13) - set both values in one setState
       setState(() {
         _seasonStart = picked;
-        _markChanged();
+        _hasChanges = true;
       });
     }
   }
@@ -591,10 +594,23 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   }
 
   String _generateFieldId(String name) {
-    return name.trim()
+    // Generate base ID from name (Issue #10)
+    String baseId = name.trim()
         .toLowerCase()
         .replaceAll(RegExp(r'\s+'), '_')
         .replaceAll(RegExp(r'[^a-z0-9_]'), '');
+
+    // Handle empty base ID
+    if (baseId.isEmpty) baseId = 'field';
+
+    // Add counter if collision exists
+    String finalId = baseId;
+    int counter = 1;
+    while (_extraFields.any((f) => f.id == finalId)) {
+      finalId = '${baseId}_$counter';
+      counter++;
+    }
+    return finalId;
   }
 
   Future<void> _showAddExtraFieldDialog() async {
@@ -761,7 +777,8 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                         defaultValue = DateTime.now().toIso8601String().split('T')[0];
                         break;
                       case 'select':
-                        defaultValue = options.first;
+                        // Safe access with guard (Issue #7)
+                        defaultValue = options.isNotEmpty ? options.first : '';
                         break;
                     }
 
@@ -777,7 +794,9 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                     });
 
                     Navigator.of(ctx).pop();
-                    ToastHelper.showSuccess(context, 'Feld hinzugefügt');
+                    if (context.mounted) {
+                      ToastHelper.showSuccess(context, 'Feld hinzugefügt');
+                    }
                   },
                   child: const Text('Feld hinzufügen'),
                 ),
@@ -787,7 +806,11 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      // Dispose controllers to prevent memory leak (Issue #22)
+      nameController.dispose();
+      optionController.dispose();
+    });
   }
 
   Future<void> _showEditExtraFieldDialog(int index) async {
@@ -927,14 +950,19 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                         id: field.id, // Keep original ID
                         name: name,
                         type: field.type,
-                        defaultValue: field.type == 'select' ? options.first : field.defaultValue,
+                        // Safe access with guard (Issue #7)
+                        defaultValue: field.type == 'select' && options.isNotEmpty
+                            ? options.first
+                            : field.defaultValue,
                         options: field.type == 'select' ? options : null,
                       );
                       _markChanged();
                     });
 
                     Navigator.of(ctx).pop();
-                    ToastHelper.showSuccess(context, 'Feld aktualisiert');
+                    if (context.mounted) {
+                      ToastHelper.showSuccess(context, 'Feld aktualisiert');
+                    }
                   },
                   child: const Text('Speichern'),
                 ),
@@ -944,7 +972,11 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      // Dispose controllers to prevent memory leak (Issue #22)
+      nameController.dispose();
+      optionController.dispose();
+    });
   }
 
   Future<void> _confirmDeleteExtraField(int index) async {

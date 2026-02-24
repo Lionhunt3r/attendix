@@ -38,6 +38,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
           .from('songs')
           .select('*')
           .eq('id', id)
+          .eq('tenantId', currentTenantId)
           .maybeSingle();
 
       if (response == null) return null;
@@ -90,6 +91,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
           .from('songs')
           .update(updates)
           .eq('id', id)
+          .eq('tenantId', currentTenantId)
           .select()
           .single();
 
@@ -103,7 +105,11 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
   /// Delete a song
   Future<void> deleteSong(int id) async {
     try {
-      await supabase.from('songs').delete().eq('id', id);
+      await supabase
+          .from('songs')
+          .delete()
+          .eq('id', id)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'deleteSong');
       rethrow;

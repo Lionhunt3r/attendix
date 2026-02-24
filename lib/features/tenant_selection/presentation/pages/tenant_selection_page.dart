@@ -46,6 +46,10 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
     // If no saved tenant, don't auto-navigate
     if (userPrefs.currentTenantId == null) return;
 
+    // If tenant is already set, user navigated here to switch - show selection
+    final currentTenant = ref.read(currentTenantProvider);
+    if (currentTenant != null) return;
+
     setState(() => _isAutoNavigating = true);
 
     try {

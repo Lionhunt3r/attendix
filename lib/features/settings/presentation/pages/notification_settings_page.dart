@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/supabase_config.dart';
@@ -395,8 +396,12 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
               decoration: const InputDecoration(
                 labelText: 'Chat-ID eingeben',
                 hintText: 'z.B. 123456789',
+                helperText: 'Nur Zahlen. Gruppen-IDs beginnen mit Minus.',
               ),
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[-\d]')),
+              ],
               onSubmitted: (value) {
                 Navigator.pop(context);
                 _connectTelegram(value);
@@ -414,26 +419,52 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
     );
   }
 
+  /// Validates a Telegram chat ID (Issue #6)
+  /// Returns null if valid, error message if invalid
+  String? _validateTelegramChatId(String chatId) {
+    final trimmed = chatId.trim();
+    if (trimmed.isEmpty) {
+      return 'Bitte eine Chat-ID eingeben';
+    }
+
+    // Telegram IDs: positive for users, negative for groups
+    final regex = RegExp(r'^-?\d+$');
+    if (!regex.hasMatch(trimmed)) {
+      return 'Ungültige Chat-ID. Nur Zahlen erlaubt (z.B. 123456789)';
+    }
+
+    return null;
+  }
+
   Future<void> _connectTelegram(String chatId) async {
-    if (chatId.trim().isEmpty) return;
+    final error = _validateTelegramChatId(chatId);
+    if (error != null) {
+      if (mounted) {
+        ToastHelper.showError(context, error);
+      }
+      return;
+    }
 
     _updateConfig(_config!.copyWith(telegramChatId: chatId.trim()));
     await _saveConfig();
   }
 
   Future<void> _disconnectTelegram() async {
+    final currentConfig = _config;
+    if (currentConfig == null) return;
+
     setState(() {
       _config = NotificationConfig(
-        enabled: _config!.enabled,
+        enabled: currentConfig.enabled,
         telegramChatId: null,
-        birthdays: _config!.birthdays,
-        signins: _config!.signins,
-        signouts: _config!.signouts,
-        registrations: _config!.registrations,
-        criticals: _config!.criticals,
-        reminders: _config!.reminders,
-        updates: _config!.updates,
-        checklist: _config!.checklist,
+        birthdays: currentConfig.birthdays,
+        signins: currentConfig.signins,
+        signouts: currentConfig.signouts,
+        registrations: currentConfig.registrations,
+        criticals: currentConfig.criticals,
+        reminders: currentConfig.reminders,
+        updates: currentConfig.updates,
+        checklist: currentConfig.checklist,
       );
       _hasChanges = true;
     });

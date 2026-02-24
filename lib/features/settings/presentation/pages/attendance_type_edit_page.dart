@@ -86,8 +86,23 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         _nameController.text = type.name;
         _startTimeController.text = type.startTime ?? '19:00';
         _endTimeController.text = type.endTime ?? '20:30';
-        _defaultStatus = type.defaultStatus;
-        _availableStatuses = Set.from(type.availableStatuses ?? []);
+
+        // Load available statuses with fallback
+        _availableStatuses = type.availableStatuses?.isNotEmpty == true
+            ? Set.from(type.availableStatuses!)
+            : {AttendanceStatus.present};
+
+        // Validate defaultStatus is in availableStatuses (Issue #5)
+        if (_availableStatuses.contains(type.defaultStatus)) {
+          _defaultStatus = type.defaultStatus;
+        } else if (_availableStatuses.isNotEmpty) {
+          _defaultStatus = _availableStatuses.first;
+        } else {
+          // Fallback: ensure at least one status exists
+          _availableStatuses = {AttendanceStatus.present};
+          _defaultStatus = AttendanceStatus.present;
+        }
+
         _manageSongs = type.manageSongs;
         _visible = type.visible;
         _highlight = type.highlight;
@@ -229,7 +244,9 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
             _buildSection(
               title: 'Standard-Status',
               child: DropdownButtonFormField<AttendanceStatus>(
-                value: _defaultStatus,
+                value: _availableStatuses.contains(_defaultStatus)
+                    ? _defaultStatus
+                    : _availableStatuses.firstOrNull ?? AttendanceStatus.present,
                 onChanged: (value) {
                   if (value != null) {
                     setState(() {
@@ -264,9 +281,9 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
                           // Don't allow removing last status
                           if (_availableStatuses.length > 1) {
                             _availableStatuses.remove(status);
-                            // Reset default if removed
+                            // Reset default if removed (Issue #21 - safe .first)
                             if (_defaultStatus == status) {
-                              _defaultStatus = _availableStatuses.first;
+                              _defaultStatus = _availableStatuses.firstOrNull ?? AttendanceStatus.present;
                             }
                           }
                         }

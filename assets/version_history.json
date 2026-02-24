@@ -1,6 +1,14 @@
 {
   "versions": [
     {
+      "version": "0.1.7",
+      "date": "24.2.2026",
+      "changes": [
+        "🔒 Sicherheitsupdate: Multi-Tenant Isolation verstärkt",
+        "🛡️ Alle Datenbank-Operationen prüfen jetzt Tenant-Zugehörigkeit"
+      ]
+    },
+    {
       "version": "0.1.6",
       "date": "24.2.2026",
       "changes": [

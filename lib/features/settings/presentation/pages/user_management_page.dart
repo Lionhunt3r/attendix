@@ -47,14 +47,48 @@ final tenantUsersProvider = FutureProvider<List<TenantUser>>((ref) async {
 
   if (tenantId == null) return [];
 
-  // Get tenant users (email is not available via direct join to auth.users)
+  // Get tenant users
   final response = await supabase
       .from('tenantUsers')
       .select('*')
       .eq('tenantId', tenantId)
       .order('role', ascending: true);
 
-  return (response as List).map((e) => TenantUser.fromJson(e)).toList();
+  final users = (response as List).map((e) => TenantUser.fromJson(e)).toList();
+
+  // Load emails from player table for users with personId (Issue #8)
+  final personIds = users
+      .where((u) => u.personId != null)
+      .map((u) => u.personId!)
+      .toSet()
+      .toList();
+
+  if (personIds.isEmpty) return users;
+
+  final playerResponse = await supabase
+      .from('player')
+      .select('id, email')
+      .eq('tenantId', tenantId)
+      .inFilter('id', personIds);
+
+  final emailMap = <int, String?>{};
+  for (final p in playerResponse as List) {
+    emailMap[p['id'] as int] = p['email'] as String?;
+  }
+
+  return users.map((u) {
+    if (u.personId != null && emailMap.containsKey(u.personId)) {
+      return TenantUser(
+        id: u.id,
+        tenantId: u.tenantId,
+        userId: u.userId,
+        role: u.role,
+        personId: u.personId,
+        email: emailMap[u.personId],
+      );
+    }
+    return u;
+  }).toList();
 });
 
 /// User Management Page
@@ -502,13 +536,26 @@ class _UserTile extends ConsumerWidget {
       subtitle: Text(_getRoleLabel(user.roleEnum)),
       trailing: PopupMenuButton<Role>(
         onSelected: (role) => _changeRole(context, ref, role),
-        itemBuilder: (context) => Role.values
-            .where((r) => r != Role.none && r != Role.applicant)
-            .map((role) => PopupMenuItem(
-                  value: role,
-                  child: Text(_getRoleLabel(role)),
-                ))
-            .toList(),
+        itemBuilder: (context) {
+          // Only show assignable roles (Issue #12)
+          // Exclude: none, applicant, player, helper, voiceLeader, voiceLeaderHelper
+          const assignableRoles = [
+            Role.admin,
+            Role.responsible,
+            Role.viewer,
+            Role.parent,
+          ];
+          final tenant = ref.read(currentTenantProvider);
+          final showParent = tenant?.parents ?? false;
+
+          return assignableRoles
+              .where((r) => r != Role.parent || showParent)
+              .map((role) => PopupMenuItem(
+                    value: role,
+                    child: Text(_getRoleLabel(role)),
+                  ))
+              .toList();
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
