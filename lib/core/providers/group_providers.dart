@@ -22,6 +22,8 @@ final groupsProvider = FutureProvider<List<Group>>((ref) async {
   ref.keepAlive();
 
   final repo = ref.watch(groupRepositoryWithTenantProvider);
+  // Watch tenant changes to invalidate cache when tenant switches
+  ref.watch(currentTenantIdProvider);
 
   if (!repo.hasTenantId) return [];
 
@@ -34,6 +36,8 @@ final groupsMapProvider = FutureProvider<Map<int, String>>((ref) async {
   ref.keepAlive();
 
   final repo = ref.watch(groupRepositoryWithTenantProvider);
+  // Watch tenant changes to invalidate cache when tenant switches
+  ref.watch(currentTenantIdProvider);
 
   if (!repo.hasTenantId) return {};
 
