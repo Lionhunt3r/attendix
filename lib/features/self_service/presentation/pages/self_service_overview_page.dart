@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/self_service_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/attendance/attendance.dart';
+import '../../../../data/models/person/person.dart';
 import '../widgets/plan_viewer_sheet.dart';
 import '../widgets/upcoming_songs_sheet.dart';
 
@@ -32,11 +35,37 @@ class _SelfServiceOverviewPageState
     final currentAttendance = ref.watch(currentAttendanceProvider);
     final upcoming = ref.watch(upcomingAttendancesAcrossTenantsProvider);
     final past = ref.watch(pastAttendancesAcrossTenantsProvider);
+    final isApplicant = ref.watch(isApplicantProvider);
+    final playerAsync = ref.watch(currentSelfServicePlayerProvider);
+
+    // Show applicant view if user is an applicant
+    if (isApplicant) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Übersicht'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.info_outline),
+              tooltip: 'Legende',
+              onPressed: () => _showLegend(context),
+            ),
+          ],
+        ),
+        body: _ApplicantView(
+          playerName: playerAsync.valueOrNull?.firstName,
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Übersicht'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Legende',
+            onPressed: () => _showLegend(context),
+          ),
           IconButton(
             icon: const Icon(Icons.library_music),
             tooltip: 'Aktuelle Stücke',
@@ -102,12 +131,16 @@ class _SelfServiceOverviewPageState
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(allPersonAttendancesAcrossTenantsProvider);
+              ref.invalidate(currentSelfServicePlayerProvider);
             },
             child: CustomScrollView(
               slivers: [
-                // Stats Header
+                // Stats Header with greeting
                 SliverToBoxAdapter(
-                  child: _StatsHeader(stats: stats),
+                  child: _StatsHeader(
+                    stats: stats,
+                    player: playerAsync.valueOrNull,
+                  ),
                 ),
 
                 // Current Attendance Card
@@ -222,8 +255,13 @@ class _SelfServiceOverviewPageState
           SignInType.normal,
         );
 
+    final state = ref.read(signInOutNotifierProvider);
     if (mounted) {
-      ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+      if (state.hasError) {
+        ToastHelper.showError(context, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+      } else {
+        ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+      }
     }
   }
 
@@ -281,12 +319,17 @@ class _SelfServiceOverviewPageState
             isLateComing: isLateComing,
           );
 
+      final state = ref.read(signInOutNotifierProvider);
       if (mounted) {
-        ToastHelper.showSuccess(
-            context,
-            isLateComing
-                ? 'Vielen Dank für die Info!'
-                : 'Vielen Dank für deine rechtzeitige Abmeldung!');
+        if (state.hasError) {
+          ToastHelper.showError(context, 'Abmeldung fehlgeschlagen. Bitte versuche es erneut.');
+        } else {
+          ToastHelper.showSuccess(
+              context,
+              isLateComing
+                  ? 'Vielen Dank für die Info!'
+                  : 'Vielen Dank für deine rechtzeitige Abmeldung!');
+        }
       }
     }
   }
@@ -326,11 +369,30 @@ class _SelfServiceOverviewPageState
   }
 
   Future<void> _showActionSheet(CrossTenantPersonAttendance attendance) async {
-    if (attendance.id == null) return;
+    if (attendance.id == null) {
+      ToastHelper.showError(context, 'Dieser Termin kann nicht bearbeitet werden');
+      return;
+    }
 
     final isUpcoming = attendance.isUpcoming;
     final isPast = attendance.isPast;
     final isDeadlinePassed = attendance.isDeadlinePassed;
+    final isSignedIn = attendance.status == AttendanceStatus.present ||
+        attendance.status == AttendanceStatus.late;
+    final isExcused = attendance.status == AttendanceStatus.excused ||
+        attendance.status == AttendanceStatus.lateExcused;
+
+    // Get attendance type to check available_statuses
+    AttendanceType? attType;
+    if (attendance.typeId != null) {
+      attType = await ref.read(attendanceTypeByIdProvider(attendance.typeId!).future);
+    }
+
+    // Check which statuses are available
+    final canExcuse = attType?.availableStatuses?.contains(AttendanceStatus.excused) ?? true;
+    final canLate = attType?.availableStatuses?.contains(AttendanceStatus.late) ?? true;
+
+    if (!mounted) return;
 
     await showModalBottomSheet(
       context: context,
@@ -361,7 +423,7 @@ class _SelfServiceOverviewPageState
               ),
             ),
             const Divider(),
-            if (isUpcoming && !isDeadlinePassed) ...[
+            if (isUpcoming && !isDeadlinePassed && !isSignedIn && !isExcused) ...[
               ListTile(
                 leading: const Icon(Icons.check_circle, color: AppColors.success),
                 title: const Text('Anmelden'),
@@ -371,19 +433,39 @@ class _SelfServiceOverviewPageState
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.cancel, color: AppColors.danger),
-                title: const Text('Abmelden'),
+                leading: const Icon(Icons.note_add, color: AppColors.success),
+                title: const Text('Anmelden mit Notiz'),
                 onTap: () {
                   Navigator.pop(context);
-                  _showSignOutDialog(attendance);
+                  _signInWithNote(attendance);
                 },
               ),
+              if (canExcuse)
+                ListTile(
+                  leading: const Icon(Icons.cancel, color: AppColors.danger),
+                  title: const Text('Abmelden'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSignOutDialog(attendance);
+                  },
+                ),
+              if (canLate)
+                ListTile(
+                  leading: const Icon(Icons.schedule, color: AppColors.warning),
+                  title: const Text('Verspätung eintragen'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSignOutDialog(attendance, isLateComing: true);
+                  },
+                ),
+            ],
+            if (isUpcoming && !isDeadlinePassed && isSignedIn) ...[
               ListTile(
-                leading: const Icon(Icons.schedule, color: AppColors.warning),
-                title: const Text('Verspätung eintragen'),
+                leading: const Icon(Icons.edit_note, color: AppColors.primary),
+                title: const Text('Notiz anpassen'),
                 onTap: () {
                   Navigator.pop(context);
-                  _showSignOutDialog(attendance, isLateComing: true);
+                  _showNoteDialog(attendance);
                 },
               ),
             ],
@@ -398,14 +480,15 @@ class _SelfServiceOverviewPageState
                 ),
               ),
             ],
-            ListTile(
-              leading: const Icon(Icons.note_add),
-              title: const Text('Notiz hinzufügen'),
-              onTap: () {
-                Navigator.pop(context);
-                _showNoteDialog(attendance);
-              },
-            ),
+            if (!isSignedIn)
+              ListTile(
+                leading: const Icon(Icons.note_add),
+                title: const Text('Notiz hinzufügen'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showNoteDialog(attendance);
+                },
+              ),
             if (attendance.hasPlan)
               ListTile(
                 leading: const Icon(Icons.list_alt, color: AppColors.primary),
@@ -422,6 +505,56 @@ class _SelfServiceOverviewPageState
     );
   }
 
+  Future<void> _signInWithNote(CrossTenantPersonAttendance attendance) async {
+    if (attendance.id == null) {
+      ToastHelper.showError(context, 'Fehler: Keine gültige Anwesenheits-ID');
+      return;
+    }
+
+    final controller = TextEditingController();
+    final note = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notiz für Anmeldung'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Gib hier deine Notiz ein',
+          ),
+          maxLines: 3,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: const Text('Anmelden'),
+          ),
+        ],
+      ),
+    );
+
+    if (note != null && mounted) {
+      await ref.read(signInOutNotifierProvider.notifier).signIn(
+            attendance.id!,
+            SignInType.normal,
+            notes: note,
+          );
+
+      final state = ref.read(signInOutNotifierProvider);
+      if (mounted) {
+        if (state.hasError) {
+          ToastHelper.showError(context, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+        } else {
+          ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+        }
+      }
+    }
+  }
+
   Future<void> _showPlanViewer(CrossTenantPersonAttendance attendance) async {
     if (!attendance.hasPlan) {
       ToastHelper.showWarning(context, 'Kein Ablaufplan verfügbar');
@@ -435,7 +568,10 @@ class _SelfServiceOverviewPageState
   }
 
   Future<void> _showNoteDialog(CrossTenantPersonAttendance attendance) async {
-    if (attendance.id == null) return;
+    if (attendance.id == null) {
+      ToastHelper.showError(context, 'Fehler: Keine gültige Anwesenheits-ID');
+      return;
+    }
 
     final controller = TextEditingController(text: attendance.notes);
 
@@ -469,16 +605,73 @@ class _SelfServiceOverviewPageState
           .read(signInOutNotifierProvider.notifier)
           .updateNote(attendance.id!, note);
 
+      final state = ref.read(signInOutNotifierProvider);
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Notiz gespeichert');
+        if (state.hasError) {
+          ToastHelper.showError(context, 'Notiz konnte nicht gespeichert werden.');
+        } else {
+          ToastHelper.showSuccess(context, 'Notiz gespeichert');
+        }
       }
     }
+  }
+
+  void _showLegend(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text(
+                'Legende',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+            const Divider(),
+            _LegendItem(
+              symbol: '✓',
+              color: AppColors.success,
+              label: 'Anwesend',
+            ),
+            _LegendItem(
+              symbol: 'E',
+              color: AppColors.info,
+              label: 'Entschuldigt',
+            ),
+            _LegendItem(
+              symbol: 'A',
+              color: AppColors.danger,
+              label: 'Abwesend',
+            ),
+            _LegendItem(
+              symbol: 'L',
+              color: Colors.deepOrange,
+              label: 'Verspätet anwesend',
+            ),
+            _LegendItem(
+              symbol: 'LE',
+              color: AppColors.warning,
+              label: 'Verspätet entschuldigt',
+            ),
+            _LegendItem(
+              symbol: 'N',
+              color: AppColors.medium,
+              label: 'Neutral',
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+        ),
+      ),
+    );
   }
 
   Color _parseColor(String hexColor) {
     try {
       return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
     } catch (e) {
+      debugPrint('Warning: Failed to parse color "$hexColor", using primary color');
       return AppColors.primary;
     }
   }
@@ -486,9 +679,10 @@ class _SelfServiceOverviewPageState
 
 /// Stats header showing attendance percentage and late count
 class _StatsHeader extends StatelessWidget {
-  const _StatsHeader({required this.stats});
+  const _StatsHeader({required this.stats, this.player});
 
   final AttendanceStats stats;
+  final Person? player;
 
   @override
   Widget build(BuildContext context) {
@@ -504,18 +698,37 @@ class _StatsHeader extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _StatCircle(
-            value: '${stats.percentage}%',
-            label: 'Anwesenheit',
-            color: _getPercentageColor(stats.percentage),
-          ),
-          _StatCircle(
-            value: '${stats.lateCount}',
-            label: 'Verspätungen',
-            color: stats.lateCount > 3 ? AppColors.warning : AppColors.medium,
+          // Personal greeting
+          if (player != null) ...[
+            Text(
+              player!.paused
+                  ? 'Shalom ${player!.firstName}! Du pausierst gerade.'
+                  : 'Shalom ${player!.firstName}!',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: player!.paused ? AppColors.warning : null,
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+          // Stats circles
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _StatCircle(
+                value: '${stats.percentage}%',
+                label: 'Anwesenheit',
+                color: _getPercentageColor(stats.percentage),
+              ),
+              _StatCircle(
+                value: '${stats.lateCount}',
+                label: 'Verspätungen',
+                color: stats.lateCount > 3 ? AppColors.warning : AppColors.medium,
+              ),
+            ],
           ),
         ],
       ),
@@ -763,6 +976,7 @@ class _CurrentAttendanceCard extends StatelessWidget {
     try {
       return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
     } catch (e) {
+      debugPrint('Warning: Failed to parse color "$hexColor", using primary color');
       return AppColors.primary;
     }
   }
@@ -890,6 +1104,7 @@ class _AttendanceListTile extends StatelessWidget {
     try {
       return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
     } catch (e) {
+      debugPrint('Warning: Failed to parse color "$hexColor", using primary color');
       return AppColors.primary;
     }
   }
@@ -959,5 +1174,100 @@ class _StatusBadge extends StatelessWidget {
       AttendanceStatus.lateExcused => 'SE',
       AttendanceStatus.neutral => '?',
     };
+  }
+}
+
+/// Legend item widget for the legend sheet
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({
+    required this.symbol,
+    required this.color,
+    required this.label,
+  });
+
+  final String symbol;
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Center(
+          child: Text(
+            symbol,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ),
+      title: Text(label),
+    );
+  }
+}
+
+/// Applicant view shown when user has APPLICANT role
+class _ApplicantView extends StatelessWidget {
+  const _ApplicantView({this.playerName});
+
+  final String? playerName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.paddingL),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.paddingL),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.hourglass_empty,
+                  size: 64,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(height: AppDimensions.paddingM),
+                if (playerName != null) ...[
+                  Text(
+                    'Shalom $playerName!',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+                ],
+                const Text(
+                  'Deine Registrierung wurde erfolgreich übermittelt.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: AppDimensions.paddingS),
+                const Text(
+                  'Du wirst benachrichtigt, sobald diese bearbeitet wurde.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.medium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
