@@ -38,6 +38,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
           .from('songs')
           .select('*')
           .eq('id', id)
+          .eq('tenantId', currentTenantId)
           .maybeSingle();
 
       if (response == null) return null;

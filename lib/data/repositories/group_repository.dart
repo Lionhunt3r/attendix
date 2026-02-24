@@ -75,6 +75,7 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
           .from('instruments')
           .select('*')
           .eq('id', id)
+          .eq('tenantId', currentTenantId)
           .maybeSingle();
 
       if (response == null) return null;
