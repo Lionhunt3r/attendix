@@ -64,6 +64,7 @@
 | Shift Copy to Tenant | ✅ |
 | Handover (Spieler-Transfer) | ✅ |
 | Holiday Service (Feiertage/Ferien) | ✅ |
+| Cross-Tenant Service | ✅ |
 
 ---
 
@@ -82,7 +83,6 @@
 | Feature | Komplexität | Beschreibung |
 |---------|-------------|--------------|
 | AI Service | Niedrig | GPT-basierte Gruppen-Synonyme |
-| Cross-Tenant Service | Mittel | Allgemeiner Cross-Tenant Service (Copy-Features bereits implementiert) |
 | Feedback Service | Niedrig | Feedback-Funktion |
 
 ---
@@ -104,7 +104,7 @@
 | `handover.service.ts` | `player_repository.dart` (handover methods) | ✅ |
 | `telegram.service.ts` | `telegram_service.dart` | ✅ |
 | `ai.service.ts` | - | ❌ |
-| `cross-tenant.service.ts` | `copy_to_tenant_sheet.dart`, `shift_copy_to_tenant_sheet.dart` | 🟡 (teilweise) |
+| `cross-tenant.service.ts` | `cross_tenant_service.dart` | ✅ |
 
 ---
 
