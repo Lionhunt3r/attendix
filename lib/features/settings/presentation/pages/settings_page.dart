@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/sheets/feedback_sheet.dart';
 import '../../../../shared/widgets/sheets/version_history_sheet.dart';
 
 /// Settings page with role-based menu filtering
@@ -215,6 +216,12 @@ class SettingsPage extends ConsumerWidget {
                     subtitle: 'Sprache, Theme und weitere Optionen',
                     onTap: () => context.push('/settings/general'),
                   ),
+                _SettingsTile(
+                  leading: const _SettingsIcon(icon: Icons.feedback),
+                  title: 'Feedback & Hilfe',
+                  subtitle: 'Fragen stellen oder Feedback geben',
+                  onTap: () => showFeedbackSheet(context),
+                ),
               ],
             ),
             const SizedBox(height: AppDimensions.paddingM),

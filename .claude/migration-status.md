@@ -4,13 +4,13 @@
 
 **Ionic Projekt:** `/Users/I576226/repositories/attendance` (~12.600 Zeilen TypeScript)
 **Flutter Projekt:** `/Users/I576226/repositories/attendix` (~16.800 Zeilen Dart)
-**Migrationsfortschritt:** ~95%
+**Migrationsfortschritt:** ~97%
 
 | Metrik | Wert |
 |--------|------|
 | Ionic Pages | 35 |
 | Flutter Pages | 38 |
-| Flutter Repositories | 8 |
+| Flutter Repositories | 9 |
 
 *Zuletzt aktualisiert: 2026-02-24*
 
@@ -65,6 +65,7 @@
 | Handover (Spieler-Transfer) | ✅ |
 | Holiday Service (Feiertage/Ferien) | ✅ |
 | Cross-Tenant Service | ✅ |
+| Feedback Service | ✅ |
 
 ---
 
@@ -83,7 +84,6 @@
 | Feature | Komplexität | Beschreibung |
 |---------|-------------|--------------|
 | AI Service | Niedrig | GPT-basierte Gruppen-Synonyme |
-| Feedback Service | Niedrig | Feedback-Funktion |
 
 ---
 
@@ -103,6 +103,7 @@
 | `shift.service.ts` | `shift_repository.dart` | ✅ |
 | `handover.service.ts` | `player_repository.dart` (handover methods) | ✅ |
 | `telegram.service.ts` | `telegram_service.dart` | ✅ |
+| `feedback.service.ts` | `feedback_repository.dart` | ✅ |
 | `ai.service.ts` | - | ❌ |
 | `cross-tenant.service.ts` | `cross_tenant_service.dart` | ✅ |
 
