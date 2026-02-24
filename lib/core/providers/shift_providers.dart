@@ -92,6 +92,7 @@ class ShiftNotifier extends Notifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       ref.invalidate(shiftsProvider);
       ref.invalidate(shiftByIdProvider(id));
+      ref.invalidate(shiftUsageCountProvider(id));
       return true;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);

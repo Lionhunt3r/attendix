@@ -28,6 +28,7 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
   List<ShiftDefinition> _definitions = [];
   bool _isLoading = false;
   bool _hasChanges = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
@@ -44,10 +45,11 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
   }
 
   void _initializeFromShift(ShiftPlan shift) {
-    if (_nameController.text.isEmpty) {
+    if (!_isInitialized) {
       _nameController.text = shift.name;
       _descriptionController.text = shift.description;
       _definitions = List.from(shift.definition);
+      _isInitialized = true;
     }
   }
 
@@ -399,8 +401,14 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
             ),
             ElevatedButton(
               onPressed: () {
-                final duration = double.tryParse(durationController.text) ?? 8.0;
-                final repeatCount = int.tryParse(repeatController.text) ?? 1;
+                var duration = double.tryParse(durationController.text) ?? 8.0;
+                var repeatCount = int.tryParse(repeatController.text) ?? 1;
+
+                // Validate bounds
+                if (duration < 0) duration = 0;
+                if (duration > 24) duration = 24;
+                if (repeatCount < 1) repeatCount = 1;
+                if (repeatCount > 365) repeatCount = 365;
 
                 Navigator.pop(
                   context,
