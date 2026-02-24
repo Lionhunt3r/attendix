@@ -11,14 +11,14 @@ Orchestriert den kompletten Migrations-Prozess von Ionic nach Flutter.
 ## Workflow
 
 ```
-PHASE 0: STATUS AKTUALISIEREN
-  • migration-analyzer Agent starten (IMMER als erstes!)
+PHASE 0: WORKTREE ERSTELLEN (IMMER!)
+  • EnterWorktree mit name "migrate-$ARGUMENTS"
+  • Isolierte Arbeitsumgebung für die Migration
+           ▼
+PHASE 1: STATUS AKTUALISIEREN
+  • migration-analyzer Agent starten
   • migration-status.md automatisch aktualisieren
   • Aktuellen Stand dem Benutzer zeigen
-           ▼
-PHASE 1: SETUP
-  • Worktree-Frage (optional, empfohlen für paralleles Arbeiten)
-  • Feature-Auswahl bestätigen
            ▼
 PHASE 2: ANALYSE (Parallel Agents)
   • migration-analyzer (Ionic Feature Details)
@@ -42,9 +42,33 @@ PHASE 5: VERIFICATION & COMMIT
 
 ---
 
-## Phase 0: Status aktualisieren (IMMER ZUERST!)
+## Phase 0: Worktree erstellen (IMMER ZUERST!)
 
-### Schritt 0.1: migration-analyzer starten
+### PFLICHT: EnterWorktree aufrufen
+
+**BEVOR du irgendetwas anderes tust, rufe IMMER `EnterWorktree` auf!**
+
+```
+EnterWorktree mit name: "migrate-$ARGUMENTS"
+```
+
+Beispiele:
+- `/ionic-migrate shifts` → `EnterWorktree(name: "migrate-shifts")`
+- `/ionic-migrate handover` → `EnterWorktree(name: "migrate-handover")`
+
+**Warum Worktree?**
+- Isolierte Arbeitsumgebung
+- Eigener Branch für die Migration
+- Paralleles Arbeiten möglich
+- Sauberer Merge am Ende
+
+**WICHTIG:** Fahre NICHT mit Phase 1 fort, bis der Worktree erstellt ist!
+
+---
+
+## Phase 1: Status aktualisieren
+
+### Schritt 1.1: migration-analyzer starten
 
 Starte den `migration-analyzer` Agent mit folgendem Prompt:
 
@@ -56,7 +80,7 @@ Analysiere den aktuellen Migrations-Stand:
 4. Gib eine Zusammenfassung: Was ist migriert, was fehlt noch?
 ```
 
-### Schritt 0.2: Benutzer informieren
+### Schritt 1.2: Benutzer informieren
 
 Zeige dem Benutzer:
 - Aktueller Migrations-Fortschritt (X%)
@@ -65,25 +89,6 @@ Zeige dem Benutzer:
 
 Falls `$ARGUMENTS` angegeben wurde, prüfe ob es in der Liste ist.
 Falls nicht angegeben, frage welches Feature migriert werden soll.
-
----
-
-## Phase 1: Setup
-
-### Schritt 1.1: Worktree-Entscheidung
-
-Frage den Benutzer mit AskUserQuestion:
-
-**Frage:** "Soll ich in einem isolierten Worktree arbeiten?"
-**Optionen:**
-- **Ja, Worktree erstellen** (Empfohlen für paralleles Arbeiten, eigener Branch)
-- **Nein, im aktuellen Branch** (Schneller für einzelne Features)
-
-Falls Ja: `EnterWorktree` mit name `migrate-$ARGUMENTS` aufrufen.
-
-### Schritt 1.2: Feature bestätigen
-
-Bestätige mit dem Benutzer welches Feature migriert wird.
 
 ---
 
@@ -336,8 +341,8 @@ Aus `lib/shared/widgets/`:
 
 ## Checkliste
 
-- [ ] Migration-Status aktualisiert (Phase 0)
-- [ ] Worktree-Entscheidung getroffen
+- [ ] **Worktree erstellt (PFLICHT - Phase 0)**
+- [ ] Migration-Status aktualisiert (Phase 1)
 - [ ] Ionic-Quelle analysiert (migration-analyzer)
 - [ ] Flutter-Patterns gefunden (Explore)
 - [ ] Tasks erstellt und bestätigt
