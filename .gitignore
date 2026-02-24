@@ -51,3 +51,7 @@ app.*.map.json
 # Claude Code worktrees (für parallele Entwicklung)
 .claude/worktrees/
 .claude/settings.local.json
+
+# MCP server config (contains secrets)
+.mcp.json
+.worktrees/
