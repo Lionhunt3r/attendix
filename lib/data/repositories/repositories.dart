@@ -9,3 +9,4 @@ export 'teacher_repository.dart';
 export 'group_repository.dart';
 export 'song_repository.dart';
 export 'meeting_repository.dart';
+export 'shift_repository.dart';

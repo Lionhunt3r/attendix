@@ -104,6 +104,14 @@ class SettingsPage extends ConsumerWidget {
                     subtitle: 'Vorstandssitzungen verwalten',
                     onTap: () => context.push('/settings/meetings'),
                   ),
+                // Only Admin/Responsible can manage shifts
+                if (role.isAdmin || role.isResponsible)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.schedule),
+                    title: 'Schichtpläne',
+                    subtitle: 'Arbeitsschichten für automatische Entschuldigungen',
+                    onTap: () => context.push('/settings/shifts'),
+                  ),
                 // Only Admin can manage users
                 if (role.isAdmin)
                   _SettingsTile(

@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "0.1.5",
+      "date": "24.2.2026",
+      "changes": [
+        "⏰ Schichtpläne für automatische Entschuldigungen",
+        "📅 Mitarbeiter können Arbeitsschichten zugewiesen bekommen",
+        "🔄 Automatische Berechnung von Schicht-Konflikten",
+        "📊 Vorschau der Schichtberechnung für 30 Tage"
+      ]
+    },
+    {
       "version": "0.1.4",
       "date": "24.2.2026",
       "changes": [

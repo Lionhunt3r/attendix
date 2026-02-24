@@ -43,6 +43,8 @@ import '../../features/voice_leader/presentation/pages/voice_leader_page.dart';
 import '../../features/members/presentation/pages/members_page.dart';
 import '../../features/registration/presentation/pages/tenant_registration_page.dart';
 import '../../features/parents/presentation/pages/parents_portal_page.dart';
+import '../../features/shifts/presentation/pages/shifts_list_page.dart';
+import '../../features/shifts/presentation/pages/shift_detail_page.dart';
 
 /// Router provider
 final routerProvider = Provider<GoRouter>((ref) {
@@ -367,6 +369,22 @@ final routerProvider = Provider<GoRouter>((ref) {
                 name: 'voiceLeader',
                 builder: (context, state) => const VoiceLeaderPage(),
               ),
+              GoRoute(
+                path: 'shifts',
+                name: 'shifts',
+                builder: (context, state) => const ShiftsListPage(),
+                routes: [
+                  GoRoute(
+                    path: ':id',
+                    name: 'shiftDetail',
+                    builder: (context, state) {
+                      final id = state.pathParameters['id'];
+                      if (id == null) return const ShiftsListPage();
+                      return ShiftDetailPage(shiftId: id);
+                    },
+                  ),
+                ],
+              ),
             ],
           ),
         ],
@@ -421,4 +439,6 @@ class AppRoutes {
   static const String statistics = 'statistics';
   static const String planning = 'planning';
   static const String history = 'history';
+  static const String shifts = 'shifts';
+  static const String shiftDetail = 'shiftDetail';
 }

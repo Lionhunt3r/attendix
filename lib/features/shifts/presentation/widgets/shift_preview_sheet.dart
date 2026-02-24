@@ -1,0 +1,270 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../data/models/shift/shift_definition.dart';
+import '../../../../data/models/shift/shift_plan.dart';
+
+/// Shows a preview sheet with calculated shifts for the next 30 days
+void showShiftPreviewSheet(BuildContext context, ShiftPlan plan) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) => ShiftPreviewSheet(
+        plan: plan,
+        scrollController: scrollController,
+      ),
+    ),
+  );
+}
+
+/// Preview sheet showing shift calculations
+class ShiftPreviewSheet extends StatelessWidget {
+  final ShiftPlan plan;
+  final ScrollController scrollController;
+
+  const ShiftPreviewSheet({
+    super.key,
+    required this.plan,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final dateFormat = DateFormat('E, d. MMM', 'de_DE');
+
+    return Column(
+      children: [
+        // Handle bar
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: AppColors.medium.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+
+        // Title
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Beispiel-Rechnung',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    Text(
+                      'Nächste 30 Tage ab heute',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.medium,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+
+        const Divider(),
+
+        // Info card
+        Padding(
+          padding: const EdgeInsets.all(AppDimensions.paddingM),
+          child: Card(
+            color: AppColors.info.withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.info),
+                  const SizedBox(width: AppDimensions.paddingM),
+                  Expanded(
+                    child: Text(
+                      'Startdatum: Heute (${dateFormat.format(today)})\n'
+                      'Zyklus: ${plan.cycleLengthDays} Tage',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // List of days
+        Expanded(
+          child: plan.definition.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.timeline_outlined,
+                          size: 48, color: AppColors.medium),
+                      const SizedBox(height: AppDimensions.paddingM),
+                      const Text(
+                        'Keine Definition vorhanden',
+                        style: TextStyle(color: AppColors.medium),
+                      ),
+                      const SizedBox(height: AppDimensions.paddingS),
+                      Text(
+                        'Füge Segmente hinzu, um die Vorschau zu sehen',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.medium,
+                            ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  controller: scrollController,
+                  itemCount: 30,
+                  itemBuilder: (context, index) {
+                    final date = today.add(Duration(days: index));
+                    final dayInCycle = plan.getDayInCycle(date, today);
+                    final segment = plan.getSegmentForDay(dayInCycle);
+
+                    return _DayPreviewTile(
+                      date: date,
+                      dateFormat: dateFormat,
+                      dayInCycle: dayInCycle,
+                      segment: segment,
+                      isToday: index == 0,
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DayPreviewTile extends StatelessWidget {
+  final DateTime date;
+  final DateFormat dateFormat;
+  final int dayInCycle;
+  final ShiftDefinition? segment;
+  final bool isToday;
+
+  const _DayPreviewTile({
+    required this.date,
+    required this.dateFormat,
+    required this.dayInCycle,
+    required this.segment,
+    required this.isToday,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isFree = segment?.free ?? true;
+    final isWeekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isToday ? AppColors.primary.withValues(alpha: 0.05) : null,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.medium.withValues(alpha: 0.1),
+          ),
+        ),
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: isFree
+                ? AppColors.success.withValues(alpha: 0.2)
+                : AppColors.warning.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+            border: isToday
+                ? Border.all(color: AppColors.primary, width: 2)
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              '${date.day}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isFree ? AppColors.success : AppColors.warning,
+              ),
+            ),
+          ),
+        ),
+        title: Row(
+          children: [
+            Text(
+              dateFormat.format(date),
+              style: TextStyle(
+                fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                color: isWeekend ? AppColors.medium : null,
+              ),
+            ),
+            if (isToday) ...[
+              const SizedBox(width: AppDimensions.paddingS),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Heute',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        subtitle: Text(
+          _getSubtitle(),
+          style: TextStyle(
+            color: isFree ? AppColors.success : AppColors.warning,
+            fontSize: 12,
+          ),
+        ),
+        trailing: Text(
+          'Tag ${dayInCycle + 1}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.medium,
+              ),
+        ),
+      ),
+    );
+  }
+
+  String _getSubtitle() {
+    if (segment == null) {
+      return 'Keine Definition';
+    }
+
+    if (segment!.free) {
+      return 'Frei';
+    }
+
+    return '${segment!.startTime} - ${segment!.endTime} (${segment!.duration}h)';
+  }
+}
