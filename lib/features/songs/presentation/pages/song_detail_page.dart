@@ -1,7 +1,12 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/group_providers.dart';
@@ -11,9 +16,12 @@ import '../../../../core/services/telegram_service.dart';
 import '../../../../core/services/zip_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
+import '../../../../core/utils/instrument_matcher.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/instrument/instrument.dart';
 import '../../../../data/models/song/song.dart';
 import '../../../../shared/widgets/sheets/image_viewer_sheet.dart';
+import '../widgets/file_upload_sheet.dart';
 import '../widgets/pdf_viewer_sheet.dart';
 import '../widgets/smart_print_dialog.dart';
 
@@ -305,11 +313,21 @@ class _FilesSection extends ConsumerStatefulWidget {
 }
 
 class _FilesSectionState extends ConsumerState<_FilesSection> {
-  bool _isUploading = false;
   bool _isDownloadingAll = false;
+  bool _isDeletingAll = false;
 
   @override
   Widget build(BuildContext context) {
+    final groupsAsync = ref.watch(groupsProvider);
+
+    return groupsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _buildContent(context, []),
+      data: (groups) => _buildContent(context, groups),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, List<Group> groups) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -328,37 +346,73 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (widget.files.length > 1)
-                    _isDownloadingAll
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.download, size: 20),
-                            onPressed: () => _downloadAllFiles(context),
-                            tooltip: 'Alle herunterladen (ZIP)',
+                  // Popover menu for bulk actions
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    tooltip: 'Mehr Aktionen',
+                    onSelected: (value) => _handleBulkAction(context, value),
+                    itemBuilder: (context) => [
+                      if (_hasPdfFiles())
+                        const PopupMenuItem(
+                          value: 'print_group',
+                          child: Row(
+                            children: [
+                              Icon(Icons.print),
+                              SizedBox(width: 8),
+                              Text('Gruppen-PDFs drucken'),
+                            ],
                           ),
-                  _isUploading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : TextButton.icon(
-                          onPressed: () => _addFile(context),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Hinzufügen'),
                         ),
+                      if (widget.files.length > 1)
+                        const PopupMenuItem(
+                          value: 'download_all',
+                          child: Row(
+                            children: [
+                              Icon(Icons.download),
+                              SizedBox(width: 8),
+                              Text('Alle herunterladen (ZIP)'),
+                            ],
+                          ),
+                        ),
+                      const PopupMenuItem(
+                        value: 'upload',
+                        child: Row(
+                          children: [
+                            Icon(Icons.cloud_upload),
+                            SizedBox(width: 8),
+                            Text('Dateien hochladen'),
+                          ],
+                        ),
+                      ),
+                      if (widget.files.isNotEmpty) ...[
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          value: 'delete_all',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_sweep, color: AppColors.danger),
+                              SizedBox(width: 8),
+                              Text('Alle löschen',
+                                  style: TextStyle(color: AppColors.danger)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  // Quick upload button
+                  IconButton(
+                    icon: const Icon(Icons.add, size: 20),
+                    onPressed: () => _showUploadSheet(context, groups),
+                    tooltip: 'Dateien hinzufügen',
+                  ),
                 ],
               ),
             ],
           ),
         ),
+        if (_isDeletingAll || _isDownloadingAll)
+          const LinearProgressIndicator(),
         if (widget.files.isEmpty)
           const Card(
             child: ListTile(
@@ -376,12 +430,50 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
                         file: file,
                         songId: widget.songId,
                         songName: widget.songName,
+                        groups: groups,
                         onDeleted: widget.onFileAdded,
                       ))
                   .toList(),
             ),
           ),
       ],
+    );
+  }
+
+  bool _hasPdfFiles() {
+    return widget.files.any((f) => f.fileType.toLowerCase() == 'pdf');
+  }
+
+  Future<void> _handleBulkAction(BuildContext context, String action) async {
+    switch (action) {
+      case 'print_group':
+        await _printGroupPdfs(context);
+        break;
+      case 'download_all':
+        await _downloadAllFiles(context);
+        break;
+      case 'upload':
+        final groupsAsync = ref.read(groupsProvider);
+        final groups = groupsAsync.valueOrNull ?? [];
+        await _showUploadSheet(context, groups);
+        break;
+      case 'delete_all':
+        await _deleteAllFiles(context);
+        break;
+    }
+  }
+
+  Future<void> _printGroupPdfs(BuildContext context) async {
+    final pdfFiles = widget.files.where((f) => f.fileType.toLowerCase() == 'pdf').toList();
+    if (pdfFiles.isEmpty) return;
+
+    // Show smart print dialog for first PDF (user can select instruments)
+    await showSmartPrintDialog(
+      context,
+      ref: ref,
+      url: pdfFiles.first.url,
+      fileName: pdfFiles.first.fileName,
+      instrumentId: pdfFiles.first.instrumentId,
     );
   }
 
@@ -409,71 +501,52 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
     }
   }
 
-  Future<void> _addFile(BuildContext context) async {
-    final songFileService = ref.read(songFileServiceProvider);
-
-    // Show dialog to get optional note
-    final noteController = TextEditingController();
-    final shouldUpload = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Datei hinzufügen'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Wähle eine PDF, PNG oder JPG Datei aus.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: noteController,
-              decoration: const InputDecoration(
-                labelText: 'Notiz (optional)',
-                hintText: 'z.B. "Partitur" oder "Klarinette"',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Abbrechen'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Datei wählen'),
-          ),
-        ],
-      ),
+  Future<void> _deleteAllFiles(BuildContext context) async {
+    final confirmed = await DialogHelper.showConfirmation(
+      context,
+      title: 'Alle Dateien löschen',
+      message:
+          'Möchtest du wirklich alle ${widget.files.length} Dateien löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmText: 'Alle löschen',
+      cancelText: 'Abbrechen',
     );
 
-    if (shouldUpload != true) return;
+    if (!confirmed) return;
 
-    // Pick file
-    final file = await songFileService.pickFile();
-    if (file == null) return;
-
-    setState(() => _isUploading = true);
+    setState(() => _isDeletingAll = true);
 
     try {
-      await songFileService.uploadFile(
-        songId: widget.songId,
-        file: file,
-        note: noteController.text.trim().isNotEmpty
-            ? noteController.text.trim()
-            : null,
-      );
+      final songFileService = ref.read(songFileServiceProvider);
+      await songFileService.deleteAllFiles(songId: widget.songId);
 
-      if (mounted) {
-        ToastHelper.showSuccess(context, 'Datei hochgeladen');
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Alle Dateien gelöscht');
         widget.onFileAdded();
       }
     } catch (e) {
-      if (mounted) {
-        ToastHelper.showError(context, 'Fehler beim Hochladen: $e');
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Löschen: $e');
       }
     } finally {
       if (mounted) {
-        setState(() => _isUploading = false);
+        setState(() => _isDeletingAll = false);
       }
+    }
+  }
+
+  Future<void> _showUploadSheet(BuildContext context, List<Group> groups) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => FileUploadSheet(
+        songId: widget.songId,
+        groups: groups,
+      ),
+    );
+
+    if (result == true) {
+      widget.onFileAdded();
     }
   }
 }
@@ -482,27 +555,83 @@ class _FileTile extends ConsumerWidget {
   final SongFile file;
   final int songId;
   final String songName;
+  final List<Group> groups;
   final VoidCallback onDeleted;
 
   const _FileTile({
     required this.file,
     required this.songId,
     required this.songName,
+    required this.groups,
     required this.onDeleted,
   });
 
   bool get _isPdf => file.fileType.toLowerCase() == 'pdf';
   bool get _isImage => ['png', 'jpg', 'jpeg'].contains(file.fileType.toLowerCase());
+  bool get _canDownload => !kIsWeb && !(Platform.isIOS);
+
+  String _getInstrumentLabel() {
+    final instruments = groups
+        .map((g) => InstrumentInfo(id: g.id!, name: g.name))
+        .toList();
+
+    return InstrumentMatcher.getFileLabel(
+      instrumentId: file.instrumentId,
+      note: file.note,
+      instruments: instruments,
+    );
+  }
+
+  Color _getBadgeColor() {
+    if (file.instrumentId == InstrumentMatcher.recordingId) {
+      return AppColors.primary;
+    }
+    if (file.instrumentId == InstrumentMatcher.lyricsId) {
+      return AppColors.success;
+    }
+    if (file.instrumentId != null) {
+      return AppColors.secondary;
+    }
+    return AppColors.medium;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final label = _getInstrumentLabel();
+    final badgeColor = _getBadgeColor();
+
     return ListTile(
       leading: Icon(
         _getFileIcon(file.fileType),
         color: AppColors.primary,
       ),
-      title: Text(file.fileName),
-      subtitle: file.note != null ? Text(file.note!) : null,
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              file.fileName,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: badgeColor.withAlpha(30),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: badgeColor.withAlpha(80)),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: badgeColor,
+              ),
+            ),
+          ),
+        ],
+      ),
       trailing: PopupMenuButton<String>(
         onSelected: (value) => _handleMenuAction(context, ref, value),
         itemBuilder: (context) => [
@@ -537,6 +666,17 @@ class _FileTile extends ConsumerWidget {
                 ],
               ),
             ),
+          if (_canDownload)
+            const PopupMenuItem(
+              value: 'download',
+              child: Row(
+                children: [
+                  Icon(Icons.download),
+                  SizedBox(width: 8),
+                  Text('Herunterladen'),
+                ],
+              ),
+            ),
           const PopupMenuItem(
             value: 'telegram',
             child: Row(
@@ -544,6 +684,17 @@ class _FileTile extends ConsumerWidget {
                 Icon(Icons.send),
                 SizedBox(width: 8),
                 Text('Per Telegram senden'),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            value: 'change_category',
+            child: Row(
+              children: [
+                Icon(Icons.category),
+                SizedBox(width: 8),
+                Text('Kategorie ändern'),
               ],
             ),
           ),
@@ -576,8 +727,14 @@ class _FileTile extends ConsumerWidget {
       case 'print':
         await _showPrintDialog(context, ref);
         break;
+      case 'download':
+        await _downloadFile(context, ref);
+        break;
       case 'telegram':
         await _sendViaTelegram(context, ref);
+        break;
+      case 'change_category':
+        await _changeCategory(context, ref);
         break;
       case 'delete':
         await _deleteFile(context, ref);
@@ -677,6 +834,95 @@ class _FileTile extends ConsumerWidget {
     }
   }
 
+  Future<void> _downloadFile(BuildContext context, WidgetRef ref) async {
+    try {
+      final songFileService = ref.read(songFileServiceProvider);
+      final bytes = await songFileService.downloadFileBytes(file.url);
+
+      if (bytes == null) {
+        if (context.mounted) {
+          ToastHelper.showError(context, 'Datei konnte nicht heruntergeladen werden');
+        }
+        return;
+      }
+
+      // Save to temp directory and share
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/${file.fileName}');
+      await tempFile.writeAsBytes(bytes);
+
+      await Share.shareXFiles(
+        [XFile(tempFile.path)],
+        subject: file.fileName,
+      );
+
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Datei heruntergeladen');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Herunterladen: $e');
+      }
+    }
+  }
+
+  Future<void> _changeCategory(BuildContext context, WidgetRef ref) async {
+    // Build category options
+    final categories = <_CategoryOption>[
+      _CategoryOption(
+        id: InstrumentMatcher.recordingId,
+        name: 'Aufnahme',
+        icon: Icons.audiotrack,
+      ),
+      _CategoryOption(
+        id: InstrumentMatcher.lyricsId,
+        name: 'Liedtext',
+        icon: Icons.text_snippet,
+      ),
+      ...groups.map((g) => _CategoryOption(
+            id: g.id!,
+            name: g.name,
+            icon: Icons.music_note,
+          )),
+      _CategoryOption(
+        id: null,
+        name: 'Sonstige',
+        icon: Icons.more_horiz,
+      ),
+    ];
+
+    // Show selection dialog
+    final selectedId = await showDialog<int?>(
+      context: context,
+      builder: (context) => _CategorySelectionDialog(
+        categories: categories,
+        currentId: file.instrumentId,
+      ),
+    );
+
+    // User cancelled
+    if (selectedId == -1) return;
+
+    try {
+      final songFileService = ref.read(songFileServiceProvider);
+      await songFileService.updateFileCategory(
+        songId: songId,
+        storageName: file.storageName ?? '',
+        instrumentId: selectedId,
+        note: null, // Clear note when changing category
+      );
+
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Kategorie geändert');
+        onDeleted(); // Refresh the list
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Ändern: $e');
+      }
+    }
+  }
+
   Future<void> _deleteFile(BuildContext context, WidgetRef ref) async {
     final confirmed = await DialogHelper.showConfirmation(
       context,
@@ -704,5 +950,91 @@ class _FileTile extends ConsumerWidget {
         ToastHelper.showError(context, 'Fehler beim Löschen: $e');
       }
     }
+  }
+}
+
+/// Category option for selection dialog
+class _CategoryOption {
+  final int? id;
+  final String name;
+  final IconData icon;
+
+  const _CategoryOption({
+    required this.id,
+    required this.name,
+    required this.icon,
+  });
+}
+
+/// Dialog for selecting file category
+class _CategorySelectionDialog extends StatefulWidget {
+  final List<_CategoryOption> categories;
+  final int? currentId;
+
+  const _CategorySelectionDialog({
+    required this.categories,
+    required this.currentId,
+  });
+
+  @override
+  State<_CategorySelectionDialog> createState() => _CategorySelectionDialogState();
+}
+
+class _CategorySelectionDialogState extends State<_CategorySelectionDialog> {
+  late int? _selectedId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedId = widget.currentId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Kategorie wählen'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: widget.categories.length,
+          itemBuilder: (context, index) {
+            final category = widget.categories[index];
+            final isSelected = category.id == _selectedId;
+
+            return RadioListTile<int?>(
+              value: category.id,
+              groupValue: _selectedId,
+              onChanged: (value) {
+                setState(() => _selectedId = value);
+              },
+              title: Row(
+                children: [
+                  Icon(
+                    category.icon,
+                    size: 20,
+                    color: isSelected ? AppColors.primary : AppColors.medium,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(category.name),
+                ],
+              ),
+              activeColor: AppColors.primary,
+              dense: true,
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, -1),
+          child: const Text('Abbrechen'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selectedId),
+          child: const Text('Speichern'),
+        ),
+      ],
+    );
   }
 }

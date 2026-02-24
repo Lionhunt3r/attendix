@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "0.1.4",
+      "date": "24.2.2026",
+      "changes": [
+        "🏷️ Dateien zeigen jetzt Instrument/Kategorie als Badge an",
+        "🔄 Kategorie von Dateien kann nachträglich geändert werden",
+        "📥 Einzelne Dateien können heruntergeladen werden (Android/Desktop)",
+        "🗑️ Alle Dateien eines Songs auf einmal löschen",
+        "📤 Verbessertes Upload-Modal mit Multi-Datei-Auswahl",
+        "🔍 Automatische Instrument-Erkennung beim Datei-Upload"
+      ]
+    },
+    {
       "version": "0.1.3",
       "date": "24.2.2026",
       "changes": [
