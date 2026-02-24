@@ -2,33 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/song_providers.dart';
+import '../../../../core/providers/song_filter_providers.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/song/song.dart';
-import '../../../../core/providers/tenant_providers.dart';
+import '../../../../data/models/song/song_filter.dart';
+import '../widgets/song_filter_sheet.dart';
 
-/// Provider for songs list
-final songsListProvider = FutureProvider<List<Song>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-  
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('songs')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .order('number')
-      .order('name');
-
-  return (response as List)
-      .map((e) => Song.fromJson(e as Map<String, dynamic>))
-      .toList();
-});
-
-/// Songs list page
+/// Songs list page with filter and sort support
 class SongsListPage extends ConsumerStatefulWidget {
   const SongsListPage({super.key});
 
@@ -37,8 +19,16 @@ class SongsListPage extends ConsumerStatefulWidget {
 }
 
 class _SongsListPageState extends ConsumerState<SongsListPage> {
-  String _searchQuery = '';
   final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize search controller with current search query
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchController.text = ref.read(songSearchQueryProvider);
+    });
+  }
 
   @override
   void dispose() {
@@ -46,20 +36,13 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
     super.dispose();
   }
 
-  List<Song> _filterSongs(List<Song> songs) {
-    if (_searchQuery.isEmpty) return songs;
-    
-    final query = _searchQuery.toLowerCase();
-    return songs.where((song) {
-      return song.name.toLowerCase().contains(query) ||
-          (song.fullNumber.toLowerCase().contains(query)) ||
-          (song.conductor?.toLowerCase().contains(query) ?? false);
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final songsAsync = ref.watch(songsListProvider);
+    final songsAsync = ref.watch(songsProvider);
+    final filteredSongs = ref.watch(filteredSongsProvider);
+    final filter = ref.watch(songFilterProvider);
+    final searchQuery = ref.watch(songSearchQueryProvider);
+    final categoriesAsync = ref.watch(songCategoriesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,6 +51,42 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/settings'),
         ),
+        actions: [
+          // Filter button with indicator
+          Stack(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.filter_list,
+                  color:
+                      filter.hasActiveFilters ? AppColors.primary : null,
+                ),
+                onPressed: () => showSongFilterSheet(context),
+                tooltip: 'Filter & Sortierung',
+              ),
+              if (filter.hasActiveFilters)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${filter.activeFilterCount}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -79,25 +98,92 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
               decoration: InputDecoration(
                 hintText: 'Suchen...',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
+                suffixIcon: searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                          });
+                          ref.read(songSearchQueryProvider.notifier).state = '';
                         },
                       )
                     : null,
               ),
               onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
+                ref.read(songSearchQueryProvider.notifier).state = value;
               },
             ),
           ),
+
+          // Category chips (horizontal scroll)
+          categoriesAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (categories) {
+              if (categories.isEmpty) return const SizedBox.shrink();
+              return SizedBox(
+                height: 48,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: const Text('Alle'),
+                        selected: filter.category == null,
+                        onSelected: (selected) {
+                          if (selected) {
+                            ref
+                                .read(songFilterProvider.notifier)
+                                .setCategory(null);
+                          }
+                        },
+                      ),
+                    ),
+                    ...categories.map((c) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(c.name),
+                            selected: filter.category == c.name,
+                            onSelected: (selected) {
+                              ref
+                                  .read(songFilterProvider.notifier)
+                                  .setCategory(selected ? c.name : null);
+                            },
+                          ),
+                        )),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          // Active filter chips
+          if (filter.hasActiveFilters && filter.category == null)
+            _ActiveFilterChips(filter: filter),
+
+          // Sort indicator
+          if (filter.sortOption != SongSortOption.numberAsc)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.paddingM,
+                vertical: AppDimensions.paddingXS,
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.sort, size: 16, color: AppColors.medium),
+                  const SizedBox(width: 4),
+                  Text(
+                    filter.sortOption.label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.medium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Songs list
           Expanded(
@@ -118,15 +204,13 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                     Text('Fehler: $error'),
                     const SizedBox(height: AppDimensions.paddingM),
                     ElevatedButton(
-                      onPressed: () => ref.refresh(songsListProvider),
+                      onPressed: () => ref.invalidate(songsProvider),
                       child: const Text('Erneut versuchen'),
                     ),
                   ],
                 ),
               ),
               data: (songs) {
-                final filteredSongs = _filterSongs(songs);
-
                 if (songs.isEmpty) {
                   return Center(
                     child: Column(
@@ -145,9 +229,10 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                         const SizedBox(height: AppDimensions.paddingS),
                         Text(
                           'Füge das erste Lied hinzu',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.medium,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.medium,
+                                  ),
                         ),
                       ],
                     ),
@@ -166,9 +251,20 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                         ),
                         const SizedBox(height: AppDimensions.paddingM),
                         Text(
-                          'Keine Ergebnisse für "$_searchQuery"',
+                          searchQuery.isNotEmpty
+                              ? 'Keine Ergebnisse für "$searchQuery"'
+                              : 'Keine Lieder mit diesen Filtern',
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
+                        const SizedBox(height: AppDimensions.paddingM),
+                        if (filter.hasActiveFilters)
+                          TextButton.icon(
+                            onPressed: () {
+                              ref.read(songFilterProvider.notifier).reset();
+                            },
+                            icon: const Icon(Icons.filter_list_off),
+                            label: const Text('Filter zurücksetzen'),
+                          ),
                       ],
                     ),
                   );
@@ -176,7 +272,7 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
 
                 return RefreshIndicator(
                   onRefresh: () async {
-                    ref.refresh(songsListProvider);
+                    ref.invalidate(songsProvider);
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(
@@ -198,8 +294,63 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddSongDialog(context, ref),
+        onPressed: () => context.push('/settings/songs/new'),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+/// Active filter chips row (removable)
+class _ActiveFilterChips extends ConsumerWidget {
+  final SongFilter filter;
+
+  const _ActiveFilterChips({required this.filter});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.paddingM,
+        vertical: AppDimensions.paddingXS,
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          if (filter.withChoir)
+            Chip(
+              label: const Text('Chor & Orchester'),
+              onDeleted: () {
+                ref.read(songFilterProvider.notifier).setWithChoir(false);
+              },
+              visualDensity: VisualDensity.compact,
+            ),
+          if (filter.withSolo)
+            Chip(
+              label: const Text('Mit Solo'),
+              onDeleted: () {
+                ref.read(songFilterProvider.notifier).setWithSolo(false);
+              },
+              visualDensity: VisualDensity.compact,
+            ),
+          if (filter.difficulty != null)
+            Chip(
+              label: Text('Schwierigkeit: ${filter.difficulty}'),
+              onDeleted: () {
+                ref.read(songFilterProvider.notifier).clearDifficulty();
+              },
+              visualDensity: VisualDensity.compact,
+            ),
+          if (filter.instrumentIds.isNotEmpty)
+            Chip(
+              label: Text('${filter.instrumentIds.length} Instrumente'),
+              onDeleted: () {
+                ref.read(songFilterProvider.notifier).clearInstruments();
+              },
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
       ),
     );
   }
@@ -296,220 +447,5 @@ class _SongListItem extends StatelessWidget {
               ),
       ),
     );
-  }
-}
-
-/// Show dialog to add a new song
-Future<void> _showAddSongDialog(BuildContext context, WidgetRef ref) async {
-  final result = await showDialog<Map<String, dynamic>>(
-    context: context,
-    builder: (context) => const _AddSongDialog(),
-  );
-
-  if (result != null && context.mounted) {
-    try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-
-      if (tenant == null) {
-        ToastHelper.showError(context, 'Kein Tenant ausgewählt');
-        return;
-      }
-
-      final response = await supabase
-          .from('songs')
-          .insert({
-            'name': result['name'],
-            'number': result['number'],
-            'prefix': result['prefix'],
-            'link': result['link'],
-            'conductor': result['conductor'],
-            'withChoir': result['withChoir'] ?? false,
-            'withSolo': result['withSolo'] ?? false,
-            'tenantId': tenant.id,
-          })
-          .select()
-          .single();
-
-      ref.invalidate(songsListProvider);
-
-      if (context.mounted) {
-        ToastHelper.showSuccess(context, 'Lied erstellt');
-        // Navigate to the new song's detail page
-        final songId = response['id'];
-        if (songId != null) {
-          context.push('/settings/songs/$songId');
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ToastHelper.showError(context, 'Fehler: $e');
-      }
-    }
-  }
-}
-
-/// Dialog for adding a new song
-class _AddSongDialog extends StatefulWidget {
-  const _AddSongDialog();
-
-  @override
-  State<_AddSongDialog> createState() => _AddSongDialogState();
-}
-
-class _AddSongDialogState extends State<_AddSongDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _numberController = TextEditingController();
-  final _prefixController = TextEditingController();
-  final _linkController = TextEditingController();
-  final _conductorController = TextEditingController();
-  bool _withChoir = false;
-  bool _withSolo = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _numberController.dispose();
-    _prefixController.dispose();
-    _linkController.dispose();
-    _conductorController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Neues Lied'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Name
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name *',
-                  hintText: 'z.B. Amazing Grace',
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Name ist erforderlich';
-                  }
-                  return null;
-                },
-                autofocus: true,
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-
-              // Number and Prefix in a row
-              Row(
-                children: [
-                  // Prefix
-                  Expanded(
-                    flex: 1,
-                    child: TextFormField(
-                      controller: _prefixController,
-                      decoration: const InputDecoration(
-                        labelText: 'Präfix',
-                        hintText: 'z.B. GL',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppDimensions.paddingS),
-                  // Number
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _numberController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nummer',
-                        hintText: 'z.B. 123',
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-
-              // Link
-              TextFormField(
-                controller: _linkController,
-                decoration: const InputDecoration(
-                  labelText: 'Link (optional)',
-                  hintText: 'https://...',
-                ),
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-
-              // Conductor
-              TextFormField(
-                controller: _conductorController,
-                decoration: const InputDecoration(
-                  labelText: 'Dirigent (optional)',
-                ),
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-
-              // Toggles
-              Row(
-                children: [
-                  Expanded(
-                    child: SwitchListTile(
-                      title: const Text('Mit Chor'),
-                      value: _withChoir,
-                      onChanged: (value) => setState(() => _withChoir = value),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  Expanded(
-                    child: SwitchListTile(
-                      title: const Text('Mit Solo'),
-                      value: _withSolo,
-                      onChanged: (value) => setState(() => _withSolo = value),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
-        ),
-        ElevatedButton(
-          onPressed: _save,
-          child: const Text('Erstellen'),
-        ),
-      ],
-    );
-  }
-
-  void _save() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.of(context).pop({
-        'name': _nameController.text.trim(),
-        'number': int.tryParse(_numberController.text.trim()),
-        'prefix': _prefixController.text.trim().isNotEmpty
-            ? _prefixController.text.trim()
-            : null,
-        'link': _linkController.text.trim().isNotEmpty
-            ? _linkController.text.trim()
-            : null,
-        'conductor': _conductorController.text.trim().isNotEmpty
-            ? _conductorController.text.trim()
-            : null,
-        'withChoir': _withChoir,
-        'withSolo': _withSolo,
-      });
-    }
   }
 }

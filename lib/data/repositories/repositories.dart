@@ -7,3 +7,4 @@ export 'attendance_repository.dart';
 export 'attendance_type_repository.dart';
 export 'teacher_repository.dart';
 export 'group_repository.dart';
+export 'song_repository.dart';

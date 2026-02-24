@@ -29,6 +29,8 @@ import '../../features/teachers/presentation/pages/teachers_list_page.dart';
 import '../../features/export/presentation/pages/export_page.dart';
 import '../../features/songs/presentation/pages/songs_list_page.dart';
 import '../../features/songs/presentation/pages/song_detail_page.dart';
+import '../../features/songs/presentation/pages/song_create_page.dart';
+import '../../features/songs/presentation/pages/song_edit_page.dart';
 import '../../features/instruments/presentation/pages/instruments_list_page.dart';
 import '../../features/self_service/presentation/pages/self_service_overview_page.dart';
 import '../../features/statistics/presentation/pages/statistics_page.dart';
@@ -261,6 +263,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const SongsListPage(),
                 routes: [
                   GoRoute(
+                    path: 'new',
+                    name: 'songCreate',
+                    builder: (context, state) => const SongCreatePage(),
+                  ),
+                  GoRoute(
                     path: ':id',
                     name: 'songDetail',
                     builder: (context, state) {
@@ -268,6 +275,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                       if (id == null) return const SongsListPage();
                       return SongDetailPage(songId: id);
                     },
+                    routes: [
+                      GoRoute(
+                        path: 'edit',
+                        name: 'songEdit',
+                        builder: (context, state) {
+                          final id = int.tryParse(state.pathParameters['id'] ?? '');
+                          if (id == null) return const SongsListPage();
+                          return SongEditPage(songId: id);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -380,6 +398,8 @@ class AppRoutes {
   static const String profile = 'profile';
   static const String songs = 'songs';
   static const String songDetail = 'songDetail';
+  static const String songCreate = 'songCreate';
+  static const String songEdit = 'songEdit';
   static const String instruments = 'instruments';
   static const String teachers = 'teachers';
   static const String meetings = 'meetings';

@@ -3,28 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/group_providers.dart';
+import '../../../../core/providers/song_providers.dart';
 import '../../../../core/services/song_file_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/song/song.dart';
-
-/// Provider for single song by ID
-final songByIdProvider = FutureProvider.family<Song?, String>((ref, id) async {
-  final supabase = ref.watch(supabaseClientProvider);
-
-  final response = await supabase
-      .from('songs')
-      .select('*, files:song_files(*)')
-      .eq('id', id)
-      .maybeSingle();
-
-  if (response == null) return null;
-  return Song.fromJson(response);
-});
 
 /// Song Detail Page
 class SongDetailPage extends ConsumerStatefulWidget {
@@ -39,7 +25,15 @@ class SongDetailPage extends ConsumerStatefulWidget {
 class _SongDetailPageState extends ConsumerState<SongDetailPage> {
   @override
   Widget build(BuildContext context) {
-    final songAsync = ref.watch(songByIdProvider(widget.songId));
+    final songId = int.tryParse(widget.songId);
+    if (songId == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Lied')),
+        body: const Center(child: Text('Ungültige Song-ID')),
+      );
+    }
+
+    final songAsync = ref.watch(songByIdProvider(songId));
 
     return songAsync.when(
       loading: () => Scaffold(
@@ -64,7 +58,7 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.edit),
-                onPressed: () => _showEditDialog(context, song),
+                onPressed: () => context.push('/settings/songs/${widget.songId}/edit'),
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
@@ -84,14 +78,15 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
                     children: [
                       if (song.fullNumber.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withAlpha(20),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             song.fullNumber,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
@@ -102,18 +97,19 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
                       Text(
                         song.name,
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       if (song.conductor != null) ...[
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.person, size: 16, color: AppColors.medium),
+                            const Icon(Icons.person,
+                                size: 16, color: AppColors.medium),
                             const SizedBox(width: 4),
                             Text(
                               song.conductor!,
-                              style: TextStyle(color: AppColors.medium),
+                              style: const TextStyle(color: AppColors.medium),
                             ),
                           ],
                         ),
@@ -124,15 +120,15 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
                         runSpacing: 8,
                         children: [
                           if (song.withChoir)
-                            Chip(
-                              label: const Text('Mit Chor'),
-                              avatar: const Icon(Icons.groups, size: 16),
+                            const Chip(
+                              label: Text('Mit Chor'),
+                              avatar: Icon(Icons.groups, size: 16),
                               visualDensity: VisualDensity.compact,
                             ),
                           if (song.withSolo)
-                            Chip(
-                              label: const Text('Mit Solo'),
-                              avatar: const Icon(Icons.mic, size: 16),
+                            const Chip(
+                              label: Text('Mit Solo'),
+                              avatar: Icon(Icons.mic, size: 16),
                               visualDensity: VisualDensity.compact,
                             ),
                           if (song.difficultyLabel != null)
@@ -163,7 +159,7 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
               _FilesSection(
                 files: song.files ?? [],
                 songId: song.id!,
-                onFileAdded: () => ref.invalidate(songByIdProvider(widget.songId)),
+                onFileAdded: () => ref.invalidate(songByIdProvider(songId)),
               ),
 
               // Last sung
@@ -209,115 +205,6 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
     }
   }
 
-  Future<void> _showEditDialog(BuildContext context, Song song) async {
-    final nameController = TextEditingController(text: song.name);
-    final numberController = TextEditingController(text: song.number?.toString() ?? '');
-    final prefixController = TextEditingController(text: song.prefix ?? '');
-    final conductorController = TextEditingController(text: song.conductor ?? '');
-    final linkController = TextEditingController(text: song.link ?? '');
-    bool withChoir = song.withChoir;
-    bool withSolo = song.withSolo;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Lied bearbeiten'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Name *'),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: TextField(
-                        controller: prefixController,
-                        decoration: const InputDecoration(labelText: 'Präfix'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: numberController,
-                        decoration: const InputDecoration(labelText: 'Nummer'),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: conductorController,
-                  decoration: const InputDecoration(labelText: 'Dirigent'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: linkController,
-                  decoration: const InputDecoration(labelText: 'Link'),
-                ),
-                const SizedBox(height: 12),
-                CheckboxListTile(
-                  title: const Text('Mit Chor'),
-                  value: withChoir,
-                  onChanged: (v) => setDialogState(() => withChoir = v ?? false),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                CheckboxListTile(
-                  title: const Text('Mit Solo'),
-                  value: withSolo,
-                  onChanged: (v) => setDialogState(() => withSolo = v ?? false),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Abbrechen'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final supabase = ref.read(supabaseClientProvider);
-                try {
-                  await supabase.from('songs').update({
-                    'name': nameController.text.trim(),
-                    'number': int.tryParse(numberController.text.trim()),
-                    'prefix': prefixController.text.trim(),
-                    'conductor': conductorController.text.trim(),
-                    'link': linkController.text.trim(),
-                    'withChoir': withChoir,
-                    'withSolo': withSolo,
-                  }).eq('id', song.id!);
-                  Navigator.pop(context, true);
-                } catch (e) {
-                  if (context.mounted) {
-                    ToastHelper.showError(context, 'Fehler: $e');
-                  }
-                }
-              },
-              child: const Text('Speichern'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (result == true) {
-      ref.invalidate(songByIdProvider(widget.songId));
-      if (mounted) {
-        ToastHelper.showSuccess(context, 'Änderungen gespeichert');
-      }
-    }
-  }
-
   Future<void> _deleteSong(BuildContext context, Song song) async {
     final confirmed = await DialogHelper.showConfirmation(
       context,
@@ -329,12 +216,11 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
 
     if (!confirmed) return;
 
-    final supabase = ref.read(supabaseClientProvider);
-
     try {
-      await supabase.from('songs').delete().eq('id', song.id!);
+      final success =
+          await ref.read(songNotifierProvider.notifier).deleteSong(song.id!);
 
-      if (mounted) {
+      if (mounted && success) {
         ToastHelper.showSuccess(context, 'Lied gelöscht');
         context.pop();
       }
@@ -359,17 +245,16 @@ class _InstrumentsSection extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (groups) {
-        final matchedGroups = groups
-            .where((g) => instrumentIds.contains(g.id))
-            .toList();
+        final matchedGroups =
+            groups.where((g) => instrumentIds.contains(g.id)).toList();
 
         if (matchedGroups.isEmpty) return const SizedBox.shrink();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
                 'Instrumente/Gruppen',
                 style: TextStyle(
@@ -426,7 +311,7 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
             children: [
               Text(
                 'Dateien (${widget.files.length})',
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   color: AppColors.medium,
                 ),
@@ -446,11 +331,12 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
           ),
         ),
         if (widget.files.isEmpty)
-          Card(
+          const Card(
             child: ListTile(
-              leading: const Icon(Icons.insert_drive_file_outlined, color: AppColors.medium),
-              title: const Text('Keine Dateien'),
-              subtitle: const Text('Füge Notenblätter oder andere Dateien hinzu'),
+              leading:
+                  Icon(Icons.insert_drive_file_outlined, color: AppColors.medium),
+              title: Text('Keine Dateien'),
+              subtitle: Text('Füge Notenblätter oder andere Dateien hinzu'),
             ),
           )
         else
@@ -517,7 +403,9 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
       await songFileService.uploadFile(
         songId: widget.songId,
         file: file,
-        note: noteController.text.trim().isNotEmpty ? noteController.text.trim() : null,
+        note: noteController.text.trim().isNotEmpty
+            ? noteController.text.trim()
+            : null,
       );
 
       if (mounted) {
@@ -541,7 +429,8 @@ class _FileTile extends ConsumerWidget {
   final int songId;
   final VoidCallback onDeleted;
 
-  const _FileTile({required this.file, required this.songId, required this.onDeleted});
+  const _FileTile(
+      {required this.file, required this.songId, required this.onDeleted});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -2,42 +2,78 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../data/models/attendance/attendance.dart';
+import '../../../../core/providers/holiday_providers.dart';
+import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/shift_utils.dart';
+import '../../../../data/models/attendance/attendance.dart';
+import '../widgets/multi_date_calendar.dart';
+import '../widgets/songs_selection_sheet.dart';
 
-/// Page for creating a new attendance
+/// Page for creating a new attendance with all Ionic-like features:
+/// - Multi-date selection
+/// - Holiday highlighting
+/// - TypeInfo custom text
+/// - All-day duration
+/// - Songs/works selection with conductor
+/// - Checklist from type
+/// - Relevant groups filtering
+/// - Shift-based auto-status
 class AttendanceCreatePage extends ConsumerStatefulWidget {
   const AttendanceCreatePage({super.key});
 
   @override
-  ConsumerState<AttendanceCreatePage> createState() => _AttendanceCreatePageState();
+  ConsumerState<AttendanceCreatePage> createState() =>
+      _AttendanceCreatePageState();
 }
 
 class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
-  DateTime _selectedDate = DateTime.now();
+  // Multi-date selection (starts empty - user must actively select dates)
+  List<DateTime> _selectedDates = [];
+
+  // Type selection
+  AttendanceType? _selectedType;
+
+  // Times
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
-  AttendanceType? _selectedType;
+
+  // TypeInfo (custom display text)
+  String? _typeInfo;
+
+  // All-day duration
+  int _durationDays = 1;
+
+  // Notes
   String? _notes;
+
+  // Songs selection (if type.manageSongs)
+  List<SongHistoryEntry> _songEntries = [];
+
+  // Loading state
   bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
     final typesAsync = ref.watch(visibleAttendanceTypesProvider);
+    final isAllDay = _selectedType?.allDay == true;
+    final showSongs = _selectedType?.manageSongs == true;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Neue Anwesenheit'),
+        title: const Text('Anwesenheit hinzufügen'),
         actions: [
           TextButton.icon(
-            onPressed: _isLoading ? null : _createAttendance,
+            onPressed: _isLoading || _selectedDates.isEmpty
+                ? null
+                : _createAttendances,
             icon: _isLoading
                 ? const SizedBox(
                     width: 16,
@@ -45,7 +81,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.check),
-            label: const Text('Erstellen'),
+            label: Text(_selectedDates.length > 1 ? 'Erstellen' : 'Erstellen'),
           ),
         ],
       ),
@@ -54,19 +90,24 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Date picker
+            // Date picker (multi-select)
             _SectionCard(
-              title: 'Datum',
+              title: 'Datum (Mehrfachauswahl möglich)',
+              trailing: IconButton(
+                icon: const Icon(Icons.info_outline, size: 20),
+                onPressed: _showHolidayInfo,
+                tooltip: 'Feiertage anzeigen',
+              ),
               child: ListTile(
-                leading: const Icon(Icons.calendar_today, color: AppColors.primary),
-                title: Text(
-                  DateFormat('EEEE, d. MMMM yyyy', 'de_DE').format(_selectedDate),
-                ),
-                subtitle: _isToday(_selectedDate)
-                    ? const Text('Heute', style: TextStyle(color: AppColors.success))
+                leading:
+                    const Icon(Icons.calendar_today, color: AppColors.primary),
+                title: Text(_getDateDisplayText()),
+                subtitle: _selectedDates.isEmpty
+                    ? const Text('Tippe hier um Datum auszuwählen',
+                        style: TextStyle(color: AppColors.medium))
                     : null,
                 trailing: const Icon(Icons.edit),
-                onTap: _pickDate,
+                onTap: _pickDates,
               ),
             ),
 
@@ -74,7 +115,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
             // Attendance type
             _SectionCard(
-              title: 'Veranstaltungstyp',
+              title: 'Typ',
               child: typesAsync.when(
                 loading: () => const Padding(
                   padding: EdgeInsets.all(AppDimensions.paddingM),
@@ -91,37 +132,41 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
                       child: Text('Keine Veranstaltungstypen konfiguriert'),
                     );
                   }
+                  // Auto-select first type if none selected
+                  if (_selectedType == null && types.isNotEmpty) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && _selectedType == null) {
+                        _onTypeChanged(types.first);
+                      }
+                    });
+                  }
                   return Column(
-                    children: types.map((type) => RadioListTile<AttendanceType>(
-                      value: type,
-                      groupValue: _selectedType,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedType = value;
-                          // Set default times from type
-                          if (value?.startTime != null) {
-                            _startTime = _parseTime(value!.startTime!);
-                          }
-                          if (value?.endTime != null) {
-                            _endTime = _parseTime(value!.endTime!);
-                          }
-                        });
-                      },
-                      title: Text(type.name),
-                      subtitle: type.startTime != null
-                          ? Text('${type.startTime} - ${type.endTime ?? '?'}')
-                          : null,
-                      secondary: type.color != null
-                          ? Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: _parseColor(type.color!),
-                                shape: BoxShape.circle,
-                              ),
-                            )
-                          : const Icon(Icons.event),
-                    )).toList(),
+                    children: types
+                        .map((type) => RadioListTile<AttendanceType>(
+                              value: type,
+                              groupValue: _selectedType,
+                              onChanged: (value) {
+                                if (value != null) _onTypeChanged(value);
+                              },
+                              title: Text(type.name),
+                              subtitle: type.startTime != null && type.allDay != true
+                                  ? Text(
+                                      '${type.startTime} - ${type.endTime ?? '?'}')
+                                  : type.allDay == true
+                                      ? const Text('Ganztägig')
+                                      : null,
+                              secondary: type.color != null
+                                  ? Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        color: _parseColor(type.color!),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    )
+                                  : const Icon(Icons.event),
+                            ))
+                        .toList(),
                   );
                 },
               ),
@@ -129,37 +174,119 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
             const SizedBox(height: AppDimensions.paddingM),
 
-            // Time range
+            // All-day duration (only shown for all-day events)
+            if (isAllDay) ...[
+              _SectionCard(
+                title: 'Dauer (in Tagen)',
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.paddingM),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: '1',
+                          ),
+                          controller:
+                              TextEditingController(text: '$_durationDays'),
+                          onChanged: (value) {
+                            final parsed = int.tryParse(value);
+                            if (parsed != null && parsed > 0) {
+                              setState(() => _durationDays = parsed);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        _durationDays == 1 ? 'Tag' : 'Tage',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+            ],
+
+            // TypeInfo (custom display text)
             _SectionCard(
-              title: 'Uhrzeit',
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ListTile(
-                      leading: const Icon(Icons.access_time, color: AppColors.primary),
-                      title: Text(_startTime != null
-                          ? _formatTime(_startTime!)
-                          : 'Startzeit'),
-                      subtitle: const Text('Von'),
-                      onTap: () => _pickTime(isStart: true),
-                    ),
+              title: 'Info-Text (optional)',
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'z.B. "Weihnachtskonzert 2026"',
+                    helperText: 'Dieser Text wird anstelle des Typs angezeigt.',
                   ),
-                  const Icon(Icons.arrow_forward, color: AppColors.medium),
-                  Expanded(
-                    child: ListTile(
-                      leading: const Icon(Icons.access_time_filled, color: AppColors.primary),
-                      title: Text(_endTime != null
-                          ? _formatTime(_endTime!)
-                          : 'Endzeit'),
-                      subtitle: const Text('Bis'),
-                      onTap: () => _pickTime(isStart: false),
-                    ),
-                  ),
-                ],
+                  onChanged: (value) =>
+                      setState(() => _typeInfo = value.isEmpty ? null : value),
+                ),
               ),
             ),
 
             const SizedBox(height: AppDimensions.paddingM),
+
+            // Time range (only for non-all-day events)
+            if (!isAllDay) ...[
+              _SectionCard(
+                title: 'Uhrzeit',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ListTile(
+                        leading: const Icon(Icons.access_time,
+                            color: AppColors.primary),
+                        title: Text(_getDisplayStartTime()),
+                        subtitle: const Text('Von'),
+                        onTap: () => _pickTime(isStart: true),
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward, color: AppColors.medium),
+                    Expanded(
+                      child: ListTile(
+                        leading: const Icon(Icons.access_time_filled,
+                            color: AppColors.primary),
+                        title: Text(_getDisplayEndTime()),
+                        subtitle: const Text('Bis'),
+                        onTap: () => _pickTime(isStart: false),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+            ],
+
+            // Songs selection (only if type.manageSongs)
+            if (showSongs) ...[
+              _SectionCard(
+                title: 'Werke',
+                trailing: IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: _addSongs,
+                  tooltip: 'Werk hinzufügen',
+                ),
+                child: _songEntries.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.all(AppDimensions.paddingM),
+                        child: Text(
+                          'Keine Werke ausgewählt',
+                          style: TextStyle(color: AppColors.medium),
+                        ),
+                      )
+                    : SelectedSongsList(
+                        entries: _songEntries,
+                        onEntriesChanged: (entries) {
+                          setState(() => _songEntries = entries);
+                        },
+                      ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+            ],
 
             // Notes
             _SectionCard(
@@ -179,35 +306,27 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
             const SizedBox(height: AppDimensions.paddingXL),
 
-            // Quick actions
-            Text(
-              'Schnellauswahl',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+            // Create button at bottom
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _isLoading || _selectedDates.isEmpty
+                    ? null
+                    : _createAttendances,
+                icon: _isLoading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.add),
+                label: Text(_selectedDates.length == 1
+                    ? 'Termin hinzufügen'
+                    : '${_selectedDates.length} Termine hinzufügen'),
               ),
-            ),
-            const SizedBox(height: AppDimensions.paddingS),
-            Wrap(
-              spacing: AppDimensions.paddingS,
-              runSpacing: AppDimensions.paddingS,
-              children: [
-                _QuickDateChip(
-                  label: 'Heute',
-                  selected: _isToday(_selectedDate),
-                  onTap: () => setState(() => _selectedDate = DateTime.now()),
-                ),
-                _QuickDateChip(
-                  label: 'Morgen',
-                  selected: _isTomorrow(_selectedDate),
-                  onTap: () => setState(() => 
-                    _selectedDate = DateTime.now().add(const Duration(days: 1))),
-                ),
-                _QuickDateChip(
-                  label: 'Nächsten Sonntag',
-                  selected: false,
-                  onTap: () => setState(() => _selectedDate = _nextWeekday(7)),
-                ),
-              ],
             ),
           ],
         ),
@@ -215,16 +334,66 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     );
   }
 
-  Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      locale: const Locale('de', 'DE'),
+  void _onTypeChanged(AttendanceType type) {
+    setState(() {
+      _selectedType = type;
+      // Set default times from type (always overwrite to match type defaults)
+      _startTime = type.startTime != null ? _parseTime(type.startTime!) : null;
+      _endTime = type.endTime != null ? _parseTime(type.endTime!) : null;
+      // Set default duration for all-day events
+      if (type.allDay == true) {
+        _durationDays = type.durationDays ?? 1;
+      }
+    });
+  }
+
+  /// Get display text for start time
+  /// Priority: 1. User-selected time, 2. Type default, 3. Tenant practice time, 4. Placeholder
+  String _getDisplayStartTime() {
+    if (_startTime != null) {
+      return _formatTime(_startTime!);
+    }
+    // Fallback to tenant's practice start time
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant?.practiceStart != null) {
+      return tenant!.practiceStart!;
+    }
+    return 'Startzeit';
+  }
+
+  /// Get display text for end time
+  /// Priority: 1. User-selected time, 2. Type default, 3. Tenant practice time, 4. Placeholder
+  String _getDisplayEndTime() {
+    if (_endTime != null) {
+      return _formatTime(_endTime!);
+    }
+    // Fallback to tenant's practice end time
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant?.practiceEnd != null) {
+      return tenant!.practiceEnd!;
+    }
+    return 'Endzeit';
+  }
+
+  String _getDateDisplayText() {
+    if (_selectedDates.isEmpty) {
+      return 'Kein Datum ausgewählt';
+    } else if (_selectedDates.length == 1) {
+      return DateFormat('EEEE, d. MMMM yyyy', 'de_DE')
+          .format(_selectedDates.first);
+    } else {
+      return '${_selectedDates.length} Termine ausgewählt';
+    }
+  }
+
+  Future<void> _pickDates() async {
+    final result = await MultiDateCalendarDialog.show(
+      context,
+      initialDates: _selectedDates,
     );
-    if (date != null) {
-      setState(() => _selectedDate = date);
+
+    if (result != null) {
+      setState(() => _selectedDates = result);
     }
   }
 
@@ -246,7 +415,130 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     }
   }
 
-  Future<void> _createAttendance() async {
+  Future<void> _addSongs() async {
+    final result = await SongsSelectionSheet.show(
+      context,
+      existingEntries: _songEntries,
+    );
+
+    if (result != null) {
+      setState(() => _songEntries = result);
+    }
+  }
+
+  void _showHolidayInfo() {
+    final holidaysAsync = ref.read(holidaysProvider);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => holidaysAsync.when(
+          loading: () =>
+              const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Fehler: $e')),
+          data: (holidays) => ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Header
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Feiertage & Ferien',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const Divider(),
+
+              // Public holidays
+              if (holidays.publicHolidays.isNotEmpty) ...[
+                const Text(
+                  'Feiertage',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                ...holidays.publicHolidays
+                    .where((h) => !h.isPast)
+                    .take(10)
+                    .map((h) => ListTile(
+                          leading: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: const BoxDecoration(
+                              color: AppColors.danger,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          title: Text(h.name),
+                          subtitle: Text(DateFormat('dd.MM.yyyy', 'de_DE')
+                              .format(h.startDate)),
+                          dense: true,
+                        )),
+                const SizedBox(height: 16),
+              ],
+
+              // School holidays
+              if (holidays.schoolHolidays.isNotEmpty) ...[
+                const Text(
+                  'Schulferien',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                ...holidays.schoolHolidays
+                    .where((h) => !h.isPast)
+                    .take(10)
+                    .map((h) => ListTile(
+                          leading: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: const BoxDecoration(
+                              color: AppColors.medium,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          title: Text(h.name),
+                          subtitle: Text(
+                              '${DateFormat('dd.MM.yyyy', 'de_DE').format(h.startDate)} - ${DateFormat('dd.MM.yyyy', 'de_DE').format(h.endDate)}'),
+                          dense: true,
+                        )),
+              ],
+
+              if (holidays.publicHolidays.isEmpty &&
+                  holidays.schoolHolidays.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text(
+                    'Keine Feiertage konfiguriert.\n\nAktiviere "Feiertage anzeigen" in den Tenant-Einstellungen und wähle eine Region aus.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.medium),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createAttendances() async {
     if (_selectedType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bitte wähle einen Veranstaltungstyp')),
@@ -254,48 +546,48 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
       return;
     }
 
+    if (_selectedDates.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte wähle mindestens ein Datum aus')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
       final tenant = ref.read(currentTenantProvider);
 
       if (tenant == null) throw Exception('Kein Tenant ausgewählt');
 
-      final dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      int? lastCreatedId;
 
-      // 1. Create the attendance record
-      final response = await supabase.from('attendance').insert({
-        'tenantId': tenant.id,
-        'date': dateString,
-        'type_id': _selectedType!.id,
-        'type': _selectedType!.name,
-        'typeInfo': _selectedType!.name,
-        'start_time': _startTime != null ? _formatTime(_startTime!) : null,
-        'end_time': _endTime != null ? _formatTime(_endTime!) : null,
-        'notes': _notes,
-        'created_by': supabase.auth.currentUser?.id,
-      }).select().single();
+      // Create attendance for each selected date
+      for (final date in _selectedDates) {
+        final attendanceId = await _createSingleAttendance(date);
+        lastCreatedId = attendanceId;
+      }
 
       if (!mounted) return;
 
-      final newId = response['id'] as int;
-
-      // 2. Create PersonAttendance records for all active players
-      await _createPersonAttendancesForAll(newId);
-
-      if (!mounted) return;
-
-      // 3. Invalidate attendance providers so lists are refreshed
+      // Invalidate attendance providers so lists are refreshed
       ref.invalidate(attendancesProvider);
       ref.invalidate(upcomingAttendancesProvider);
 
+      final message = _selectedDates.length == 1
+          ? 'Anwesenheit hinzugefügt'
+          : '${_selectedDates.length} Anwesenheiten hinzugefügt';
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Anwesenheit erstellt')),
+        SnackBar(content: Text(message)),
       );
 
-      // Navigate to the new attendance
-      context.go('/attendance/$newId');
+      // Navigate to the last created attendance
+      if (lastCreatedId != null) {
+        context.go('/attendance/$lastCreatedId');
+      } else {
+        context.pop();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -308,56 +600,214 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     }
   }
 
-  /// Create PersonAttendance records for all active players
-  Future<void> _createPersonAttendancesForAll(int attendanceId) async {
+  Future<int> _createSingleAttendance(DateTime date) async {
     final supabase = ref.read(supabaseClientProvider);
     final tenant = ref.read(currentTenantProvider);
+    final type = _selectedType!;
 
-    // Guard against null tenant or null tenant.id
+    // Normalize date to noon to avoid timezone issues
+    final normalizedDate = DateTime(date.year, date.month, date.day, 12);
+    final dateString = DateFormat('yyyy-MM-dd').format(normalizedDate);
+
+    // Prepare checklist from type
+    List<Map<String, dynamic>>? checklist;
+    if (type.checklist != null && type.checklist!.isNotEmpty) {
+      final eventDateTime = type.startTime != null
+          ? DateTime(
+              normalizedDate.year,
+              normalizedDate.month,
+              normalizedDate.day,
+              int.parse(type.startTime!.split(':')[0]),
+              int.parse(type.startTime!.split(':')[1]),
+            )
+          : DateTime(normalizedDate.year, normalizedDate.month,
+              normalizedDate.day, 19, 0);
+
+      checklist = type.checklist!.map((item) {
+        DateTime? dueDate;
+        if (item.deadlineHours != null) {
+          dueDate =
+              eventDateTime.subtract(Duration(hours: item.deadlineHours!));
+        }
+
+        return {
+          'id': const Uuid().v4(),
+          'text': item.text,
+          'deadlineHours': item.deadlineHours,
+          'completed': false,
+          'dueDate': dueDate?.toIso8601String(),
+        };
+      }).toList();
+    }
+
+    // Resolve start/end times with fallbacks: user input > type default > tenant default
+    final resolvedStartTime = _startTime != null
+        ? _formatTime(_startTime!)
+        : (type.startTime ?? tenant?.practiceStart);
+    final resolvedEndTime = _endTime != null
+        ? _formatTime(_endTime!)
+        : (type.endTime ?? tenant?.practiceEnd);
+
+    // 1. Create the attendance record
+    final response = await supabase.from('attendance').insert({
+      'tenantId': tenant!.id,
+      'date': dateString,
+      'type_id': type.id,
+      'type': type.name,
+      'typeInfo': _typeInfo ?? type.name,
+      'start_time': resolvedStartTime,
+      'end_time': resolvedEndTime,
+      'notes': _notes,
+      'duration_days': type.allDay == true ? _durationDays : null,
+      'checklist': checklist,
+      'created_by': supabase.auth.currentUser?.id,
+      'save_in_history': true,
+    }).select().single();
+
+    final attendanceId = response['id'] as int;
+
+    // 2. Create PersonAttendance records for relevant players
+    await _createPersonAttendancesForRelevant(attendanceId, normalizedDate);
+
+    // 3. Create song history entries if songs were selected
+    if (_songEntries.isNotEmpty) {
+      await _createSongHistoryEntries(attendanceId, dateString);
+    }
+
+    return attendanceId;
+  }
+
+  /// Create PersonAttendance records for players based on relevant groups
+  Future<void> _createPersonAttendancesForRelevant(
+      int attendanceId, DateTime date) async {
+    final supabase = ref.read(supabaseClientProvider);
+    final tenant = ref.read(currentTenantProvider);
+    final type = _selectedType!;
+
     if (tenant?.id == null) return;
 
     // Get all active players (not left, not pending, not paused)
-    final players = await supabase
+    var query = supabase
         .from('player')
-        .select('id')
+        .select('id, instrument, shift_id, shift_start, shift_name, additional_fields')
         .eq('tenantId', tenant!.id!)
-        .isFilter('left', null)  // null = nicht archiviert
-        .eq('paused', false);    // nicht pausiert
+        .isFilter('left', null) // null = not archived
+        .isFilter('pending', false) // not pending
+        .eq('paused', false); // not paused
 
+    final players = await query;
     final playerList = players as List;
     if (playerList.isEmpty) return;
 
     // Get default status from attendance type
-    final defaultStatus = _selectedType?.defaultStatus ?? AttendanceStatus.neutral;
+    final defaultStatus = type.defaultStatus;
 
-    // Create PersonAttendance records
-    final records = playerList.map((p) => {
-      'attendance_id': attendanceId,
-      'person_id': p['id'],
-      'status': defaultStatus.value,  // Use integer value, not string name
+    // Filter players based on relevant_groups
+    final relevantGroups = type.relevantGroups;
+    final additionalFieldsFilter = type.additionalFieldsFilter;
+
+    final filteredPlayers = playerList.where((player) {
+      // Filter by relevant_groups if set
+      if (relevantGroups != null && relevantGroups.isNotEmpty) {
+        final playerInstrument = player['instrument'] as int?;
+        if (playerInstrument == null ||
+            !relevantGroups.contains(playerInstrument)) {
+          return false;
+        }
+      }
+
+      // Filter by additional_fields_filter if set
+      if (additionalFieldsFilter != null) {
+        final filterKey = additionalFieldsFilter['key'] as String?;
+        final filterOption = additionalFieldsFilter['option'];
+
+        if (filterKey != null && filterOption != null) {
+          final playerAdditionalFields =
+              player['additional_fields'] as Map<String, dynamic>?;
+          final playerValue = playerAdditionalFields?[filterKey];
+
+          // Get default value from tenant's additional_fields
+          final fieldDef = tenant.additionalFields?.firstWhere(
+            (f) => f.id == filterKey,
+            orElse: () => throw StateError('Field not found'),
+          );
+          final defaultValue = fieldDef?.defaultValue;
+
+          final effectiveValue = playerValue ?? defaultValue;
+          if (effectiveValue != filterOption) {
+            return false;
+          }
+        }
+      }
+
+      return true;
     }).toList();
+
+    if (filteredPlayers.isEmpty) return;
+
+    // Create PersonAttendance records with optional shift-based status
+    final records = <Map<String, dynamic>>[];
+    for (final player in filteredPlayers) {
+      var status = defaultStatus;
+      var notes = '';
+
+      // Apply shift-based status if player has shift and not all-day event
+      final shiftId = player['shift_id'] as String?;
+      if (shiftId != null && type.allDay != true) {
+        final result = ShiftUtils.getStatusByShift(
+          shiftId: shiftId,
+          attendanceDate: date,
+          attendanceStart: type.startTime ?? '19:00',
+          attendanceEnd: type.endTime ?? '21:00',
+          defaultStatus: defaultStatus,
+          shiftStart: player['shift_start'] as String?,
+          shiftName: player['shift_name'] as String?,
+        );
+
+        status = result.status;
+        notes = result.note;
+      }
+
+      records.add({
+        'attendance_id': attendanceId,
+        'person_id': player['id'],
+        'status': status.value,
+        'notes': notes.isNotEmpty ? notes : null,
+      });
+    }
 
     // Batch insert all records
     await supabase.from('person_attendances').insert(records);
   }
 
-  bool _isToday(DateTime date) {
-    final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
-  }
+  /// Create song history entries for the attendance
+  Future<void> _createSongHistoryEntries(
+      int attendanceId, String dateString) async {
+    final supabase = ref.read(supabaseClientProvider);
+    final tenant = ref.read(currentTenantProvider);
 
-  bool _isTomorrow(DateTime date) {
-    final tomorrow = DateTime.now().add(const Duration(days: 1));
-    return date.year == tomorrow.year && 
-           date.month == tomorrow.month && 
-           date.day == tomorrow.day;
-  }
+    if (tenant?.id == null) return;
 
-  DateTime _nextWeekday(int weekday) {
-    final now = DateTime.now();
-    int daysUntil = weekday - now.weekday;
-    if (daysUntil <= 0) daysUntil += 7;
-    return now.add(Duration(days: daysUntil));
+    final entries = _songEntries.map((entry) {
+      return {
+        'song_id': entry.songId,
+        'attendance_id': attendanceId,
+        'date': dateString,
+        'tenantId': tenant!.id,
+        'conductorName': entry.conductorName,
+        'otherConductor': entry.otherConductor,
+      };
+    }).toList();
+
+    if (entries.isNotEmpty) {
+      await supabase.from('history').insert(entries);
+    }
+
+    // Invalidate song history providers
+    ref.invalidate(songHistoryProvider(null));
+    for (final entry in _songEntries) {
+      ref.invalidate(songHistoryProvider(entry.songId));
+    }
   }
 
   TimeOfDay? _parseTime(String time) {
@@ -378,7 +828,21 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
       if (colorStr.startsWith('#')) {
         return Color(int.parse('FF${colorStr.substring(1)}', radix: 16));
       }
-      return AppColors.primary;
+      // Handle named colors
+      switch (colorStr.toLowerCase()) {
+        case 'primary':
+          return AppColors.primary;
+        case 'success':
+          return AppColors.success;
+        case 'warning':
+          return AppColors.warning;
+        case 'danger':
+          return AppColors.danger;
+        case 'tertiary':
+          return AppColors.tertiary;
+        default:
+          return AppColors.primary;
+      }
     } catch (_) {
       return AppColors.primary;
     }
@@ -389,10 +853,12 @@ class _SectionCard extends StatelessWidget {
   const _SectionCard({
     required this.title,
     required this.child,
+    this.trailing,
   });
 
   final String title;
   final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -403,43 +869,28 @@ class _SectionCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppDimensions.paddingM,
-              AppDimensions.paddingM,
-              AppDimensions.paddingM,
+              AppDimensions.paddingS,
+              AppDimensions.paddingS,
               0,
             ),
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: AppColors.medium,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppColors.medium,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                if (trailing != null) trailing!,
+              ],
             ),
           ),
           child,
         ],
       ),
-    );
-  }
-}
-
-class _QuickDateChip extends StatelessWidget {
-  const _QuickDateChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ActionChip(
-      label: Text(label),
-      backgroundColor: selected ? AppColors.primary.withValues(alpha: 0.2) : null,
-      side: selected ? BorderSide(color: AppColors.primary) : null,
-      onPressed: onTap,
     );
   }
 }
