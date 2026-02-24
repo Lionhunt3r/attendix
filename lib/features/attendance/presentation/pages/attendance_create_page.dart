@@ -6,29 +6,11 @@ import 'package:intl/intl.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/attendance_providers.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../core/providers/tenant_providers.dart';
-
-/// Provider for attendance types
-final attendanceTypesProvider = FutureProvider<List<AttendanceType>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  // Guard against null tenant or null tenant.id
-  if (tenant?.id == null) return [];
-
-  final response = await supabase
-      .from('attendance_types')
-      .select('*')
-      .eq('tenant_id', tenant!.id!)
-      .eq('visible', true)
-      .order('index', ascending: true);
-
-  return (response as List)
-      .map((e) => AttendanceType.fromJson(e as Map<String, dynamic>))
-      .toList();
-});
 
 /// Page for creating a new attendance
 class AttendanceCreatePage extends ConsumerStatefulWidget {
@@ -48,7 +30,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final typesAsync = ref.watch(attendanceTypesProvider);
+    final typesAsync = ref.watch(visibleAttendanceTypesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -303,6 +285,10 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
       await _createPersonAttendancesForAll(newId);
 
       if (!mounted) return;
+
+      // 3. Invalidate attendance providers so lists are refreshed
+      ref.invalidate(attendancesProvider);
+      ref.invalidate(upcomingAttendancesProvider);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Anwesenheit erstellt')),

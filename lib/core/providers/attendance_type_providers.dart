@@ -28,6 +28,12 @@ final attendanceTypesProvider = FutureProvider<List<AttendanceType>>((ref) async
   return repo.getTypes();
 });
 
+/// Provider for visible attendance types only (for creating new attendances)
+final visibleAttendanceTypesProvider = FutureProvider<List<AttendanceType>>((ref) async {
+  final allTypes = await ref.watch(attendanceTypesProvider.future);
+  return allTypes.where((type) => type.visible == true).toList();
+});
+
 /// Provider for a single attendance type by ID
 final attendanceTypeByIdProvider = FutureProvider.family<AttendanceType?, String>((ref, id) async {
   final repo = ref.watch(attendanceTypeRepositoryWithTenantProvider);

@@ -47,24 +47,14 @@ final tenantUsersProvider = FutureProvider<List<TenantUser>>((ref) async {
 
   if (tenantId == null) return [];
 
-  // Get tenant users with auth user email
+  // Get tenant users (email is not available via direct join to auth.users)
   final response = await supabase
       .from('tenantUsers')
-      .select('*, email:auth.users!userId(email)')
+      .select('*')
       .eq('tenantId', tenantId)
       .order('role', ascending: true);
 
-  return (response as List).map((e) {
-    // Extract email from nested structure
-    final emailData = e['email'];
-    String? email;
-    if (emailData is Map) {
-      email = emailData['email'] as String?;
-    } else if (emailData is String) {
-      email = emailData;
-    }
-    return TenantUser.fromJson({...e, 'email': email});
-  }).toList();
+  return (response as List).map((e) => TenantUser.fromJson(e)).toList();
 });
 
 /// User Management Page
@@ -128,18 +118,37 @@ class UserManagementPage extends ConsumerWidget {
     if (tenantId == null) return;
 
     try {
-      // First check if user exists
-      final existingUser = await supabase
-          .from('auth.users')
-          .select('id')
+      // Try to find user by email in player table (where users register)
+      // Users must first register through the app before they can be added
+      final existingPlayer = await supabase
+          .from('player')
+          .select('appId')
           .eq('email', email.toLowerCase().trim())
           .maybeSingle();
 
-      if (existingUser != null) {
-        // User exists, add to tenant
+      if (existingPlayer != null && existingPlayer['appId'] != null) {
+        // User exists and has an appId (is registered)
+        final userId = existingPlayer['appId'] as String;
+
+        // Check if user is already in this tenant
+        final existingTenantUser = await supabase
+            .from('tenantUsers')
+            .select('id')
+            .eq('tenantId', tenantId)
+            .eq('userId', userId)
+            .maybeSingle();
+
+        if (existingTenantUser != null) {
+          if (context.mounted) {
+            ToastHelper.showInfo(context, 'Benutzer ist bereits in diesem Tenant');
+          }
+          return;
+        }
+
+        // Add user to tenant
         await supabase.from('tenantUsers').insert({
           'tenantId': tenantId,
-          'userId': existingUser['id'],
+          'userId': userId,
           'role': role.value,
         });
 
@@ -149,11 +158,11 @@ class UserManagementPage extends ConsumerWidget {
           ToastHelper.showSuccess(context, 'Benutzer hinzugefügt');
         }
       } else {
-        // User doesn't exist - show invitation message
+        // User doesn't exist or hasn't registered yet
         if (context.mounted) {
           ToastHelper.showInfo(
             context,
-            'Benutzer mit dieser E-Mail nicht gefunden. Bitte lade ihn ein, sich zu registrieren.',
+            'Benutzer mit dieser E-Mail nicht gefunden oder noch nicht registriert. Bitte lade ihn ein, sich zu registrieren.',
           );
         }
       }

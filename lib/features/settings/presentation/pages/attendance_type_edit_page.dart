@@ -5,20 +5,25 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
-import 'attendance_types_page.dart';
 
-/// Provider for a single attendance type
-final attendanceTypeByIdProvider = FutureProvider.family<AttendanceType?, String>((ref, id) async {
+/// Local provider for a single attendance type (with tenant filtering)
+final _attendanceTypeByIdProvider = FutureProvider.family<AttendanceType?, String>((ref, id) async {
   final supabase = ref.watch(supabaseClientProvider);
+  final tenantId = ref.watch(currentTenantIdProvider);
+
+  if (tenantId == null) return null;
 
   final response = await supabase
       .from('attendance_types')
       .select()
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .maybeSingle();
 
   if (response == null) return null;
@@ -84,7 +89,7 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   }
 
   Future<void> _loadType() async {
-    final type = await ref.read(attendanceTypeByIdProvider(widget.typeId).future);
+    final type = await ref.read(_attendanceTypeByIdProvider(widget.typeId).future);
 
     if (type != null && mounted) {
       setState(() {
@@ -448,6 +453,9 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
     if (!_formKey.currentState!.validate()) return;
 
     final supabase = ref.read(supabaseClientProvider);
+    final tenantId = ref.read(currentTenantIdProvider);
+
+    if (tenantId == null) return;
 
     try {
       await supabase.from('attendance_types').update({
@@ -462,10 +470,10 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         'hide_name': _hideName,
         'include_in_average': _includeInAverage,
         'color': _color,
-      }).eq('id', widget.typeId);
+      }).eq('id', widget.typeId).eq('tenant_id', tenantId);
 
       ref.invalidate(attendanceTypesProvider);
-      ref.invalidate(attendanceTypeByIdProvider(widget.typeId));
+      ref.invalidate(_attendanceTypeByIdProvider(widget.typeId));
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Änderungen gespeichert');
@@ -491,9 +499,16 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
     if (!confirmed) return;
 
     final supabase = ref.read(supabaseClientProvider);
+    final tenantId = ref.read(currentTenantIdProvider);
+
+    if (tenantId == null) return;
 
     try {
-      await supabase.from('attendance_types').delete().eq('id', widget.typeId);
+      await supabase
+          .from('attendance_types')
+          .delete()
+          .eq('id', widget.typeId)
+          .eq('tenant_id', tenantId);
 
       ref.invalidate(attendanceTypesProvider);
 

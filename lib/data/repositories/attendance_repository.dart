@@ -81,6 +81,7 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
             )
           )''')
           .eq('id', id)
+          .eq('tenantId', currentTenantId)
           .maybeSingle();
 
       if (response == null) return null;
@@ -125,6 +126,7 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
           .from('attendance')
           .update(updates)
           .eq('id', id)
+          .eq('tenantId', currentTenantId)
           .select()
           .single();
 
@@ -141,7 +143,8 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
       await supabase
           .from('attendance')
           .delete()
-          .eq('id', id);
+          .eq('id', id)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'deleteAttendance');
       rethrow;

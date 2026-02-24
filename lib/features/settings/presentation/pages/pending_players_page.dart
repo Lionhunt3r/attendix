@@ -17,7 +17,7 @@ final pendingPlayersProvider = FutureProvider<List<Person>>((ref) async {
   if (tenant == null) return [];
 
   final response = await supabase
-      .from('players')
+      .from('player')
       .select('*, instruments(id, name)')
       .eq('tenantId', tenant.id!)
       .eq('pending', true)
@@ -124,7 +124,7 @@ class PendingPlayersPage extends ConsumerWidget {
       try {
         final supabase = ref.read(supabaseClientProvider);
         await supabase
-            .from('players')
+            .from('player')
             .update({'pending': false})
             .eq('id', player.id!);
 
@@ -165,7 +165,7 @@ class PendingPlayersPage extends ConsumerWidget {
       try {
         final supabase = ref.read(supabaseClientProvider);
         await supabase
-            .from('players')
+            .from('player')
             .delete()
             .eq('id', player.id!);
 

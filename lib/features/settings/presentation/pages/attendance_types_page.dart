@@ -3,26 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/supabase_config.dart';
+import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
-
-/// Provider for attendance types
-final attendanceTypesProvider = FutureProvider<List<AttendanceType>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenantId = ref.watch(currentTenantIdProvider);
-
-  if (tenantId == null) return [];
-
-  final response = await supabase
-      .from('attendance_types')
-      .select()
-      .eq('tenant_id', tenantId)
-      .order('index', ascending: true);
-
-  return (response as List).map((e) => AttendanceType.fromJson(e)).toList();
-});
 
 /// Attendance Types List Page
 ///
@@ -217,8 +203,14 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
       await supabase.from('attendance_types').insert({
         'name': name,
         'tenant_id': tenantId,
-        'default_status': 'present',
-        'available_statuses': ['neutral', 'present', 'absent', 'excused', 'late'],
+        'default_status': AttendanceStatus.present.value,
+        'available_statuses': [
+          AttendanceStatus.neutral.value,
+          AttendanceStatus.present.value,
+          AttendanceStatus.absent.value,
+          AttendanceStatus.excused.value,
+          AttendanceStatus.late.value,
+        ],
         'manage_songs': false,
         'start_time': '19:00',
         'end_time': '20:30',
