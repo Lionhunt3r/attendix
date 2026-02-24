@@ -1,0 +1,859 @@
+{
+  "reportDate": "2026-02-24",
+  "reportType": "Ionic-Flutter Feature Parity Audit",
+  "overallScore": 91.2,
+  "summary": {
+    "totalIonicFeatures": 228,
+    "totalFlutterFeatures": 208,
+    "missingFeatures": 20,
+    "extraFlutterFeatures": 12,
+    "criticalGaps": 3
+  },
+  "pageComparisons": [
+    {
+      "ionicPage": "attendance/att-list/att-list.page.ts",
+      "flutterPage": "attendance/presentation/pages/attendance_list_page.dart",
+      "score": 95.0,
+      "ionicFeatures": {
+        "count": 20,
+        "features": [
+          "loadAttendances(forceRefresh)",
+          "processAttendances() - split upcoming/past",
+          "handleRefresh(event)",
+          "calculateStats()",
+          "navigateToDetail(att)",
+          "showCalendarView()",
+          "createNewAttendance()",
+          "showAttendanceSelectionDialog()",
+          "currentAttendance extraction",
+          "percentage calculation",
+          "collapsible sections (accordion)",
+          "highlighted type IDs",
+          "date formatting",
+          "time range display",
+          "notes display",
+          "attendance type filtering",
+          "tenant info display",
+          "role-based FAB visibility",
+          "empty state handling",
+          "pull-to-refresh"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 19,
+        "features": [
+          "attendanceListProvider (FutureProvider)",
+          "categorizedAttendancesProvider (computed)",
+          "handleRefresh via RefreshIndicator",
+          "Calendar view modal with TableCalendar",
+          "Navigate to detail page",
+          "Create new attendance",
+          "showAttendanceSelectionDialog",
+          "current attendance section",
+          "percentage badge display",
+          "_CollapsibleSection widget",
+          "highlighted types from attendanceTypesProvider",
+          "date formatting (_getMonthShort, _getDayNumber)",
+          "_formatTimeRange",
+          "notes display",
+          "tenant info in AppBar",
+          "role.canAddAttendance for FAB",
+          "EmptyStateWidget",
+          "RefreshIndicator",
+          "AnimatedListItem"
+        ]
+      },
+      "missingInFlutter": [
+        "calculateStats() for percentage overview"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "attendance/attendance.page.ts",
+      "flutterPage": "attendance/presentation/pages/attendance_detail_page.dart",
+      "score": 92.0,
+      "ionicFeatures": {
+        "count": 25,
+        "features": [
+          "loadAttendance()",
+          "loadPersonAttendances()",
+          "updateStatus(person, status)",
+          "bulkUpdateStatus(persons, status)",
+          "showBulkActionSheet()",
+          "showPersonActions(person)",
+          "showReasonDialog(person)",
+          "showNoteDialog(person)",
+          "sortPersons()",
+          "filterPersons()",
+          "groupByInstrument()",
+          "calculatePercentage()",
+          "saveNote()",
+          "saveReason()",
+          "editAttendance()",
+          "deleteAttendance()",
+          "shareAttendance()",
+          "duplicateAttendance()",
+          "showPlanViewer()",
+          "showAddParticipantSheet()",
+          "realtime subscription",
+          "swipe actions",
+          "status badge colors",
+          "instrument grouping view",
+          "search/filter persons"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 23,
+        "features": [
+          "attendanceDetailProvider",
+          "updatePersonStatus()",
+          "bulkUpdateStatus()",
+          "showBulkActionSheet()",
+          "showPersonActions()",
+          "showReasonSheet()",
+          "showNoteSheet()",
+          "sorting options",
+          "filtering options",
+          "group by instrument",
+          "calculatePercentage()",
+          "saveNote()",
+          "saveReason()",
+          "editAttendance()",
+          "deleteAttendance()",
+          "shareAttendance()",
+          "duplicateAttendance()",
+          "showPlanViewer()",
+          "addParticipantSheet",
+          "realtime via Riverpod",
+          "Slidable swipe actions",
+          "status badges",
+          "search/filter"
+        ]
+      },
+      "missingInFlutter": [
+        "Realtime subscription (uses manual refresh)",
+        "Some bulk action confirmations"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "people/list/list.page.ts",
+      "flutterPage": "people/presentation/pages/people_list_page.dart",
+      "score": 96.0,
+      "ionicFeatures": {
+        "count": 25,
+        "features": [
+          "loadPlayers()",
+          "filterPlayers(query)",
+          "sortPlayers(option)",
+          "groupByInstrument()",
+          "searchPlayers()",
+          "showPlayerDetail(player)",
+          "createPlayer()",
+          "pausePlayer(player)",
+          "unpausePlayer(player)",
+          "archivePlayer(player)",
+          "showPauseDialog()",
+          "showArchiveDialog()",
+          "showHandoverSheet()",
+          "selectionMode toggle",
+          "selectAll()",
+          "deselectAll()",
+          "filter chips (all/active/paused/critical/leaders)",
+          "sort options (group/lastName/firstName)",
+          "group headers with counts",
+          "player avatar",
+          "leader badge",
+          "pause indicator",
+          "critical indicator",
+          "swipe actions",
+          "pull-to-refresh"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 24,
+        "features": [
+          "peopleListProvider",
+          "_filterPeople()",
+          "_sortPeople()",
+          "_groupByGroup()",
+          "TextField search",
+          "Navigate to detail",
+          "FloatingActionButton for new",
+          "_pausePerson()",
+          "_unpausePerson()",
+          "_archivePerson()",
+          "_showPauseDialog()",
+          "_showArchiveDialog()",
+          "showHandoverSheet()",
+          "selection mode",
+          "select all/deselect",
+          "PopupMenuButton filter chips",
+          "PopupMenuButton sort",
+          "group headers",
+          "CircleAvatar with initials",
+          "leader star icon",
+          "pause icon",
+          "critical warning icon",
+          "Slidable swipe",
+          "RefreshIndicator"
+        ]
+      },
+      "missingInFlutter": [
+        "Auto-pause end date handling UI indicator"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "people/person/person.page.ts",
+      "flutterPage": "people/presentation/pages/person_detail_page.dart",
+      "score": 90.0,
+      "ionicFeatures": {
+        "count": 30,
+        "features": [
+          "loadPerson()",
+          "loadAttendanceHistory()",
+          "editPerson()",
+          "savePerson()",
+          "deletePerson()",
+          "pausePerson()",
+          "unpausePerson()",
+          "archivePerson()",
+          "restorePerson()",
+          "showDeleteConfirm()",
+          "showEditSheet()",
+          "showAttendanceDetail()",
+          "calculateAttendanceStats()",
+          "uploadImage()",
+          "removeImage()",
+          "linkToApp()",
+          "unlinkFromApp()",
+          "sendNotification()",
+          "showContactOptions()",
+          "callPerson()",
+          "emailPerson()",
+          "showExtraFields()",
+          "editExtraFields()",
+          "showParentInfo()",
+          "attendance chart",
+          "instrument selector",
+          "birthday picker",
+          "address fields",
+          "notes field",
+          "leader toggle"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 27,
+        "features": [
+          "personDetailProvider",
+          "attendanceHistoryProvider",
+          "editPerson()",
+          "savePerson()",
+          "deletePerson()",
+          "pausePerson()",
+          "unpausePerson()",
+          "archivePerson()",
+          "restorePerson()",
+          "delete confirmation dialog",
+          "edit bottom sheet",
+          "attendance detail navigation",
+          "attendance stats",
+          "image upload",
+          "contact options (call/email)",
+          "extra fields display",
+          "extra fields edit",
+          "parent info",
+          "attendance chart (fl_chart)",
+          "instrument dropdown",
+          "birthday DatePicker",
+          "address fields",
+          "notes TextField",
+          "leader Switch",
+          "critical toggle",
+          "pause reason display",
+          "history list"
+        ]
+      },
+      "missingInFlutter": [
+        "Link/unlink to app account",
+        "Send push notification",
+        "Remove image (only upload)"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "songs/songs.page.ts",
+      "flutterPage": "songs/presentation/pages/songs_list_page.dart",
+      "score": 95.0,
+      "ionicFeatures": {
+        "count": 20,
+        "features": [
+          "loadSongs()",
+          "filterSongs(query)",
+          "sortSongs(option)",
+          "filterByCategory()",
+          "filterByDifficulty()",
+          "filterByInstrument()",
+          "filterWithChoir()",
+          "filterWithSolo()",
+          "showSongDetail()",
+          "createSong()",
+          "showFilterSheet()",
+          "resetFilters()",
+          "category chips",
+          "active filter chips",
+          "sort indicator",
+          "song number display",
+          "conductor display",
+          "lastSung display",
+          "pull-to-refresh",
+          "empty state"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 19,
+        "features": [
+          "songsProvider",
+          "filteredSongsProvider",
+          "songSearchQueryProvider",
+          "songFilterProvider",
+          "songCategoriesProvider",
+          "showSongFilterSheet()",
+          "reset filters",
+          "category ChoiceChips",
+          "_ActiveFilterChips",
+          "sort indicator",
+          "song fullNumber",
+          "conductor display",
+          "lastSung display",
+          "RefreshIndicator",
+          "empty state",
+          "navigate to detail",
+          "FAB for new song",
+          "withChoir/withSolo chips",
+          "search TextField"
+        ]
+      },
+      "missingInFlutter": [
+        "filterByInstrument fully implemented"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "songs/song/song.page.ts",
+      "flutterPage": "songs/presentation/pages/song_detail_page.dart",
+      "score": 88.0,
+      "ionicFeatures": {
+        "count": 25,
+        "features": [
+          "loadSong()",
+          "editSong()",
+          "saveSong()",
+          "deleteSong()",
+          "duplicateSong()",
+          "shareSong()",
+          "uploadPdf()",
+          "viewPdf()",
+          "deletePdf()",
+          "downloadPdf()",
+          "showPdfViewer()",
+          "addInstrumentPdf()",
+          "removeInstrumentPdf()",
+          "editLyrics()",
+          "showLyrics()",
+          "editConductor()",
+          "editCategory()",
+          "editDifficulty()",
+          "editNotes()",
+          "toggleWithChoir()",
+          "toggleWithSolo()",
+          "linkToAttendance()",
+          "showHistory()",
+          "playAudio()",
+          "showInstrumentPdfs()"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 22,
+        "features": [
+          "songDetailProvider",
+          "edit mode",
+          "save song",
+          "delete song",
+          "duplicate song",
+          "share song",
+          "uploadPdf",
+          "viewPdf modal",
+          "deletePdf",
+          "addInstrumentPdf",
+          "removeInstrumentPdf",
+          "lyrics editor",
+          "lyrics display",
+          "conductor field",
+          "category dropdown",
+          "difficulty slider",
+          "notes field",
+          "withChoir toggle",
+          "withSolo toggle",
+          "link to attendance",
+          "history display",
+          "instrument PDFs section"
+        ]
+      },
+      "missingInFlutter": [
+        "downloadPdf for offline",
+        "playAudio feature",
+        "PDF viewer full-screen mode"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "settings/settings/settings.page.ts",
+      "flutterPage": "settings/presentation/pages/settings_page.dart",
+      "score": 98.0,
+      "ionicFeatures": {
+        "count": 20,
+        "features": [
+          "showTenantInfo()",
+          "switchTenant()",
+          "navigateToTypes()",
+          "navigateToSongs()",
+          "navigateToInstruments()",
+          "navigateToTeachers()",
+          "navigateToMeetings()",
+          "navigateToShifts()",
+          "navigateToUsers()",
+          "navigateToPending()",
+          "navigateToLeft()",
+          "navigateToCalendar()",
+          "navigateToNotifications()",
+          "navigateToGeneral()",
+          "showFeedback()",
+          "navigateToProfile()",
+          "logout()",
+          "showLogoutConfirm()",
+          "showVersionHistory()",
+          "role-based menu filtering"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 20,
+        "features": [
+          "tenant info section",
+          "switch tenant (go to /tenants)",
+          "navigate to types",
+          "navigate to songs",
+          "navigate to instruments",
+          "navigate to teachers",
+          "navigate to meetings",
+          "navigate to shifts",
+          "navigate to users",
+          "navigate to pending",
+          "navigate to left",
+          "navigate to calendar",
+          "navigate to notifications",
+          "navigate to general",
+          "showFeedbackSheet()",
+          "navigate to profile",
+          "logout with confirmation",
+          "showVersionHistorySheet()",
+          "role-based visibility (role.canEdit, role.isAdmin, etc.)",
+          "applicant status hint"
+        ]
+      },
+      "missingInFlutter": [],
+      "extraInFlutter": [
+        "Voice leader section navigation"
+      ]
+    },
+    {
+      "ionicPage": "settings/general/general.page.ts",
+      "flutterPage": "settings/presentation/pages/general_settings_page.dart",
+      "score": 94.0,
+      "ionicFeatures": {
+        "count": 18,
+        "features": [
+          "loadTenantSettings()",
+          "saveShortName()",
+          "saveLongName()",
+          "saveSeasonStart()",
+          "savePracticeStart()",
+          "savePracticeEnd()",
+          "saveHolidayRegion()",
+          "toggleWithExcuses()",
+          "toggleMaintainTeachers()",
+          "toggleParentsMode()",
+          "toggleShowMembersList()",
+          "toggleSongSharing()",
+          "toggleSelfRegistration()",
+          "toggleAutoApprove()",
+          "manageExtraFields()",
+          "addExtraField()",
+          "editExtraField()",
+          "deleteExtraField()"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 17,
+        "features": [
+          "tenantSettingsProvider",
+          "update shortName",
+          "update longName",
+          "update seasonStart",
+          "update practiceStart",
+          "update practiceEnd",
+          "holiday region dropdown",
+          "withExcuses switch",
+          "maintainTeachers switch",
+          "parentsMode switch",
+          "showMembersList switch",
+          "songSharing switch",
+          "selfRegistration switch",
+          "autoApprove switch",
+          "extraFieldsProvider",
+          "add/edit/delete extra fields",
+          "extra field type picker"
+        ]
+      },
+      "missingInFlutter": [
+        "Export tenant data feature"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "selfService/overview/overview.page.ts",
+      "flutterPage": "self_service/presentation/pages/self_service_overview_page.dart",
+      "score": 96.0,
+      "ionicFeatures": {
+        "count": 25,
+        "features": [
+          "loadAttendances()",
+          "processAttendances()",
+          "calculateStats()",
+          "groupByTenant()",
+          "handleRefresh()",
+          "presentActionSheetForChoice()",
+          "signin()",
+          "signout()",
+          "showNoteAlertForSignin()",
+          "showNoteAlert()",
+          "onReasonSelect()",
+          "excuseModal handling",
+          "groupingMode toggle",
+          "currentAttendance card",
+          "upcomingAttendances list",
+          "pastAttendances list",
+          "tenantGroups accordion",
+          "status badge colors",
+          "deadline info display",
+          "reason selection modal",
+          "late coming option",
+          "attendance type filtering",
+          "isAttToday check",
+          "attHasPassed check",
+          "attIsInFuture check"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 24,
+        "features": [
+          "crossTenantAttendancesProvider",
+          "processAttendances()",
+          "calculateStats()",
+          "groupByTenant()",
+          "RefreshIndicator",
+          "action sheet for choices",
+          "signIn()",
+          "signOut()",
+          "note alert for signin",
+          "note edit alert",
+          "reason selection in sheet",
+          "reason sheet modal",
+          "grouping mode segmented control",
+          "current attendance card",
+          "upcoming list",
+          "past list",
+          "tenant accordion groups",
+          "status badge",
+          "deadline info",
+          "reason selection",
+          "late coming toggle",
+          "attendance type check",
+          "date comparison helpers",
+          "legend sheet"
+        ]
+      },
+      "missingInFlutter": [
+        "Breakpoint adjustment for modal (native sheet behavior)"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "stats/stats.page.ts",
+      "flutterPage": "statistics/presentation/pages/statistics_page.dart",
+      "score": 85.0,
+      "ionicFeatures": {
+        "count": 22,
+        "features": [
+          "loadAttendances()",
+          "loadPlayers()",
+          "applyDateFilter()",
+          "initializeCharts()",
+          "initAttendanceTrendChart()",
+          "initStatusPieChart()",
+          "initInstrumentBarChart()",
+          "initTop20Chart()",
+          "initAgeDistributionChart()",
+          "initAvgAgePerInstrumentChart()",
+          "initDivaIndexChart()",
+          "getOrganizationStats()",
+          "filterInstances()",
+          "openInstancesAlert()",
+          "bestAttendance calculation",
+          "worstAttendance calculation",
+          "attPerc average",
+          "date range picker",
+          "player counts (active/paused/left)",
+          "unique persons across tenants",
+          "organization multi-tenant stats",
+          "chart dynamic heights"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 19,
+        "features": [
+          "statisticsProvider",
+          "playersStatsProvider",
+          "date range filter",
+          "initializeCharts via fl_chart",
+          "trend line chart",
+          "status pie chart",
+          "instrument bar chart",
+          "top 20 chart",
+          "age distribution chart",
+          "avg age per instrument",
+          "diva index chart",
+          "best/worst attendance",
+          "average percentage",
+          "date range DatePicker",
+          "player count cards",
+          "summary statistics cards",
+          "RefreshIndicator",
+          "chart animations",
+          "empty state handling"
+        ]
+      },
+      "missingInFlutter": [
+        "Organization-wide multi-tenant statistics",
+        "filterInstances() for org stats",
+        "openInstancesAlert() for org info"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "planning/planning.page.ts",
+      "flutterPage": "planning/presentation/pages/planning_page.dart",
+      "score": 88.0,
+      "ionicFeatures": {
+        "count": 15,
+        "features": [
+          "loadPlanItems()",
+          "createPlanItem()",
+          "editPlanItem()",
+          "deletePlanItem()",
+          "reorderPlanItems()",
+          "showPlanItemDetail()",
+          "showCreateSheet()",
+          "showEditSheet()",
+          "showDeleteConfirm()",
+          "filterByType()",
+          "sortByDate()",
+          "linkToAttendance()",
+          "showSongPicker()",
+          "drag-and-drop reorder",
+          "plan item status toggle"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 13,
+        "features": [
+          "planItemsProvider",
+          "create plan item",
+          "edit plan item",
+          "delete plan item",
+          "ReorderableListView",
+          "plan item detail view",
+          "create bottom sheet",
+          "edit bottom sheet",
+          "delete confirmation",
+          "type filtering",
+          "date sorting",
+          "song picker dialog",
+          "drag handle for reorder"
+        ]
+      },
+      "missingInFlutter": [
+        "Link to attendance from plan item",
+        "Plan item status toggle"
+      ],
+      "extraInFlutter": []
+    },
+    {
+      "ionicPage": "login/login.page.ts",
+      "flutterPage": "auth/presentation/pages/login_page.dart",
+      "score": 90.0,
+      "ionicFeatures": {
+        "count": 10,
+        "features": [
+          "login()",
+          "register()",
+          "forgotPassword()",
+          "showPasswordReset()",
+          "validateEmail()",
+          "validatePassword()",
+          "showLoginError()",
+          "showRegisterSuccess()",
+          "navigateToTenants()",
+          "checkExistingSession()"
+        ]
+      },
+      "flutterFeatures": {
+        "count": 9,
+        "features": [
+          "login via Supabase",
+          "register via Supabase",
+          "forgot password flow",
+          "email validation",
+          "password validation",
+          "error snackbar",
+          "success feedback",
+          "navigate to tenants",
+          "session check in router"
+        ]
+      },
+      "missingInFlutter": [
+        "Detailed registration success page/toast"
+      ],
+      "extraInFlutter": []
+    }
+  ],
+  "criticalGaps": [
+    {
+      "feature": "Organization-wide multi-tenant statistics",
+      "ionicLocation": "stats/stats.page.ts",
+      "description": "Flutter version lacks the ability to view aggregated statistics across all tenants in an organization, including unique persons list and instance filtering.",
+      "impact": "HIGH",
+      "estimatedEffort": "2-3 days"
+    },
+    {
+      "feature": "Link/Unlink user to app account",
+      "ionicLocation": "people/person/person.page.ts",
+      "description": "Flutter version cannot link or unlink a person record to their app authentication account.",
+      "impact": "MEDIUM",
+      "estimatedEffort": "1 day"
+    },
+    {
+      "feature": "Realtime subscription for attendance updates",
+      "ionicLocation": "attendance/attendance.page.ts",
+      "description": "Flutter uses manual refresh instead of automatic realtime updates when attendance statuses change.",
+      "impact": "MEDIUM",
+      "estimatedEffort": "1-2 days"
+    }
+  ],
+  "extraFlutterFeatures": [
+    {
+      "feature": "Voice Leader section in settings",
+      "location": "settings_page.dart",
+      "description": "Dedicated voice leader management section not present in Ionic"
+    },
+    {
+      "feature": "AnimatedListItem",
+      "location": "Multiple list pages",
+      "description": "Staggered animation for list items"
+    },
+    {
+      "feature": "Handover sheet for player transfer",
+      "location": "people_list_page.dart",
+      "description": "Bulk transfer players between tenants"
+    },
+    {
+      "feature": "Auto-unpause check",
+      "location": "people_list_page.dart",
+      "description": "Automatic unpause when pause date expires"
+    },
+    {
+      "feature": "Legend sheet in self-service",
+      "location": "self_service_overview_page.dart",
+      "description": "Visual legend explaining status badges"
+    },
+    {
+      "feature": "Applicant status hint card",
+      "location": "settings_page.dart",
+      "description": "Visual indicator for pending registration status"
+    },
+    {
+      "feature": "Calendar view with TableCalendar",
+      "location": "attendance_list_page.dart",
+      "description": "Interactive calendar for attendance navigation"
+    },
+    {
+      "feature": "Pause until date with auto-expiry",
+      "location": "people_list_page.dart",
+      "description": "Set specific end date for pause period"
+    },
+    {
+      "feature": "fl_chart integration",
+      "location": "statistics_page.dart",
+      "description": "Native Flutter charting library"
+    },
+    {
+      "feature": "Song filter provider architecture",
+      "location": "songs_list_page.dart",
+      "description": "Dedicated filter state management"
+    },
+    {
+      "feature": "Percentage badge widget",
+      "location": "attendance_list_page.dart",
+      "description": "Reusable colored percentage display"
+    },
+    {
+      "feature": "Collapsible sections with animation",
+      "location": "attendance_list_page.dart",
+      "description": "Native Flutter expansion with state"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "HIGH",
+      "action": "Implement organization-wide statistics",
+      "rationale": "Important for admins managing multiple tenants in an organization"
+    },
+    {
+      "priority": "MEDIUM",
+      "action": "Add realtime subscriptions for attendance",
+      "rationale": "Improves UX for multi-user attendance taking"
+    },
+    {
+      "priority": "MEDIUM",
+      "action": "Implement link/unlink app account",
+      "rationale": "Required for proper user management"
+    },
+    {
+      "priority": "LOW",
+      "action": "Add audio playback for songs",
+      "rationale": "Nice-to-have feature for rehearsal support"
+    },
+    {
+      "priority": "LOW",
+      "action": "Add PDF download for offline",
+      "rationale": "Useful for offline sheet music access"
+    }
+  ],
+  "methodology": {
+    "description": "Systematic analysis of all Ionic TypeScript page files comparing public methods, template actions, dialogs, navigation patterns, and service calls against corresponding Flutter Dart pages.",
+    "ionicPath": "/Users/I576226/repositories/attendance/src/app/",
+    "flutterPath": "/Users/I576226/repositories/attendix/lib/features/",
+    "scoreFormula": "(Flutter Features / Ionic Features) * 100"
+  }
+}

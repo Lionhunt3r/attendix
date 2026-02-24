@@ -1,0 +1,237 @@
+{
+  "categories": [
+    {
+      "name": "multi_tenant_security",
+      "status": "warning",
+      "checkedFiles": [
+        "attendance_repository.dart",
+        "player_repository.dart",
+        "song_repository.dart",
+        "meeting_repository.dart",
+        "group_repository.dart",
+        "teacher_repository.dart",
+        "attendance_type_repository.dart",
+        "shift_repository.dart",
+        "sign_in_out_repository.dart",
+        "feedback_repository.dart"
+      ],
+      "findings": [
+        {
+          "file": "lib/data/repositories/song_repository.dart",
+          "line": 41,
+          "severity": "critical",
+          "message": "Missing tenantId filter in getSongById() - query only uses .eq('id', id) without tenant validation",
+          "code": "final response = await supabase.from('songs').select('*').eq('id', id).maybeSingle();"
+        },
+        {
+          "file": "lib/data/repositories/song_repository.dart",
+          "line": 89,
+          "severity": "critical",
+          "message": "Missing tenantId filter in updateSong() - allows updating songs across tenants",
+          "code": "final response = await supabase.from('songs').update(updates).eq('id', id).select().single();"
+        },
+        {
+          "file": "lib/data/repositories/song_repository.dart",
+          "line": 106,
+          "severity": "critical",
+          "message": "Missing tenantId filter in deleteSong() - allows deleting songs across tenants",
+          "code": "await supabase.from('songs').delete().eq('id', id);"
+        },
+        {
+          "file": "lib/data/repositories/group_repository.dart",
+          "line": 77,
+          "severity": "critical",
+          "message": "Missing tenantId filter in getGroupById() - query only uses .eq('id', id) without tenant validation",
+          "code": "final response = await supabase.from('instruments').select('*').eq('id', id).maybeSingle();"
+        },
+        {
+          "file": "lib/data/repositories/group_repository.dart",
+          "line": 123,
+          "severity": "critical",
+          "message": "Missing tenantId filter in updateGroup() - allows updating groups across tenants",
+          "code": "final response = await supabase.from('instruments').update(updates).eq('id', id).select().single();"
+        },
+        {
+          "file": "lib/data/repositories/group_repository.dart",
+          "line": 149,
+          "severity": "critical",
+          "message": "Missing tenantId filter in deleteGroup() - allows deleting groups across tenants",
+          "code": "await supabase.from('instruments').delete().eq('id', id);"
+        },
+        {
+          "file": "lib/data/repositories/group_repository.dart",
+          "line": 208,
+          "severity": "critical",
+          "message": "Missing tenantId filter in updateGroupCategory() - allows updating categories across tenants",
+          "code": "final response = await supabase.from('group_categories').update(updates).eq('id', id).select().single();"
+        },
+        {
+          "file": "lib/data/repositories/group_repository.dart",
+          "line": 225,
+          "severity": "critical",
+          "message": "Missing tenantId filter in deleteGroupCategory() - allows deleting categories across tenants",
+          "code": "await supabase.from('group_categories').delete().eq('id', id);"
+        },
+        {
+          "file": "lib/data/repositories/attendance_repository.dart",
+          "line": 166,
+          "severity": "warning",
+          "message": "getPersonAttendancesForPerson() filters by person_id but does not validate tenant ownership of person",
+          "code": ".eq('person_id', personId)"
+        },
+        {
+          "file": "lib/data/repositories/attendance_repository.dart",
+          "line": 295,
+          "severity": "warning",
+          "message": "recalculatePercentage() filters by attendance_id but does not validate tenant ownership",
+          "code": ".eq('attendance_id', attendanceId)"
+        }
+      ],
+      "score": 65,
+      "summary": "8 critical findings: song_repository and group_repository have multiple methods without tenantId filtering. 2 warnings for indirect tenant validation."
+    },
+    {
+      "name": "riverpod_patterns",
+      "status": "pass",
+      "checkedFiles": [
+        "player_providers.dart",
+        "attendance_providers.dart",
+        "song_providers.dart",
+        "meeting_providers.dart",
+        "group_providers.dart",
+        "shift_providers.dart",
+        "teacher_providers.dart",
+        "attendance_type_providers.dart",
+        "self_service_providers.dart",
+        "feedback_providers.dart"
+      ],
+      "findings": [],
+      "score": 100,
+      "summary": "All providers follow correct naming conventions. FutureProvider for async data, NotifierProvider for mutations. ref.watch() used in build contexts, ref.read() in handlers. ref.invalidate() called after mutations."
+    },
+    {
+      "name": "error_handling",
+      "status": "pass",
+      "checkedFiles": [
+        "attendance_repository.dart",
+        "player_repository.dart",
+        "song_repository.dart",
+        "meeting_repository.dart",
+        "group_repository.dart",
+        "teacher_repository.dart",
+        "attendance_type_repository.dart",
+        "shift_repository.dart",
+        "sign_in_out_repository.dart",
+        "feedback_repository.dart"
+      ],
+      "findings": [],
+      "score": 100,
+      "summary": "All repositories implement proper try-catch with handleError(e, stack, 'methodName') pattern. No empty catch blocks found."
+    },
+    {
+      "name": "freezed_models",
+      "status": "pass",
+      "checkedFiles": [
+        "song.dart",
+        "person.dart",
+        "attendance.dart",
+        "meeting.dart",
+        "tenant.dart",
+        "instrument.dart",
+        "shift_plan.dart",
+        "shift_definition.dart",
+        "shift_instance.dart",
+        "song_filter.dart",
+        "cross_tenant_attendance.dart"
+      ],
+      "findings": [],
+      "score": 100,
+      "summary": "All models have @freezed annotation, corresponding .freezed.dart files exist, and .g.dart files for JSON serialization are present."
+    },
+    {
+      "name": "import_structure",
+      "status": "pass",
+      "checkedFiles": [
+        "Various feature pages and widgets"
+      ],
+      "findings": [],
+      "score": 100,
+      "summary": "Imports use relative paths within features (../../../../core/...) which is acceptable. Core imports use package:attendix/core/ pattern. No cross-feature relative imports detected."
+    },
+    {
+      "name": "repository_structure",
+      "status": "pass",
+      "checkedFiles": [
+        "attendance_repository.dart",
+        "player_repository.dart",
+        "song_repository.dart",
+        "meeting_repository.dart",
+        "group_repository.dart",
+        "teacher_repository.dart",
+        "attendance_type_repository.dart",
+        "shift_repository.dart",
+        "sign_in_out_repository.dart",
+        "feedback_repository.dart"
+      ],
+      "findings": [],
+      "score": 100,
+      "summary": "All repositories extend BaseRepository with TenantAwareRepository mixin. Provider definitions follow the pattern: final xxxRepositoryProvider = Provider<XxxRepository>((ref) => XxxRepository(ref));"
+    },
+    {
+      "name": "provider_tenant_injection",
+      "status": "pass",
+      "checkedFiles": [
+        "player_providers.dart",
+        "attendance_providers.dart",
+        "song_providers.dart",
+        "meeting_providers.dart",
+        "group_providers.dart",
+        "shift_providers.dart",
+        "teacher_providers.dart",
+        "attendance_type_providers.dart",
+        "feedback_providers.dart"
+      ],
+      "findings": [],
+      "score": 100,
+      "summary": "All *WithTenantProvider definitions correctly watch the repository and currentTenantIdProvider, then call setTenantId() if tenant is available."
+    }
+  ],
+  "overallScore": 92,
+  "criticalFindings": [
+    {
+      "file": "lib/data/repositories/song_repository.dart",
+      "issue": "getSongById(), updateSong(), deleteSong() missing tenantId filter - potential cross-tenant data access"
+    },
+    {
+      "file": "lib/data/repositories/group_repository.dart",
+      "issue": "getGroupById(), updateGroup(), deleteGroup(), updateGroupCategory(), deleteGroupCategory() missing tenantId filter - potential cross-tenant data access"
+    }
+  ],
+  "warningCount": 2,
+  "infoCount": 0,
+  "recommendations": [
+    {
+      "priority": "high",
+      "area": "song_repository.dart",
+      "action": "Add .eq('tenantId', currentTenantId) to getSongById(), updateSong(), and deleteSong() methods"
+    },
+    {
+      "priority": "high",
+      "area": "group_repository.dart",
+      "action": "Add .eq('tenantId', currentTenantId) to getGroupById(), updateGroup(), deleteGroup(), updateGroupCategory(), deleteGroupCategory() methods"
+    },
+    {
+      "priority": "medium",
+      "area": "attendance_repository.dart",
+      "action": "Consider adding tenant validation for person_attendances queries that filter by person_id to ensure the person belongs to the current tenant"
+    }
+  ],
+  "auditMetadata": {
+    "date": "2026-02-24",
+    "auditor": "Code-Quality Auditor Agent",
+    "repositoriesChecked": 10,
+    "providersChecked": 10,
+    "modelsChecked": 11,
+    "totalFilesAnalyzed": 31
+  }
+}
