@@ -120,10 +120,12 @@ class UserManagementPage extends ConsumerWidget {
     try {
       // Try to find user by email in player table (where users register)
       // Users must first register through the app before they can be added
+      // Note: We filter by tenantId to only find players in the current tenant
       final existingPlayer = await supabase
           .from('player')
           .select('appId')
           .eq('email', email.toLowerCase().trim())
+          .eq('tenantId', tenantId)
           .maybeSingle();
 
       if (existingPlayer != null && existingPlayer['appId'] != null) {
@@ -541,12 +543,15 @@ class _UserTile extends ConsumerWidget {
     if (newRole.value == user.role) return;
 
     final supabase = ref.read(supabaseClientProvider);
+    final tenantId = ref.read(currentTenantIdProvider);
+    if (tenantId == null) return;
 
     try {
       await supabase
           .from('tenantUsers')
           .update({'role': newRole.value})
-          .eq('id', user.id);
+          .eq('id', user.id)
+          .eq('tenantId', tenantId);
 
       ref.invalidate(tenantUsersProvider);
 

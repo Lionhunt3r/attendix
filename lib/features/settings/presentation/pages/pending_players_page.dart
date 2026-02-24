@@ -123,10 +123,16 @@ class PendingPlayersPage extends ConsumerWidget {
     if (confirmed == true && context.mounted) {
       try {
         final supabase = ref.read(supabaseClientProvider);
+        final tenantId = ref.read(currentTenantIdProvider);
+        if (tenantId == null) {
+          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+          return;
+        }
         await supabase
             .from('player')
             .update({'pending': false})
-            .eq('id', player.id!);
+            .eq('id', player.id!)
+            .eq('tenantId', tenantId);
 
         ref.invalidate(pendingPlayersProvider);
 
@@ -164,10 +170,16 @@ class PendingPlayersPage extends ConsumerWidget {
     if (confirmed == true && context.mounted) {
       try {
         final supabase = ref.read(supabaseClientProvider);
+        final tenantId = ref.read(currentTenantIdProvider);
+        if (tenantId == null) {
+          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+          return;
+        }
         await supabase
             .from('player')
             .delete()
-            .eq('id', player.id!);
+            .eq('id', player.id!)
+            .eq('tenantId', tenantId);
 
         ref.invalidate(pendingPlayersProvider);
 
