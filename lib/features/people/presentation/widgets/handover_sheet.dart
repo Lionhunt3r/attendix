@@ -30,7 +30,7 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
   bool _stayInInstance = false; // false = transfer, true = copy
   bool _isTransferring = false;
   String _progressMessage = '';
-  Map<int, int?> _groupMapping = {};
+  final Map<int, int?> _groupMapping = {};
   List<Group> _targetGroups = [];
 
   @override
@@ -572,8 +572,8 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
         },
       );
 
-      // Invalidate players provider to refresh list
-      ref.invalidate(playersProvider);
+      // Note: The calling page (PeopleListPage) will invalidate peopleListProvider
+      // when this sheet returns true
 
       if (mounted) {
         final action = _stayInInstance ? 'kopiert' : 'übertragen';
