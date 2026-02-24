@@ -8,12 +8,13 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/player_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
-import '../../../../core/providers/tenant_providers.dart';
 import '../../../../shared/widgets/loading/loading.dart';
 import '../../../../shared/widgets/common/empty_state.dart';
 import '../../../../shared/widgets/animations/animated_list_item.dart';
+import '../widgets/handover_sheet.dart';
 
 /// Provider for people list (active players only)
 final peopleListProvider = FutureProvider<List<Person>>((ref) async {
@@ -72,6 +73,10 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
   final _searchController = TextEditingController();
   String _filterOption = 'all';
   String _sortOption = 'group';
+
+  // Selection mode state
+  bool _isSelectionMode = false;
+  final Set<int> _selectedPlayerIds = {};
 
   @override
   void dispose() {
@@ -152,91 +157,134 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Personen'),
-            if (tenant != null)
-              Text(
-                tenant.shortName,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.medium,
-                ),
+        title: _isSelectionMode
+            ? Text('${_selectedPlayerIds.length} ausgewählt')
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Personen'),
+                  if (tenant != null)
+                    Text(
+                      tenant.shortName,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.medium,
+                          ),
+                    ),
+                ],
               ),
-          ],
-        ),
-        actions: [
-          // Filter button
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.filter_list,
-              color: _filterOption != 'all' ? AppColors.primary : null,
-            ),
-            tooltip: 'Filter',
-            onSelected: (value) {
-              setState(() {
-                _filterOption = value;
-              });
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'all', child: Text('Alle')),
-              const PopupMenuItem(value: 'active', child: Text('Aktiv')),
-              const PopupMenuItem(value: 'paused', child: Text('Pausiert')),
-              const PopupMenuItem(value: 'critical', child: Text('Kritisch')),
-              const PopupMenuItem(value: 'leaders', child: Text('Leiter')),
-            ],
-          ),
-          // Sort button
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.sort),
-            tooltip: 'Sortierung',
-            onSelected: (value) {
-              setState(() {
-                _sortOption = value;
-              });
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'group',
-                child: Row(
-                  children: [
-                    if (_sortOption == 'group') 
-                      const Icon(Icons.check, size: 18, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    const Text('Nach Gruppe'),
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _exitSelectionMode,
+              )
+            : null,
+        actions: _isSelectionMode
+            ? [
+                // Select all button
+                IconButton(
+                  icon: const Icon(Icons.select_all),
+                  tooltip: 'Alle auswählen',
+                  onPressed: () {
+                    final people = ref.read(peopleListProvider).valueOrNull ?? [];
+                    final filtered = _filterPeople(people);
+                    setState(() {
+                      _selectedPlayerIds.clear();
+                      for (final p in filtered) {
+                        if (p.id != null) _selectedPlayerIds.add(p.id!);
+                      }
+                    });
+                  },
+                ),
+                // Clear selection button
+                IconButton(
+                  icon: const Icon(Icons.deselect),
+                  tooltip: 'Auswahl aufheben',
+                  onPressed: () {
+                    setState(() => _selectedPlayerIds.clear());
+                  },
+                ),
+              ]
+            : [
+                // Selection mode toggle
+                IconButton(
+                  icon: const Icon(Icons.checklist),
+                  tooltip: 'Auswahl-Modus',
+                  onPressed: _enterSelectionMode,
+                ),
+                // Filter button
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: _filterOption != 'all' ? AppColors.primary : null,
+                  ),
+                  tooltip: 'Filter',
+                  onSelected: (value) {
+                    setState(() {
+                      _filterOption = value;
+                    });
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'all', child: Text('Alle')),
+                    const PopupMenuItem(value: 'active', child: Text('Aktiv')),
+                    const PopupMenuItem(value: 'paused', child: Text('Pausiert')),
+                    const PopupMenuItem(value: 'critical', child: Text('Kritisch')),
+                    const PopupMenuItem(value: 'leaders', child: Text('Leiter')),
                   ],
                 ),
-              ),
-              PopupMenuItem(
-                value: 'lastName',
-                child: Row(
-                  children: [
-                    if (_sortOption == 'lastName') 
-                      const Icon(Icons.check, size: 18, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    const Text('Nach Nachname'),
+                // Sort button
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.sort),
+                  tooltip: 'Sortierung',
+                  onSelected: (value) {
+                    setState(() {
+                      _sortOption = value;
+                    });
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'group',
+                      child: Row(
+                        children: [
+                          if (_sortOption == 'group')
+                            const Icon(Icons.check,
+                                size: 18, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          const Text('Nach Gruppe'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'lastName',
+                      child: Row(
+                        children: [
+                          if (_sortOption == 'lastName')
+                            const Icon(Icons.check,
+                                size: 18, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          const Text('Nach Nachname'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'firstName',
+                      child: Row(
+                        children: [
+                          if (_sortOption == 'firstName')
+                            const Icon(Icons.check,
+                                size: 18, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          const Text('Nach Vorname'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              PopupMenuItem(
-                value: 'firstName',
-                child: Row(
-                  children: [
-                    if (_sortOption == 'firstName') 
-                      const Icon(Icons.check, size: 18, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    const Text('Nach Vorname'),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.swap_horiz),
+                  tooltip: 'Gruppe wechseln',
+                  onPressed: () => context.go('/tenants'),
                 ),
-              ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.swap_horiz),
-            tooltip: 'Gruppe wechseln',
-            onPressed: () => context.go('/tenants'),
-          ),
-        ],
+              ],
       ),
       body: Column(
         children: [
@@ -391,11 +439,17 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                             ...groupPeople.asMap().entries.map((entry) {
                               final index = entry.key;
                               final person = entry.value;
+                              final isSelected = person.id != null &&
+                                  _selectedPlayerIds.contains(person.id);
                               return AnimatedListItem(
                                 index: index,
                                 child: _PersonListItem(
                                   person: person,
-                                  onTap: () => context.push('/people/${person.id}'),
+                                  isSelectionMode: _isSelectionMode,
+                                  isSelected: isSelected,
+                                  onTap: _isSelectionMode && person.id != null
+                                      ? () => _togglePlayerSelection(person.id!)
+                                      : () => context.push('/people/${person.id}'),
                                   onPause: () => _showPauseDialog(person),
                                   onUnpause: () => _unpausePerson(person),
                                   onArchive: () => _showArchiveDialog(person),
@@ -420,11 +474,17 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                     itemCount: sortedPeople.length,
                     itemBuilder: (context, index) {
                       final person = sortedPeople[index];
+                      final isSelected = person.id != null &&
+                          _selectedPlayerIds.contains(person.id);
                       return AnimatedListItem(
                         index: index,
                         child: _PersonListItem(
                           person: person,
-                          onTap: () => context.push('/people/${person.id}'),
+                          isSelectionMode: _isSelectionMode,
+                          isSelected: isSelected,
+                          onTap: _isSelectionMode && person.id != null
+                              ? () => _togglePlayerSelection(person.id!)
+                              : () => context.push('/people/${person.id}'),
                           onPause: () => _showPauseDialog(person),
                           onUnpause: () => _unpausePerson(person),
                           onArchive: () => _showArchiveDialog(person),
@@ -438,10 +498,19 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/people/new'),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _isSelectionMode
+          ? _selectedPlayerIds.isNotEmpty
+              ? FloatingActionButton.extended(
+                  onPressed: _showHandoverSheet,
+                  icon: const Icon(Icons.swap_horiz),
+                  label: Text('${_selectedPlayerIds.length} übertragen'),
+                  backgroundColor: AppColors.warning,
+                )
+              : null
+          : FloatingActionButton(
+              onPressed: () => context.push('/people/new'),
+              child: const Icon(Icons.add),
+            ),
     );
   }
 
@@ -453,6 +522,49 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
       'active' => 'Aktiv',
       _ => 'Alle',
     };
+  }
+
+  void _enterSelectionMode() {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedPlayerIds.clear();
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedPlayerIds.clear();
+    });
+  }
+
+  void _togglePlayerSelection(int playerId) {
+    setState(() {
+      if (_selectedPlayerIds.contains(playerId)) {
+        _selectedPlayerIds.remove(playerId);
+      } else {
+        _selectedPlayerIds.add(playerId);
+      }
+    });
+  }
+
+  Future<void> _showHandoverSheet() async {
+    final people = ref.read(peopleListProvider).valueOrNull ?? [];
+    final selectedPlayers = people
+        .where((p) => p.id != null && _selectedPlayerIds.contains(p.id))
+        .toList();
+
+    if (selectedPlayers.isEmpty) return;
+
+    final result = await showHandoverSheet(
+      context,
+      selectedPlayers: selectedPlayers,
+    );
+
+    if (result == true && mounted) {
+      _exitSelectionMode();
+      ref.invalidate(peopleListProvider);
+    }
   }
 
   /// Show pause dialog for a person
@@ -688,6 +800,8 @@ class _PersonListItem extends StatelessWidget {
   const _PersonListItem({
     required this.person,
     required this.onTap,
+    this.isSelectionMode = false,
+    this.isSelected = false,
     this.onPause,
     this.onUnpause,
     this.onArchive,
@@ -695,6 +809,8 @@ class _PersonListItem extends StatelessWidget {
 
   final Person person;
   final VoidCallback onTap;
+  final bool isSelectionMode;
+  final bool isSelected;
   final VoidCallback? onPause;
   final VoidCallback? onUnpause;
   final VoidCallback? onArchive;
@@ -706,7 +822,71 @@ class _PersonListItem extends StatelessWidget {
         RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.borderRadiusL),
         );
-    final cardBorderRadius = cardShape.borderRadius.resolve(Directionality.of(context));
+    final cardBorderRadius =
+        cardShape.borderRadius.resolve(Directionality.of(context));
+
+    // In selection mode, don't use Slidable
+    if (isSelectionMode) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : null,
+          child: ListTile(
+            onTap: onTap,
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => onTap(),
+                ),
+                CircleAvatar(
+                  backgroundColor: person.critical
+                      ? AppColors.danger.withValues(alpha: 0.2)
+                      : person.paused
+                          ? AppColors.warning.withValues(alpha: 0.2)
+                          : AppColors.primaryLight.withValues(alpha: 0.2),
+                  backgroundImage: (person.imageUrl != null &&
+                          !person.imageUrl!.contains('.svg'))
+                      ? NetworkImage(person.imageUrl!)
+                      : null,
+                  child: (person.imageUrl == null ||
+                          person.imageUrl!.contains('.svg'))
+                      ? Text(
+                          person.initials,
+                          style: TextStyle(
+                            color: person.critical
+                                ? AppColors.danger
+                                : person.paused
+                                    ? AppColors.warning
+                                    : AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      : null,
+                ),
+              ],
+            ),
+            title: Text(
+              person.fullName,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: person.groupName != null
+                ? Text(
+                    person.groupName!,
+                    style: const TextStyle(
+                      color: AppColors.medium,
+                      fontSize: 13,
+                    ),
+                  )
+                : null,
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppDimensions.paddingS),
@@ -774,7 +954,8 @@ class _PersonListItem extends StatelessWidget {
                     backgroundColor: Colors.transparent,
                     padding: EdgeInsets.zero,
                     child: Container(
-                      margin: const EdgeInsets.only(right: AppDimensions.paddingS),
+                      margin:
+                          const EdgeInsets.only(right: AppDimensions.paddingS),
                       decoration: BoxDecoration(
                         color: AppColors.danger,
                         borderRadius: cardBorderRadius,

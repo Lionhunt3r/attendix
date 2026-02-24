@@ -665,4 +665,196 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       rethrow;
     }
   }
+
+  // ============= HANDOVER METHODS =============
+
+  /// Result of a handover operation for a single player
+  static const int handoverSuccess = 0;
+  static const int handoverDuplicate = 1;
+  static const int handoverError = 2;
+
+  /// Check if a player already exists in the target tenant
+  /// Uses email or appId for duplicate detection
+  Future<bool> playerExistsInTenant(Person player, int targetTenantId) async {
+    try {
+      // Check by email if available
+      if (player.email != null && player.email!.isNotEmpty) {
+        final byEmail = await supabase
+            .from('player')
+            .select('id')
+            .eq('tenantId', targetTenantId)
+            .eq('email', player.email!)
+            .maybeSingle();
+        if (byEmail != null) return true;
+      }
+
+      // Check by appId if available
+      if (player.appId != null && player.appId!.isNotEmpty) {
+        final byAppId = await supabase
+            .from('player')
+            .select('id')
+            .eq('tenantId', targetTenantId)
+            .eq('appId', player.appId!)
+            .maybeSingle();
+        if (byAppId != null) return true;
+      }
+
+      return false;
+    } catch (e, stack) {
+      handleError(e, stack, 'playerExistsInTenant');
+      rethrow;
+    }
+  }
+
+  /// Handover a single player to another tenant
+  ///
+  /// [player] - The player to transfer
+  /// [targetTenantId] - The target tenant ID
+  /// [targetGroupId] - The mapped group/instrument ID in the target tenant
+  /// [targetTenantName] - Name of target tenant for history entry
+  /// [sourceTenantName] - Name of source tenant for history entry
+  /// [stayInInstance] - If true, copies player (COPIED_FROM/TO), otherwise transfers (TRANSFERRED_FROM/TO)
+  ///
+  /// Returns handoverSuccess, handoverDuplicate, or handoverError
+  Future<int> handoverPlayer({
+    required Person player,
+    required int targetTenantId,
+    required int? targetGroupId,
+    required String targetTenantName,
+    required String sourceTenantName,
+    required bool stayInInstance,
+  }) async {
+    if (player.id == null) {
+      throw RepositoryException(
+        message: 'Player ID is required for handover',
+        operation: 'handoverPlayer',
+      );
+    }
+
+    try {
+      // Check for duplicates
+      final exists = await playerExistsInTenant(player, targetTenantId);
+      if (exists) {
+        return handoverDuplicate;
+      }
+
+      // Determine history types based on stayInInstance
+      final sourceHistoryType = stayInInstance
+          ? PlayerHistoryType.copiedTo
+          : PlayerHistoryType.transferredTo;
+      final targetHistoryType = stayInInstance
+          ? PlayerHistoryType.copiedFrom
+          : PlayerHistoryType.transferredFrom;
+
+      final now = DateTime.now().toIso8601String();
+
+      // 1. Update source player with history entry
+      final sourceHistory = List<Map<String, dynamic>>.from(
+        player.history.map((e) => e.toJson()),
+      );
+      sourceHistory.add({
+        'date': now,
+        'text': stayInInstance
+            ? 'Kopiert nach $targetTenantName'
+            : 'Übertragen nach $targetTenantName',
+        'type': sourceHistoryType.value,
+      });
+
+      final sourceUpdate = <String, dynamic>{
+        'history': sourceHistory,
+      };
+
+      // If transferring (not copying), archive the source player
+      if (!stayInInstance) {
+        sourceUpdate['left'] = now.substring(0, 10); // Date only
+        sourceUpdate['appId'] = null; // Unlink account
+      }
+
+      await supabase
+          .from('player')
+          .update(sourceUpdate)
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
+
+      // 2. Create new player in target tenant
+      final targetHistory = <Map<String, dynamic>>[
+        {
+          'date': now,
+          'text': stayInInstance
+              ? 'Kopiert von $sourceTenantName'
+              : 'Übertragen von $sourceTenantName',
+          'type': targetHistoryType.value,
+        },
+      ];
+
+      final newPlayerData = <String, dynamic>{
+        'tenantId': targetTenantId,
+        'firstName': player.firstName,
+        'lastName': player.lastName,
+        'email': player.email,
+        'birthday': player.birthday,
+        'joined': player.joined ?? now.substring(0, 10),
+        'phone': player.phone,
+        'notes': player.notes,
+        'instrument': targetGroupId,
+        'isLeader': false, // Reset leader status
+        'isCritical': false, // Reset critical status
+        'pending': false,
+        'paused': false,
+        'history': targetHistory,
+        // Don't copy: appId (user must re-link), img, shift_id, etc.
+      };
+
+      await supabase.from('player').insert(newPlayerData);
+
+      return handoverSuccess;
+    } catch (e, stack) {
+      handleError(e, stack, 'handoverPlayer');
+      return handoverError;
+    }
+  }
+
+  /// Handover multiple players to another tenant
+  ///
+  /// Returns a map with counts: {'success': n, 'duplicate': n, 'error': n}
+  Future<Map<String, int>> handoverPlayers({
+    required List<Person> players,
+    required int targetTenantId,
+    required Map<int, int?> groupMapping,
+    required String targetTenantName,
+    required String sourceTenantName,
+    required bool stayInInstance,
+    void Function(int current, int total, String playerName)? onProgress,
+  }) async {
+    final results = {'success': 0, 'duplicate': 0, 'error': 0};
+
+    for (var i = 0; i < players.length; i++) {
+      final player = players[i];
+      onProgress?.call(i + 1, players.length, player.fullName);
+
+      final targetGroupId = player.instrument != null
+          ? groupMapping[player.instrument]
+          : null;
+
+      final result = await handoverPlayer(
+        player: player,
+        targetTenantId: targetTenantId,
+        targetGroupId: targetGroupId,
+        targetTenantName: targetTenantName,
+        sourceTenantName: sourceTenantName,
+        stayInInstance: stayInInstance,
+      );
+
+      switch (result) {
+        case handoverSuccess:
+          results['success'] = results['success']! + 1;
+        case handoverDuplicate:
+          results['duplicate'] = results['duplicate']! + 1;
+        case handoverError:
+          results['error'] = results['error']! + 1;
+      }
+    }
+
+    return results;
+  }
 }
