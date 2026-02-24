@@ -11,42 +11,58 @@ Orchestriert den kompletten Migrations-Prozess von Ionic nach Flutter.
 ## Workflow
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 1: SETUP                                                  │
-│  • Worktree-Frage (optional, empfohlen für paralleles Arbeiten) │
-│  • Migration-Status prüfen                                       │
-└──────────────────────────────┬──────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 2: ANALYSE (Parallel Agents)                              │
-│  ┌─────────────────────┐  ┌─────────────────────┐               │
-│  │ migration-analyzer  │  │ Explore Agent       │               │
-│  │ (Ionic Features)    │  │ (Flutter Patterns)  │               │
-│  └─────────────────────┘  └─────────────────────┘               │
-└──────────────────────────────┬──────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 3: PLANUNG                                                │
-│  • Feature-Scope definieren                                      │
-│  • Tasks erstellen (TaskCreate)                                  │
-│  • Benutzer-Bestätigung holen                                    │
-└──────────────────────────────┬──────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 4: IMPLEMENTIERUNG                                        │
-│  • Tasks nacheinander abarbeiten                                 │
-│  • Pattern-Mapping anwenden (siehe unten)                        │
-│  • Nach jedem Abschnitt: flutter-reviewer Agent                  │
-└──────────────────────────────┬──────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  PHASE 5: VERIFICATION & COMMIT                                  │
-│  • dart analyze lib/                                             │
-│  • Optional: test-generator Agent                                │
-│  • /commit Skill aufrufen                                        │
-│  • migration-status.md aktualisieren                             │
-└─────────────────────────────────────────────────────────────────┘
+PHASE 0: STATUS AKTUALISIEREN
+  • migration-analyzer Agent starten (IMMER als erstes!)
+  • migration-status.md automatisch aktualisieren
+  • Aktuellen Stand dem Benutzer zeigen
+           ▼
+PHASE 1: SETUP
+  • Worktree-Frage (optional, empfohlen für paralleles Arbeiten)
+  • Feature-Auswahl bestätigen
+           ▼
+PHASE 2: ANALYSE (Parallel Agents)
+  • migration-analyzer (Ionic Feature Details)
+  • Explore Agent (Flutter Patterns)
+           ▼
+PHASE 3: PLANUNG
+  • Tasks erstellen (TaskCreate)
+  • Benutzer-Bestätigung holen
+           ▼
+PHASE 4: IMPLEMENTIERUNG
+  • Tasks abarbeiten
+  • flutter-reviewer Agent nach jedem Abschnitt
+           ▼
+PHASE 5: VERIFICATION & COMMIT
+  • dart analyze lib/
+  • /commit Skill
+  • migration-status.md aktualisieren
 ```
+
+---
+
+## Phase 0: Status aktualisieren (IMMER ZUERST!)
+
+### Schritt 0.1: migration-analyzer starten
+
+Starte den `migration-analyzer` Agent mit folgendem Prompt:
+
+```
+Analysiere den aktuellen Migrations-Stand:
+1. Scanne /Users/I576226/repositories/attendance/src/app/ für alle Ionic Features
+2. Scanne /Users/I576226/repositories/attendix/lib/features/ für migrierte Flutter Features
+3. Vergleiche und aktualisiere /Users/I576226/repositories/attendix/.claude/migration-status.md
+4. Gib eine Zusammenfassung: Was ist migriert, was fehlt noch?
+```
+
+### Schritt 0.2: Benutzer informieren
+
+Zeige dem Benutzer:
+- Aktueller Migrations-Fortschritt (X%)
+- Liste der ausstehenden Features
+- Empfohlenes nächstes Feature
+
+Falls `$ARGUMENTS` angegeben wurde, prüfe ob es in der Liste ist.
+Falls nicht angegeben, frage welches Feature migriert werden soll.
 
 ---
 
@@ -63,11 +79,9 @@ Frage den Benutzer mit AskUserQuestion:
 
 Falls Ja: `EnterWorktree` mit name `migrate-$ARGUMENTS` aufrufen.
 
-### Schritt 1.2: Status prüfen
+### Schritt 1.2: Feature bestätigen
 
-Lies `.claude/migration-status.md` und prüfe:
-- Ist das Feature bereits migriert?
-- Welche Abhängigkeiten bestehen?
+Bestätige mit dem Benutzer welches Feature migriert wird.
 
 ---
 
@@ -210,7 +224,7 @@ final ${name}NotifierProvider = NotifierProvider<${Name}Notifier, AsyncValue<voi
 ### Async-Handling
 
 ```dart
-// ✅ RICHTIG - .when() Pattern
+// RICHTIG - .when() Pattern
 dataAsync.when(
   loading: () => const ListSkeleton(),
   error: (e, _) => EmptyStateWidget(icon: Icons.error, title: 'Fehler'),
@@ -225,13 +239,13 @@ dataAsync.when(
 ### 1. Multi-Tenant Security (KRITISCH!)
 
 ```dart
-// ✅ RICHTIG - IMMER tenantId filtern
+// RICHTIG - IMMER tenantId filtern
 .eq('tenantId', currentTenantId)
 
-// ✅ RICHTIG - Repository mit Tenant nutzen
+// RICHTIG - Repository mit Tenant nutzen
 ref.watch(xxxRepositoryWithTenantProvider)
 
-// ❌ FALSCH - Sicherheitslücke!
+// FALSCH - Sicherheitslücke!
 .select('*')  // ohne tenantId Filter
 ```
 
@@ -291,6 +305,7 @@ Aus `lib/shared/widgets/`:
 
 ## Checkliste
 
+- [ ] Migration-Status aktualisiert (Phase 0)
 - [ ] Worktree-Entscheidung getroffen
 - [ ] Ionic-Quelle analysiert (migration-analyzer)
 - [ ] Flutter-Patterns gefunden (Explore)
