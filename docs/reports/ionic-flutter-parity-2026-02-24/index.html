@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ionic-Flutter Parity Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .score-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .score-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .section-header { cursor: pointer; user-select: none; }
+        .section-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .section-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
+        .chevron { transition: transform 0.3s; }
+        .section-header.open .chevron { transform: rotate(180deg); }
+        code { font-family: 'SF Mono', Monaco, 'Consolas', monospace; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Ionic → Flutter</h1>
+            <h2 class="text-2xl text-gray-600 mb-4">Parity Audit Report</h2>
+            <p class="text-gray-500">Generiert: <span id="generated-date" class="font-medium">--</span></p>
+        </header>
+
+        <!-- Overall Score Hero -->
+        <div class="bg-white rounded-2xl shadow-lg p-8 mb-8 text-center">
+            <h3 class="text-lg font-medium text-gray-500 mb-2">Overall Parity Score</h3>
+            <p class="text-8xl font-bold mb-2" id="overall-score">--</p>
+            <p class="text-gray-500" id="overall-status">Loading...</p>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="score-card bg-white rounded-xl shadow p-6 text-center">
+                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-blue-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">Features</h3>
+                <p class="text-3xl font-bold" id="feature-score">--</p>
+                <p class="text-xs text-gray-400 mt-1" id="feature-detail">--</p>
+            </div>
+            <div class="score-card bg-white rounded-xl shadow p-6 text-center">
+                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-purple-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">Services</h3>
+                <p class="text-3xl font-bold" id="service-score">--</p>
+                <p class="text-xs text-gray-400 mt-1" id="service-detail">--</p>
+            </div>
+            <div class="score-card bg-white rounded-xl shadow p-6 text-center">
+                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+                    </svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">UX</h3>
+                <p class="text-3xl font-bold" id="ux-score">--</p>
+                <p class="text-xs text-gray-400 mt-1" id="ux-detail">--</p>
+            </div>
+            <div class="score-card bg-white rounded-xl shadow p-6 text-center">
+                <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-orange-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-sm font-medium text-gray-500 mb-1">Code Quality</h3>
+                <p class="text-3xl font-bold" id="code-score">--</p>
+                <p class="text-xs text-gray-400 mt-1" id="code-detail">--</p>
+            </div>
+        </div>
+
+        <!-- Detail Sections -->
+        <div class="space-y-4">
+            <!-- Feature Gaps -->
+            <section class="bg-white rounded-xl shadow overflow-hidden">
+                <div class="section-header p-5 border-b flex items-center justify-between hover:bg-gray-50" onclick="toggleSection(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">📋</span>
+                        <h2 class="text-xl font-semibold">Feature Gaps</h2>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" id="feature-gaps-count">-- items</span>
+                    </div>
+                    <svg class="chevron w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="section-content">
+                    <div class="p-5" id="feature-gaps-content">
+                        <p class="text-gray-500 text-center py-8">Loading...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Service Parity -->
+            <section class="bg-white rounded-xl shadow overflow-hidden">
+                <div class="section-header p-5 border-b flex items-center justify-between hover:bg-gray-50" onclick="toggleSection(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">⚙️</span>
+                        <h2 class="text-xl font-semibold">Service Parity</h2>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" id="service-parity-count">-- services</span>
+                    </div>
+                    <svg class="chevron w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="section-content">
+                    <div class="p-5" id="service-parity-content">
+                        <p class="text-gray-500 text-center py-8">Loading...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- UX Divergences -->
+            <section class="bg-white rounded-xl shadow overflow-hidden">
+                <div class="section-header p-5 border-b flex items-center justify-between hover:bg-gray-50" onclick="toggleSection(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🎨</span>
+                        <h2 class="text-xl font-semibold">UX Divergences</h2>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" id="ux-divergences-count">-- categories</span>
+                    </div>
+                    <svg class="chevron w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="section-content">
+                    <div class="p-5" id="ux-divergences-content">
+                        <p class="text-gray-500 text-center py-8">Loading...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Code Quality -->
+            <section class="bg-white rounded-xl shadow overflow-hidden">
+                <div class="section-header p-5 border-b flex items-center justify-between hover:bg-gray-50" onclick="toggleSection(this)">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🔍</span>
+                        <h2 class="text-xl font-semibold">Code Quality Findings</h2>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600" id="code-quality-count">-- findings</span>
+                    </div>
+                    <svg class="chevron w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </div>
+                <div class="section-content">
+                    <div class="p-5" id="code-quality-content">
+                        <p class="text-gray-500 text-center py-8">Loading...</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-gray-400 text-sm">
+            <p>Ionic-Flutter Parity Audit • Generated by Claude Code</p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            header.classList.toggle('open');
+            content.classList.toggle('open');
+        }
+
+        function getScoreColor(score) {
+            if (score >= 90) return 'text-green-600';
+            if (score >= 70) return 'text-yellow-600';
+            return 'text-red-600';
+        }
+
+        function getScoreBg(score) {
+            if (score >= 90) return 'bg-green-50';
+            if (score >= 70) return 'bg-yellow-50';
+            return 'bg-red-50';
+        }
+
+        function getSeverityBadge(severity) {
+            const config = {
+                critical: { bg: 'bg-red-100', text: 'text-red-800', icon: '🔴' },
+                warning: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: '🟡' },
+                info: { bg: 'bg-blue-100', text: 'text-blue-800', icon: '🟢' }
+            };
+            const c = config[severity] || config.info;
+            return `<span class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${c.bg} ${c.text}">${c.icon} ${severity}</span>`;
+        }
+
+        function getStatusIcon(status) {
+            return status === 'mapped' ? '✅' : status === 'missing' ? '❌' : '⚠️';
+        }
+
+        async function loadData() {
+            try {
+                const response = await fetch('data.json');
+                if (!response.ok) throw new Error('Data not found');
+                const data = await response.json();
+                renderDashboard(data);
+            } catch (e) {
+                console.error('Error loading data:', e);
+                document.getElementById('overall-status').textContent = 'Error loading data. Run the audit first.';
+            }
+        }
+
+        function renderDashboard(data) {
+            // Generated date
+            document.getElementById('generated-date').textContent =
+                new Date(data.generatedAt).toLocaleString('de-DE', {
+                    dateStyle: 'long',
+                    timeStyle: 'short'
+                });
+
+            // Scores
+            const { featureScore, serviceScore, uxScore, codeQualityScore, overallScore } = data.summary;
+
+            // Overall
+            document.getElementById('overall-score').textContent = Math.round(overallScore) + '%';
+            document.getElementById('overall-score').className = `text-8xl font-bold mb-2 ${getScoreColor(overallScore)}`;
+            document.getElementById('overall-status').textContent =
+                overallScore >= 90 ? '✨ Excellent Parity' :
+                overallScore >= 70 ? '⚡ Good Progress' : '⚠️ Needs Work';
+
+            // Cards
+            const updateCard = (id, score, detail) => {
+                document.getElementById(id).textContent = Math.round(score) + '%';
+                document.getElementById(id).className = `text-3xl font-bold ${getScoreColor(score)}`;
+                document.getElementById(id.replace('-score', '-detail')).textContent = detail;
+            };
+
+            updateCard('feature-score', featureScore,
+                `${data.featureGaps?.totalFlutterFeatures || 0}/${data.featureGaps?.totalIonicFeatures || 0} features`);
+            updateCard('service-score', serviceScore,
+                `${data.serviceParity?.totalMappedMethods || 0}/${data.serviceParity?.totalIonicMethods || 0} methods`);
+            updateCard('ux-score', uxScore,
+                `${data.uxDivergences?.categories?.length || 0} categories checked`);
+            updateCard('code-score', codeQualityScore,
+                `${data.codeQuality?.warningCount || 0} warnings, ${data.codeQuality?.infoCount || 0} info`);
+
+            // Feature Gaps
+            renderFeatureGaps(data.featureGaps);
+
+            // Service Parity
+            renderServiceParity(data.serviceParity);
+
+            // UX Divergences
+            renderUxDivergences(data.uxDivergences);
+
+            // Code Quality
+            renderCodeQuality(data.codeQuality);
+        }
+
+        function renderFeatureGaps(data) {
+            if (!data?.pages) {
+                document.getElementById('feature-gaps-content').innerHTML = '<p class="text-gray-500">No data</p>';
+                return;
+            }
+
+            document.getElementById('feature-gaps-count').textContent = `${data.pages.length} pages`;
+
+            const html = data.pages.map(page => `
+                <div class="border rounded-lg p-4 mb-3 ${getScoreBg(page.score)}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <code class="text-sm font-medium text-gray-700">${page.ionicPage}</code>
+                            <span class="text-gray-400 mx-2">→</span>
+                            <code class="text-sm text-gray-500">${page.flutterPage || 'N/A'}</code>
+                        </div>
+                        <span class="font-bold text-lg ${getScoreColor(page.score)}">${page.score}%</span>
+                    </div>
+                    ${page.missingInFlutter?.length ? `
+                        <div class="mt-2">
+                            <span class="text-xs text-gray-500">Missing in Flutter:</span>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${page.missingInFlutter.map(f => `<code class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">${f}</code>`).join('')}
+                            </div>
+                        </div>
+                    ` : '<span class="text-green-600 text-sm">✓ All features present</span>'}
+                    ${page.details?.length ? `
+                        <div class="mt-2 space-y-1">
+                            ${page.details.map(d => `
+                                <div class="text-sm">${getSeverityBadge(d.severity)} ${d.description}</div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            document.getElementById('feature-gaps-content').innerHTML = html || '<p class="text-gray-500">No gaps found</p>';
+        }
+
+        function renderServiceParity(data) {
+            if (!data?.services) {
+                document.getElementById('service-parity-content').innerHTML = '<p class="text-gray-500">No data</p>';
+                return;
+            }
+
+            document.getElementById('service-parity-count').textContent = `${data.services.length} services`;
+
+            const html = data.services.map(svc => `
+                <div class="border rounded-lg p-4 mb-3 ${getScoreBg(svc.score)}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <code class="text-sm font-medium text-gray-700">${svc.ionicService}</code>
+                            <span class="text-gray-400 mx-2">→</span>
+                            <code class="text-sm text-gray-500">${svc.flutterRepo || 'N/A'}</code>
+                        </div>
+                        <span class="font-bold text-lg ${getScoreColor(svc.score)}">${svc.score}%</span>
+                    </div>
+                    ${svc.methods ? `
+                        <div class="mt-2 space-y-1">
+                            ${svc.methods.filter(m => m.status !== 'mapped').slice(0, 5).map(m => `
+                                <div class="text-sm flex items-center gap-2">
+                                    ${getStatusIcon(m.status)}
+                                    <code class="text-xs">${m.ionic}</code>
+                                    ${m.notes ? `<span class="text-gray-400 text-xs">- ${m.notes}</span>` : ''}
+                                </div>
+                            `).join('')}
+                            ${svc.methods.filter(m => m.status !== 'mapped').length > 5 ?
+                                `<div class="text-xs text-gray-400">+ ${svc.methods.filter(m => m.status !== 'mapped').length - 5} more</div>` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            // Missing services
+            const missingHtml = data.missingServices?.length ? `
+                <div class="border border-red-200 rounded-lg p-4 bg-red-50 mt-4">
+                    <h4 class="font-medium text-red-800 mb-2">Missing Services (no Flutter equivalent)</h4>
+                    <div class="flex flex-wrap gap-2">
+                        ${data.missingServices.map(s => `<code class="px-2 py-1 bg-red-100 text-red-700 rounded text-sm">${s}</code>`).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            document.getElementById('service-parity-content').innerHTML = html + missingHtml || '<p class="text-gray-500">No services found</p>';
+        }
+
+        function renderUxDivergences(data) {
+            if (!data?.categories) {
+                document.getElementById('ux-divergences-content').innerHTML = '<p class="text-gray-500">No data</p>';
+                return;
+            }
+
+            document.getElementById('ux-divergences-count').textContent = `${data.categories.length} categories`;
+
+            const html = data.categories.map(cat => `
+                <div class="border rounded-lg p-4 mb-3">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-medium capitalize">${cat.name.replace(/_/g, ' ')}</h4>
+                        <span class="font-bold ${getScoreColor(cat.score)}">${cat.score}%</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 text-sm mb-3">
+                        <div class="bg-blue-50 rounded p-2">
+                            <span class="text-blue-600 font-medium">Ionic:</span> ${cat.ionic?.count || 0} occurrences
+                        </div>
+                        <div class="bg-purple-50 rounded p-2">
+                            <span class="text-purple-600 font-medium">Flutter:</span> ${cat.flutter?.count || 0} occurrences
+                        </div>
+                    </div>
+                    ${cat.divergences?.length ? `
+                        <div class="space-y-2">
+                            ${cat.divergences.map(d => `
+                                <div class="bg-gray-50 rounded p-2 text-sm">
+                                    ${getSeverityBadge(d.severity)}
+                                    <strong class="ml-2">${d.location}</strong>
+                                    <div class="mt-1 grid grid-cols-2 gap-2 text-xs">
+                                        <div><span class="text-gray-500">Ionic:</span> ${d.ionic}</div>
+                                        <div><span class="text-gray-500">Flutter:</span> ${d.flutter}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p class="text-green-600 text-sm">✓ No divergences</p>'}
+                </div>
+            `).join('');
+
+            document.getElementById('ux-divergences-content').innerHTML = html || '<p class="text-gray-500">No categories found</p>';
+        }
+
+        function renderCodeQuality(data) {
+            if (!data?.categories) {
+                document.getElementById('code-quality-content').innerHTML = '<p class="text-gray-500">No data</p>';
+                return;
+            }
+
+            const totalFindings = data.categories.reduce((sum, c) => sum + (c.findings?.length || 0), 0);
+            document.getElementById('code-quality-count').textContent = `${totalFindings} findings`;
+
+            const html = data.categories.map(cat => `
+                <div class="border rounded-lg p-4 mb-3 ${cat.status === 'pass' ? 'bg-green-50 border-green-200' : cat.status === 'fail' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}">
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-medium capitalize">${cat.name.replace(/_/g, ' ')}</h4>
+                        <span class="px-2 py-1 rounded text-sm font-medium ${
+                            cat.status === 'pass' ? 'bg-green-100 text-green-800' :
+                            cat.status === 'fail' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                        }">${cat.status?.toUpperCase() || 'UNKNOWN'}</span>
+                    </div>
+                    ${cat.findings?.length ? `
+                        <div class="space-y-2 mt-3">
+                            ${cat.findings.map(f => `
+                                <div class="bg-white rounded p-2 text-sm border">
+                                    ${getSeverityBadge(f.severity)}
+                                    <code class="ml-2 text-gray-600">${f.file}:${f.line || '?'}</code>
+                                    <p class="mt-1 text-gray-700">${f.message}</p>
+                                    ${f.code ? `<pre class="mt-1 p-2 bg-gray-100 rounded text-xs overflow-x-auto"><code>${f.code}</code></pre>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<p class="text-green-600 text-sm mt-2">✓ No issues found</p>'}
+                </div>
+            `).join('');
+
+            // Critical findings summary
+            const criticalHtml = data.criticalFindings?.length ? `
+                <div class="border-2 border-red-500 rounded-lg p-4 bg-red-50 mt-4">
+                    <h4 class="font-bold text-red-800 mb-2">⚠️ Critical Findings</h4>
+                    ${data.criticalFindings.map(f => `
+                        <div class="text-sm text-red-700">${f.file}: ${f.message}</div>
+                    `).join('')}
+                </div>
+            ` : '';
+
+            document.getElementById('code-quality-content').innerHTML = html + criticalHtml || '<p class="text-gray-500">No categories found</p>';
+        }
+
+        // Load data on page load
+        loadData();
+    </script>
+</body>
+</html>

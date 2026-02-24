@@ -1,0 +1,498 @@
+{
+  "categories": [
+    {
+      "name": "dialogs",
+      "ionic": {
+        "count": 110,
+        "details": {
+          "alertController.create": 92,
+          "actionSheetController.create": 18
+        },
+        "locations": [
+          "app.component.ts:48 - update alert",
+          "app.component.ts:92 - error alert",
+          "meeting-list.page.ts:59 - create meeting",
+          "att-list.page.ts:203 - attendance info",
+          "att-list.page.ts:463 - delete confirmation",
+          "instrument.page.ts:87 - delete instrument",
+          "notifications.page.ts:53 - notification action",
+          "history.page.ts:159 - history edit",
+          "history.page.ts:216 - history delete",
+          "attendance.page.ts:250 - status info",
+          "attendance.page.ts:424-690 - multiple actions",
+          "list.page.ts:129 - filter/sort",
+          "list.page.ts:329-684 - person actions",
+          "list.page.ts:569 - action sheet",
+          "instrument-list.page.ts:122-180 - instrument CRUD",
+          "handover-detail.page.ts:60-126 - handover actions",
+          "export.page.ts:64 - export confirm",
+          "person.page.ts:356-1096 - person actions (14 dialogs, 4 action sheets)",
+          "planning.page.ts:141-554 - planning actions",
+          "shift.page.ts:92-166 - shift CRUD",
+          "signout.page.ts:107-628 - signout actions (8 dialogs, 5 action sheets)",
+          "tenant-register.page.ts:92-288 - registration",
+          "general.page.ts:203-748 - general settings (10 dialogs)",
+          "stats.page.ts:574 - stats export",
+          "settings.page.ts:255-789 - settings actions (10 dialogs)",
+          "type.page.ts:146-543 - type management (6 dialogs)",
+          "parents.page.ts:257 - parent actions",
+          "songs.page.ts:393-467 - song actions",
+          "song.page.ts:126-634 - song CRUD (10 dialogs, 1 action sheet)",
+          "login.page.ts:81-108 - login errors"
+        ]
+      },
+      "flutter": {
+        "count": 75,
+        "details": {
+          "showDialog": 44,
+          "showModalBottomSheet": 31
+        },
+        "locations": [
+          "dialog_helper.dart - centralized helper",
+          "notifications_page.dart:281 - notification action",
+          "planning_page.dart:485-506 - planning actions",
+          "shift_preview_sheet.dart:12 - shift preview",
+          "parents_portal_page.dart:188-431 - parent actions",
+          "shifts_list_page.dart:131 - shift create",
+          "shift_detail_page.dart:456-658 - shift CRUD",
+          "pending_players_page.dart:105-151 - player approval",
+          "attendance_create_page.dart:564 - date selection",
+          "multi_date_calendar.dart:432 - calendar picker",
+          "settings_page.dart:255 - logout confirm",
+          "songs_selection_sheet.dart:59 - song selection",
+          "attendance_detail_page.dart:606-1356 - attendance actions",
+          "song_detail_page.dart:555-1430 - song actions",
+          "general_settings_page.dart:606-986 - settings actions",
+          "self_service_overview_page.dart:284-621 - self-service actions",
+          "attendance_types_page.dart:168 - type create",
+          "left_players_page.dart:95 - player restore",
+          "attendance_list_page.dart:488-508 - attendance actions",
+          "user_management_page.dart:104-574 - user management",
+          "meetings_list_page.dart:94-265 - meeting actions",
+          "profile_page.dart:159-434 - profile actions",
+          "teachers_list_page.dart:155-338 - teacher CRUD",
+          "instruments_list_page.dart:178-351 - instrument CRUD",
+          "handover_sheet.dart:612 - handover",
+          "history_page.dart:285-330 - history actions",
+          "people_list_page.dart:575-743 - people actions",
+          "person_detail_page.dart:423-758 - person actions"
+        ]
+      },
+      "divergences": [
+        {
+          "location": "Person Actions Menu",
+          "ionic": "ActionSheet with pause/archive/delete options",
+          "flutter": "BottomSheet with ListTile actions",
+          "severity": "info",
+          "description": "Flutter uses BottomSheet instead of ActionSheet - similar UX but different implementation"
+        },
+        {
+          "location": "Delete Confirmations",
+          "ionic": "AlertController with danger button styling",
+          "flutter": "AlertDialog with isDestructive styling",
+          "severity": "info",
+          "description": "Both have destructive action styling - parity achieved"
+        },
+        {
+          "location": "Dialog count difference",
+          "ionic": "110 total dialogs",
+          "flutter": "75 total dialogs",
+          "severity": "medium",
+          "description": "35 fewer dialogs in Flutter - some consolidated, some potentially missing"
+        },
+        {
+          "location": "Centralized Dialog Helper",
+          "ionic": "No centralized helper",
+          "flutter": "DialogHelper class in core/utils",
+          "severity": "info",
+          "description": "Flutter has better abstraction with centralized dialog helper"
+        }
+      ],
+      "score": 85
+    },
+    {
+      "name": "toasts_snackbars",
+      "ionic": {
+        "count": 1,
+        "details": {
+          "toastController.create": 1,
+          "Utils.showToast": "centralized helper"
+        },
+        "locations": [
+          "utilities/Utils.ts:302 - showToast helper (bottom, 3000ms default)"
+        ]
+      },
+      "flutter": {
+        "count": 37,
+        "details": {
+          "ScaffoldMessenger.showSnackBar": 37,
+          "ToastHelper": "centralized helper"
+        },
+        "locations": [
+          "toast_helper.dart - centralized helper (success/error/info/warning)",
+          "attendance_create_page.dart:675-726 - validation messages",
+          "handover_sheet.dart:512 - handover status",
+          "people_list_page.dart:653-792 - people actions feedback",
+          "person_detail_page.dart:396-1325 - person actions feedback",
+          "app_theme.dart:143-296 - SnackBar theme (floating)"
+        ]
+      },
+      "divergences": [
+        {
+          "location": "Toast Position",
+          "ionic": "position: bottom",
+          "flutter": "behavior: SnackBarBehavior.floating (bottom with margin)",
+          "severity": "info",
+          "description": "Both show at bottom - consistent UX"
+        },
+        {
+          "location": "Toast Duration",
+          "ionic": "default 3000ms",
+          "flutter": "default 4000ms (ToastHelper)",
+          "severity": "low",
+          "description": "1 second longer display time in Flutter"
+        },
+        {
+          "location": "Toast Variants",
+          "ionic": "color parameter (success, danger, warning)",
+          "flutter": "separate methods (showSuccess, showError, showWarning, showInfo)",
+          "severity": "info",
+          "description": "Flutter has more structured approach with separate methods"
+        },
+        {
+          "location": "Direct Usage",
+          "ionic": "Mostly via Utils.showToast",
+          "flutter": "Mixed - ToastHelper and direct ScaffoldMessenger calls",
+          "severity": "low",
+          "description": "Flutter could consolidate more usage through ToastHelper"
+        }
+      ],
+      "score": 92
+    },
+    {
+      "name": "loading_states",
+      "ionic": {
+        "count": 17,
+        "details": {
+          "loadingController.create": 17,
+          "Utils.getLoadingElement": "helper with timeout"
+        },
+        "locations": [
+          "db.service.ts:384,866 - tenant/login loading",
+          "telegram.service.ts:11 - telegram loading (99999ms)",
+          "person.page.ts:315-1150 - person operations (7 locations)",
+          "song.page.ts:561 - song upload",
+          "settings.page.ts:272-549 - settings operations (5 locations)",
+          "general.page.ts:364-409 - general settings"
+        ]
+      },
+      "flutter": {
+        "count": 97,
+        "details": {
+          "CircularProgressIndicator": 66,
+          "AsyncValue.loading": 31
+        },
+        "locations": [
+          "Multiple pages - Center(child: CircularProgressIndicator())",
+          "All provider files - state = AsyncValue.loading()",
+          "Button loading states - CircularProgressIndicator(strokeWidth: 2)",
+          "Sheet loading states - Center(child: CircularProgressIndicator())"
+        ]
+      },
+      "divergences": [
+        {
+          "location": "Loading Pattern",
+          "ionic": "Modal loading overlay with message",
+          "flutter": "Inline CircularProgressIndicator",
+          "severity": "medium",
+          "description": "Different approach - Ionic uses blocking modal, Flutter uses inline indicators"
+        },
+        {
+          "location": "Loading with Message",
+          "ionic": "loadingController.create({ message: 'Loading...' })",
+          "flutter": "No standardized loading with message pattern",
+          "severity": "medium",
+          "description": "Flutter lacks standardized loading overlay with text message"
+        },
+        {
+          "location": "Async State Management",
+          "ionic": "Manual loading state management",
+          "flutter": "AsyncValue.loading() integrated with Riverpod",
+          "severity": "info",
+          "description": "Flutter has better state management with Riverpod AsyncValue"
+        },
+        {
+          "location": "Button Loading States",
+          "ionic": "Generally no button loading indicators",
+          "flutter": "Consistent button loading with small CircularProgressIndicator",
+          "severity": "info",
+          "description": "Flutter has better button loading UX"
+        }
+      ],
+      "score": 78
+    },
+    {
+      "name": "pull_to_refresh",
+      "ionic": {
+        "count": 11,
+        "details": {
+          "ion-refresher": 11
+        },
+        "locations": [
+          "members.page.html:8 - members list",
+          "songs.page.html:65 - songs list",
+          "history.page.html:13 - history list",
+          "list.page.html:8 - people list",
+          "meeting-list.page.html:11 - meetings list",
+          "overview.page.html:66 - self-service overview",
+          "att-list.page.html:50 - attendance list",
+          "signout.page.html:69 - signout page",
+          "parents.page.html:56 - parents page",
+          "settings.page.html:8 - settings page",
+          "voice-leader.page.html:11 - voice leader page"
+        ]
+      },
+      "flutter": {
+        "count": 19,
+        "details": {
+          "RefreshIndicator": 19
+        },
+        "locations": [
+          "parents_portal_page.dart:98 - parents list",
+          "people_list_page.dart:385,466 - people lists (2 tabs)",
+          "members_page.dart:54 - members list",
+          "statistics_page.dart:62 - statistics",
+          "instruments_list_page.dart:87 - instruments list",
+          "pending_players_page.dart:84 - pending players",
+          "meetings_list_page.dart:68 - meetings list",
+          "left_players_page.dart:74 - left players",
+          "history_page.dart:216 - history list",
+          "attendance_list_page.dart:185 - attendance list",
+          "user_management_page.dart:286-421 - user lists (4 tabs)",
+          "voice_leader_page.dart:24 - voice leader",
+          "self_service_overview_page.dart:132 - self-service",
+          "songs_list_page.dart:273 - songs list",
+          "teachers_list_page.dart:129 - teachers list"
+        ]
+      },
+      "divergences": [
+        {
+          "location": "Coverage",
+          "ionic": "11 lists with refresh",
+          "flutter": "19 lists with refresh (8 more)",
+          "severity": "info",
+          "description": "Flutter has more comprehensive pull-to-refresh coverage"
+        },
+        {
+          "location": "Settings Page Refresh",
+          "ionic": "Has ion-refresher",
+          "flutter": "No RefreshIndicator (settings is not a list)",
+          "severity": "info",
+          "description": "Flutter correctly omits refresh for non-list pages"
+        },
+        {
+          "location": "Refresh Callback",
+          "ionic": "handleRefresh($event)",
+          "flutter": "onRefresh: () async => ref.invalidate(provider)",
+          "severity": "info",
+          "description": "Flutter uses Riverpod invalidation - cleaner pattern"
+        }
+      ],
+      "score": 95
+    },
+    {
+      "name": "forms_validation",
+      "ionic": {
+        "count": 5,
+        "details": {
+          "FormControl/FormGroup": 5,
+          "Validators.required": 2
+        },
+        "locations": [
+          "login.page.ts:17-35 - login form with email/password validation"
+        ]
+      },
+      "flutter": {
+        "count": 41,
+        "details": {
+          "Form(": 19,
+          "validator:": 22
+        },
+        "locations": [
+          "tenant_registration_page.dart - registration form (6 validators)",
+          "tenant_create_page.dart - tenant create form",
+          "song_create_page.dart - song form",
+          "song_edit_page.dart - song edit form",
+          "login_page.dart - login form (2 validators)",
+          "register_page.dart - register form (3 validators)",
+          "forgot_password_page.dart - password reset form",
+          "person_create_page.dart - person form (3 validators)",
+          "person_detail_page.dart - person edit form",
+          "general_settings_page.dart - settings form",
+          "profile_page.dart - profile form",
+          "attendance_type_edit_page.dart - type form",
+          "instruments_list_page.dart - instrument form",
+          "teachers_list_page.dart - teacher form",
+          "feedback_sheet.dart - feedback form"
+        ]
+      },
+      "divergences": [
+        {
+          "location": "Form Coverage",
+          "ionic": "Only login form uses Reactive Forms",
+          "flutter": "15+ forms with validation",
+          "severity": "info",
+          "description": "Flutter has much more comprehensive form validation"
+        },
+        {
+          "location": "Validation Approach",
+          "ionic": "Angular Reactive Forms (FormControl, FormGroup)",
+          "flutter": "Flutter Form + TextFormField validator",
+          "severity": "info",
+          "description": "Different frameworks - Flutter approach is simpler"
+        },
+        {
+          "location": "Required Field Validation",
+          "ionic": "Validators.required",
+          "flutter": "Custom validators with German messages",
+          "severity": "info",
+          "description": "Flutter has localized validation messages"
+        }
+      ],
+      "score": 98
+    },
+    {
+      "name": "navigation",
+      "ionic": {
+        "count": 37,
+        "details": {
+          "router.navigate": 15,
+          "router.navigateByUrl": 14,
+          "navCtrl.navigateForward": 2,
+          "navCtrl.back": 6
+        },
+        "locations": [
+          "song-viewer.page.ts:49 - song navigation",
+          "voice-leader.page.ts:48 - back navigation",
+          "tabs.page.ts:48 - tab navigation",
+          "shifts.page.ts:44 - shift detail",
+          "shift.page.ts:106 - shift list",
+          "song.page.ts:514 - back to songs",
+          "handover.page.ts:89 - handover detail",
+          "db.service.ts:537-2166 - auth navigation (6 locations)",
+          "register.guard.ts:19-22 - guard redirects",
+          "songs.page.ts:200-389 - song navigation",
+          "auth.service.ts:114 - logout redirect",
+          "login.guard.ts:19 - login redirect",
+          "type.page.ts:226 - type list",
+          "auth.guard.ts:23 - auth redirect",
+          "tenant-register.page.ts:84-191 - registration flow",
+          "settings.page.ts:339 - tenant switch",
+          "list.page.ts:136 - shift navigation"
+        ]
+      },
+      "flutter": {
+        "count": 234,
+        "details": {
+          "context.go": 37,
+          "context.push": 28,
+          "context.pop": 20,
+          "Navigator.pop": 129,
+          "Navigator.of(context).pop": 20
+        },
+        "locations": [
+          "main_shell.dart:118 - tab navigation",
+          "app_router.dart - route definitions",
+          "Most pages - context.push for forward nav",
+          "Most pages - context.pop/Navigator.pop for back",
+          "All dialogs/sheets - Navigator.pop for dismiss",
+          "Auth pages - context.go for root navigation",
+          "Settings pages - context.push for sub-pages"
+        ]
+      },
+      "divergences": [
+        {
+          "location": "Navigation Style",
+          "ionic": "Imperative router.navigate()",
+          "flutter": "go_router context extensions (go, push, pop)",
+          "severity": "info",
+          "description": "Different navigation approaches - both effective"
+        },
+        {
+          "location": "Dialog Dismissal",
+          "ionic": "Implicit in alert/actionSheet handlers",
+          "flutter": "Explicit Navigator.pop() calls (149 occurrences)",
+          "severity": "info",
+          "description": "Flutter requires explicit dismissal - more verbose but clearer"
+        },
+        {
+          "location": "Route Guards",
+          "ionic": "Angular guards (auth.guard.ts, login.guard.ts)",
+          "flutter": "go_router redirect logic in app_router.dart",
+          "severity": "info",
+          "description": "Both have route protection - different implementation"
+        },
+        {
+          "location": "Deep Linking",
+          "ionic": "navigateByUrl with full paths",
+          "flutter": "go_router with typed routes",
+          "severity": "info",
+          "description": "go_router provides better type safety"
+        }
+      ],
+      "score": 90
+    }
+  ],
+  "overallScore": 89,
+  "summary": {
+    "totalIonicPatterns": 181,
+    "totalFlutterPatterns": 403,
+    "patternsWithParity": 6,
+    "patternsNeedingAttention": 0
+  },
+  "criticalDivergences": [],
+  "mediumDivergences": [
+    {
+      "category": "dialogs",
+      "issue": "35 fewer dialog instances in Flutter vs Ionic",
+      "recommendation": "Review if dialogs were consolidated or are missing"
+    },
+    {
+      "category": "loading_states",
+      "issue": "No standardized loading overlay with message in Flutter",
+      "recommendation": "Consider adding LoadingOverlay widget for long operations"
+    }
+  ],
+  "improvements": [
+    {
+      "category": "dialogs",
+      "description": "Flutter has centralized DialogHelper - better abstraction"
+    },
+    {
+      "category": "toasts_snackbars",
+      "description": "Flutter has ToastHelper with typed methods (success, error, etc.)"
+    },
+    {
+      "category": "loading_states",
+      "description": "Flutter has better button loading states with inline indicators"
+    },
+    {
+      "category": "pull_to_refresh",
+      "description": "Flutter has more comprehensive refresh coverage (19 vs 11)"
+    },
+    {
+      "category": "forms_validation",
+      "description": "Flutter has much more comprehensive form validation (22 validators)"
+    },
+    {
+      "category": "navigation",
+      "description": "Flutter uses go_router with type-safe routes"
+    }
+  ],
+  "metadata": {
+    "analyzedAt": "2026-02-24T00:00:00Z",
+    "ionicPath": "/Users/I576226/repositories/attendance/src/app/",
+    "flutterPath": "/Users/I576226/repositories/attendix/lib/",
+    "agent": "ux-detail-analyzer"
+  }
+}

@@ -1,0 +1,907 @@
+{
+  "generatedAt": "2026-02-24T12:00:00Z",
+  "summary": {
+    "totalIonicServices": 32,
+    "totalFlutterRepositories": 11,
+    "migratedServices": 12,
+    "partiallyMigratedServices": 6,
+    "notMigratedServices": 14,
+    "totalIonicMethods": 178,
+    "totalMappedMethods": 99,
+    "overallScore": 56
+  },
+  "services": [
+    {
+      "ionicService": "attendance.service.ts",
+      "flutterRepo": "attendance_repository.dart",
+      "table": "attendance, person_attendances",
+      "ionicMethods": [
+        "getCurrentAttDate()",
+        "setCurrentAttDate(date)",
+        "addAttendance(attendance, tenantId)",
+        "addPersonAttendances(personAttendances)",
+        "deletePersonAttendances(attendanceIds, personId)",
+        "getAttendance(tenantId, currentAttDate, all, withPersonAttendance)",
+        "getUpcomingAttendances(tenantId)",
+        "getAttendancesByDate(date, tenantId)",
+        "getAttendanceById(id)",
+        "updateAttendance(att, id)",
+        "removeAttendance(id)",
+        "getPersonAttendances(personId, currentAttDate, attendanceTypes, all)",
+        "getParentAttendances(playerIds, attendanceIds)",
+        "updatePersonAttendance(id, att, userId)",
+        "signOut(personAttendanceId, notes, status, userId)",
+        "signIn(personAttendanceId, status, userId)",
+        "deletePersonAttendanceById(id)"
+      ],
+      "methods": [
+        {"ionic": "getCurrentAttDate()", "flutter": null, "status": "missing", "notes": "Local storage - handled in UI state"},
+        {"ionic": "setCurrentAttDate(date)", "flutter": null, "status": "missing", "notes": "Local storage - handled in UI state"},
+        {"ionic": "addAttendance(attendance, tenantId)", "flutter": "createAttendance(attendance)", "status": "mapped", "notes": "tenantId via mixin"},
+        {"ionic": "addPersonAttendances(personAttendances)", "flutter": "createPersonAttendances(records)", "status": "mapped"},
+        {"ionic": "deletePersonAttendances(attendanceIds, personId)", "flutter": "deletePersonAttendances(personId, attendanceIds)", "status": "mapped"},
+        {"ionic": "getAttendance(...)", "flutter": "getAttendances(...)", "status": "mapped", "notes": "Unified with parameters"},
+        {"ionic": "getUpcomingAttendances(tenantId)", "flutter": "getUpcomingAttendances()", "status": "mapped", "notes": "tenantId via mixin"},
+        {"ionic": "getAttendancesByDate(date, tenantId)", "flutter": "getAttendancesByDate(date)", "status": "mapped"},
+        {"ionic": "getAttendanceById(id)", "flutter": "getAttendanceById(id)", "status": "mapped"},
+        {"ionic": "updateAttendance(att, id)", "flutter": "updateAttendance(id, updates)", "status": "mapped"},
+        {"ionic": "removeAttendance(id)", "flutter": "deleteAttendance(id)", "status": "mapped"},
+        {"ionic": "getPersonAttendances(...)", "flutter": "getPersonAttendancesForPerson(...)", "status": "mapped"},
+        {"ionic": "getParentAttendances(playerIds, attendanceIds)", "flutter": null, "status": "missing", "notes": "Parent-specific query not implemented"},
+        {"ionic": "updatePersonAttendance(id, att, userId)", "flutter": "updatePersonAttendance(id, updates)", "status": "mapped"},
+        {"ionic": "signOut(...)", "flutter": "signInOutRepository.signOut(...)", "status": "mapped", "notes": "In separate repository"},
+        {"ionic": "signIn(...)", "flutter": "signInOutRepository.signIn(...)", "status": "mapped", "notes": "In separate repository"},
+        {"ionic": "deletePersonAttendanceById(id)", "flutter": null, "status": "missing", "notes": "Single delete by ID not implemented"}
+      ],
+      "score": 76
+    },
+    {
+      "ionicService": "player.service.ts",
+      "flutterRepo": "player_repository.dart",
+      "table": "player",
+      "ionicMethods": [
+        "getPlayerByAppId(appId, tenantId, showToast)",
+        "getPlayerProfile(appId, tenantId)",
+        "getPlayers(tenantId, tenantUserRole, parentId, all)",
+        "getPlayersByGroup(tenantId, groupId)",
+        "getPendingPersons(tenantId)",
+        "getLeftPlayers(tenantId)",
+        "getPlayersWithoutAccount(tenantId)",
+        "getConductors(tenantId, mainGroupId, all)",
+        "addPlayer(player, tenantId, maintainTeachers)",
+        "updatePlayer(player, pausedAction, createAccount, updateShifts)",
+        "updatePlayerHistory(id, history)",
+        "updatePlayerAdditionalFields(id, additional_fields)",
+        "removePlayer(player)",
+        "archivePlayer(player, left, notes)",
+        "reactivatePlayer(player)",
+        "checkAndUnpausePlayers(tenantId)",
+        "updateProfile(appId, updates)",
+        "searchPersonsByName(searchTerm, tenantId, limit)",
+        "resetExtraFieldValues(tenantId, fieldId, defaultValue)",
+        "updateExtraFieldValue(tenantId, fieldId, oldValue, newValue)"
+      ],
+      "methods": [
+        {"ionic": "getPlayerByAppId(...)", "flutter": "getPlayerByAppId(appId)", "status": "mapped"},
+        {"ionic": "getPlayerProfile(...)", "flutter": "getPlayerByAppId(...)", "status": "mapped"},
+        {"ionic": "getPlayers(...)", "flutter": "getPlayers(...)", "status": "mapped"},
+        {"ionic": "getPlayersByGroup(...)", "flutter": null, "status": "missing", "notes": "Filter by group not implemented"},
+        {"ionic": "getPendingPersons(...)", "flutter": "getPendingPlayers()", "status": "mapped"},
+        {"ionic": "getLeftPlayers(...)", "flutter": "getArchivedPlayers()", "status": "mapped"},
+        {"ionic": "getPlayersWithoutAccount(...)", "flutter": null, "status": "missing", "notes": "Not implemented"},
+        {"ionic": "getConductors(...)", "flutter": "getConductors(mainGroupId, includeLeft)", "status": "mapped"},
+        {"ionic": "addPlayer(...)", "flutter": "createPlayer(player)", "status": "mapped"},
+        {"ionic": "updatePlayer(...)", "flutter": "updatePlayer(player)", "status": "mapped"},
+        {"ionic": "updatePlayerHistory(...)", "flutter": null, "status": "missing", "notes": "History updated via updatePlayer"},
+        {"ionic": "updatePlayerAdditionalFields(...)", "flutter": null, "status": "missing", "notes": "Not implemented"},
+        {"ionic": "removePlayer(...)", "flutter": "deletePlayer(playerId)", "status": "mapped"},
+        {"ionic": "archivePlayer(...)", "flutter": "archivePlayer(player, leftDate, reason)", "status": "mapped"},
+        {"ionic": "reactivatePlayer(...)", "flutter": "reactivatePlayer(player)", "status": "mapped"},
+        {"ionic": "checkAndUnpausePlayers(...)", "flutter": "checkAndUnpausePlayers()", "status": "mapped"},
+        {"ionic": "updateProfile(...)", "flutter": null, "status": "missing", "notes": "Profile update by appId not implemented"},
+        {"ionic": "searchPersonsByName(...)", "flutter": "searchPlayers(query)", "status": "mapped"},
+        {"ionic": "resetExtraFieldValues(...)", "flutter": null, "status": "missing", "notes": "Extra fields management not implemented"},
+        {"ionic": "updateExtraFieldValue(...)", "flutter": null, "status": "missing", "notes": "Extra fields management not implemented"}
+      ],
+      "score": 60
+    },
+    {
+      "ionicService": "song.service.ts",
+      "flutterRepo": "song_repository.dart",
+      "table": "songs, song_categories",
+      "ionicMethods": [
+        "encodeFilename(filename)",
+        "getSongs(tenantId)",
+        "getSong(id, tenantId)",
+        "addSong(song, tenantId)",
+        "editSong(id, song)",
+        "removeSong(song, tenantId)",
+        "uploadSongFile(songId, file, instrumentId, tenantId, mainGroupId, note)",
+        "downloadSongFile(fileName, songId, tenantId)",
+        "downloadSongFileFromPath(filePath)",
+        "deleteSongFile(songId, file, tenantId)",
+        "copySongToTenant(song, sourceTenantId, targetTenantId, instrumentMapping, onProgress)",
+        "uploadSongFileToTenant(songId, blob, fileName, fileType, targetTenantId, instrumentId, note)",
+        "getSongCategories(tenantId)",
+        "addSongCategory(category, tenantId)",
+        "updateSongCategory(category, id)",
+        "removeSongCategory(id)"
+      ],
+      "methods": [
+        {"ionic": "encodeFilename(filename)", "flutter": null, "status": "missing", "notes": "Utility function - not in repository"},
+        {"ionic": "getSongs(tenantId)", "flutter": "getSongs()", "status": "mapped"},
+        {"ionic": "getSong(id, tenantId)", "flutter": "getSongById(id)", "status": "mapped"},
+        {"ionic": "addSong(song, tenantId)", "flutter": "createSong(song)", "status": "mapped"},
+        {"ionic": "editSong(id, song)", "flutter": "updateSong(id, updates)", "status": "mapped"},
+        {"ionic": "removeSong(song, tenantId)", "flutter": "deleteSong(id)", "status": "mapped", "notes": "File cleanup not included"},
+        {"ionic": "uploadSongFile(...)", "flutter": null, "status": "missing", "notes": "File upload not implemented"},
+        {"ionic": "downloadSongFile(...)", "flutter": null, "status": "missing", "notes": "File download not implemented"},
+        {"ionic": "downloadSongFileFromPath(...)", "flutter": null, "status": "missing", "notes": "File download not implemented"},
+        {"ionic": "deleteSongFile(...)", "flutter": null, "status": "missing", "notes": "File deletion not implemented"},
+        {"ionic": "copySongToTenant(...)", "flutter": null, "status": "missing", "notes": "Cross-tenant copy not implemented"},
+        {"ionic": "uploadSongFileToTenant(...)", "flutter": null, "status": "missing", "notes": "Cross-tenant upload not implemented"},
+        {"ionic": "getSongCategories(...)", "flutter": "getSongCategories()", "status": "mapped"},
+        {"ionic": "addSongCategory(...)", "flutter": null, "status": "missing", "notes": "Category CRUD not implemented"},
+        {"ionic": "updateSongCategory(...)", "flutter": null, "status": "missing", "notes": "Category CRUD not implemented"},
+        {"ionic": "removeSongCategory(...)", "flutter": null, "status": "missing", "notes": "Category CRUD not implemented"}
+      ],
+      "score": 38
+    },
+    {
+      "ionicService": "shift.service.ts",
+      "flutterRepo": "shift_repository.dart",
+      "table": "shifts",
+      "ionicMethods": [
+        "loadShifts(tenantId)",
+        "isShiftUsed(id)",
+        "addShift(shift, tenantId)",
+        "updateShift(shift)",
+        "deleteShift(id)",
+        "getPlayersWithShift(tenantId, shiftId)",
+        "assignShiftToPlayersInTenant(targetTenantId, newShiftId, appIds, shiftData)",
+        "updateShiftAttendancesInTenant(targetTenantId, shift, assignedPlayerIds, shiftData, playerAppIdMap)"
+      ],
+      "methods": [
+        {"ionic": "loadShifts(tenantId)", "flutter": "getShifts()", "status": "mapped"},
+        {"ionic": "isShiftUsed(id)", "flutter": "isShiftUsed(id)", "status": "mapped"},
+        {"ionic": "addShift(shift, tenantId)", "flutter": "createShift(plan)", "status": "mapped"},
+        {"ionic": "updateShift(shift)", "flutter": "updateShift(plan)", "status": "mapped"},
+        {"ionic": "deleteShift(id)", "flutter": "deleteShift(id)", "status": "mapped"},
+        {"ionic": "getPlayersWithShift(...)", "flutter": null, "status": "missing", "notes": "Cross-tenant query not implemented"},
+        {"ionic": "assignShiftToPlayersInTenant(...)", "flutter": null, "status": "missing", "notes": "Cross-tenant assignment not implemented"},
+        {"ionic": "updateShiftAttendancesInTenant(...)", "flutter": null, "status": "missing", "notes": "Cross-tenant update not implemented"}
+      ],
+      "score": 63
+    },
+    {
+      "ionicService": "meeting.service.ts",
+      "flutterRepo": "meeting_repository.dart",
+      "table": "meetings",
+      "ionicMethods": [
+        "getMeetings(tenantId)",
+        "getMeeting(id, tenantId)",
+        "addMeeting(meeting, tenantId)",
+        "editMeeting(id, meeting)",
+        "removeMeeting(id)"
+      ],
+      "methods": [
+        {"ionic": "getMeetings(tenantId)", "flutter": "getMeetings()", "status": "mapped"},
+        {"ionic": "getMeeting(id, tenantId)", "flutter": "getMeetingById(id)", "status": "mapped"},
+        {"ionic": "addMeeting(meeting, tenantId)", "flutter": "createMeeting(meeting)", "status": "mapped"},
+        {"ionic": "editMeeting(id, meeting)", "flutter": "updateMeeting(id, ...)", "status": "mapped"},
+        {"ionic": "removeMeeting(id)", "flutter": "deleteMeeting(id)", "status": "mapped"}
+      ],
+      "score": 100
+    },
+    {
+      "ionicService": "group.service.ts",
+      "flutterRepo": "group_repository.dart",
+      "table": "instruments, group_categories",
+      "ionicMethods": [
+        "getGroups(tenantId)",
+        "getMainGroup(groups)",
+        "addGroup(name, tenantId, maingroup)",
+        "updateGroup(updates, id)",
+        "removeGroup(id)",
+        "getGroupCategories(tenantId)",
+        "addGroupCategory(category, tenantId)",
+        "updateGroupCategory(category, id)",
+        "removeGroupCategory(id)",
+        "getTeachers(tenantId)",
+        "addTeacher(teacher, tenantId)",
+        "updateTeacher(teacher, id)"
+      ],
+      "methods": [
+        {"ionic": "getGroups(tenantId)", "flutter": "getGroups()", "status": "mapped"},
+        {"ionic": "getMainGroup(groups)", "flutter": "getMainGroup()", "status": "mapped", "notes": "Different signature - queries DB"},
+        {"ionic": "addGroup(name, tenantId, maingroup)", "flutter": "createGroup(...)", "status": "mapped"},
+        {"ionic": "updateGroup(updates, id)", "flutter": "updateGroup(id, updates)", "status": "mapped"},
+        {"ionic": "removeGroup(id)", "flutter": "deleteGroup(id)", "status": "mapped"},
+        {"ionic": "getGroupCategories(tenantId)", "flutter": "getGroupCategories()", "status": "mapped"},
+        {"ionic": "addGroupCategory(category, tenantId)", "flutter": "createGroupCategory(...)", "status": "mapped"},
+        {"ionic": "updateGroupCategory(category, id)", "flutter": "updateGroupCategory(id, updates)", "status": "mapped"},
+        {"ionic": "removeGroupCategory(id)", "flutter": "deleteGroupCategory(id)", "status": "mapped"},
+        {"ionic": "getTeachers(tenantId)", "flutter": "TeacherRepository.getTeachers()", "status": "mapped", "notes": "In separate repository"},
+        {"ionic": "addTeacher(teacher, tenantId)", "flutter": "TeacherRepository.createTeacher()", "status": "mapped", "notes": "In separate repository"},
+        {"ionic": "updateTeacher(teacher, id)", "flutter": "TeacherRepository.updateTeacher()", "status": "mapped", "notes": "In separate repository"}
+      ],
+      "score": 100
+    },
+    {
+      "ionicService": "teacher.service.ts",
+      "flutterRepo": "teacher_repository.dart",
+      "table": "teachers (ausbilder)",
+      "ionicMethods": [
+        "getTeachers(tenantId)",
+        "addTeacher(teacher, tenantId)",
+        "updateTeacher(teacher, id)",
+        "deleteTeacher(id)"
+      ],
+      "methods": [
+        {"ionic": "getTeachers(tenantId)", "flutter": "getTeachers()", "status": "mapped"},
+        {"ionic": "addTeacher(teacher, tenantId)", "flutter": "createTeacher(teacher)", "status": "mapped"},
+        {"ionic": "updateTeacher(teacher, id)", "flutter": "updateTeacher(id, updates)", "status": "mapped"},
+        {"ionic": "deleteTeacher(id)", "flutter": "deleteTeacher(id)", "status": "mapped"}
+      ],
+      "score": 100
+    },
+    {
+      "ionicService": "feedback.service.ts",
+      "flutterRepo": "feedback_repository.dart",
+      "table": "questions, feedback",
+      "ionicMethods": [
+        "sendQuestion(message, phone, tenantId, userId)",
+        "sendFeedback(message, rating, anonymous, phone, tenantId, userId)"
+      ],
+      "methods": [
+        {"ionic": "sendQuestion(...)", "flutter": "sendQuestion(...)", "status": "mapped"},
+        {"ionic": "sendFeedback(...)", "flutter": "sendFeedback(...)", "status": "mapped"}
+      ],
+      "score": 100
+    },
+    {
+      "ionicService": "attendance-type.service.ts",
+      "flutterRepo": "attendance_type_repository.dart",
+      "table": "attendance_types",
+      "ionicMethods": [
+        "getAttendanceTypes(tenantId)",
+        "getAttendanceType(id)",
+        "updateAttendanceType(id, attType)",
+        "addAttendanceType(attType)",
+        "deleteAttendanceType(id)",
+        "addDefaultAttendanceTypes(tenantId, type)"
+      ],
+      "methods": [
+        {"ionic": "getAttendanceTypes(tenantId)", "flutter": "getTypes()", "status": "mapped"},
+        {"ionic": "getAttendanceType(id)", "flutter": "getTypeById(id)", "status": "mapped"},
+        {"ionic": "updateAttendanceType(id, attType)", "flutter": "updateType(id, updates)", "status": "mapped"},
+        {"ionic": "addAttendanceType(attType)", "flutter": "createType(type)", "status": "mapped"},
+        {"ionic": "deleteAttendanceType(id)", "flutter": "deleteType(id)", "status": "mapped"},
+        {"ionic": "addDefaultAttendanceTypes(tenantId, type)", "flutter": null, "status": "missing", "notes": "Default types creation not implemented"}
+      ],
+      "score": 83
+    },
+    {
+      "ionicService": "sign-in-out.service.ts",
+      "flutterRepo": "sign_in_out_repository.dart",
+      "table": "person_attendances",
+      "ionicMethods": [
+        "signout(attIds, reason, isLateExcused, isParents)",
+        "signin(attId, status, notes, userId)",
+        "updateAttendanceNote(attId, notes, userId)",
+        "updatePersonAttendance(id, att, userId)"
+      ],
+      "methods": [
+        {"ionic": "signout(...)", "flutter": "signOut(...)", "status": "mapped"},
+        {"ionic": "signin(...)", "flutter": "signIn(...)", "status": "mapped"},
+        {"ionic": "updateAttendanceNote(...)", "flutter": "updateAttendanceNote(...)", "status": "mapped"},
+        {"ionic": "updatePersonAttendance(...)", "flutter": null, "status": "missing", "notes": "Generic update in attendance_repository"}
+      ],
+      "score": 75
+    },
+    {
+      "ionicService": "tenant.service.ts",
+      "flutterRepo": "tenant_providers.dart (providers only)",
+      "table": "tenants, tenantUsers, viewers, parents, organisations",
+      "ionicMethods": [
+        "getTenants(tenantUserIds)",
+        "getTenantById(id)",
+        "updateTenantData(tenant, tenantId)",
+        "getTenantsByUserId(userId)",
+        "getTenantUserById(tenantId, userId)",
+        "addUserToTenant(userId, role, email, tenantId)",
+        "updateTenantUser(updates, userId, tenantId)",
+        "removeUserFromTenant(appId, tenantId, deleteAdmin)",
+        "setFavorite(tenantId, userId, favorite)",
+        "getRoleFromTenantUser(appId, tenantId)",
+        "getViewers(tenantId)",
+        "createViewer(viewer, tenantId, appId)",
+        "deleteViewer(viewer)",
+        "getParents(tenantId)",
+        "createParent(parent, tenantId, appId)",
+        "deleteParent(parent)",
+        "getOrganisationForTenant(tenantId)",
+        "createOrganisation(name, tenantId, userId)",
+        "linkTenantToOrganisation(tenantId, organisationId)",
+        "unlinkTenantFromOrganisation(tenantId, organisationId)",
+        "getAdminUsers(tenantId)",
+        "createAdminUser(userId, email, tenantId)",
+        "createTenant(tenant)",
+        "deleteTenant(tenantId)",
+        "getTenantBySongSharingId(songSharingId)",
+        "getTenantByRegisterId(registerId)"
+      ],
+      "methods": [
+        {"ionic": "getTenants(tenantUserIds)", "flutter": "userTenantsProvider", "status": "mapped", "notes": "Provider-based"},
+        {"ionic": "getTenantById(id)", "flutter": null, "status": "missing", "notes": "Not implemented"},
+        {"ionic": "updateTenantData(...)", "flutter": null, "status": "missing", "notes": "Not implemented"},
+        {"ionic": "getTenantsByUserId(userId)", "flutter": "userTenantsProvider", "status": "mapped"},
+        {"ionic": "getTenantUserById(...)", "flutter": "currentTenantUserProvider", "status": "mapped"},
+        {"ionic": "addUserToTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "updateTenantUser(...)", "flutter": null, "status": "missing"},
+        {"ionic": "removeUserFromTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "setFavorite(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getRoleFromTenantUser(...)", "flutter": "currentRoleProvider", "status": "mapped"},
+        {"ionic": "getViewers(tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "createViewer(...)", "flutter": null, "status": "missing"},
+        {"ionic": "deleteViewer(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getParents(tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "createParent(...)", "flutter": null, "status": "missing"},
+        {"ionic": "deleteParent(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getOrganisationForTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "createOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "linkTenantToOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "unlinkTenantFromOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getAdminUsers(...)", "flutter": null, "status": "missing"},
+        {"ionic": "createAdminUser(...)", "flutter": null, "status": "missing"},
+        {"ionic": "createTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "deleteTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getTenantBySongSharingId(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getTenantByRegisterId(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 19
+    },
+    {
+      "ionicService": "cross-tenant.service.ts",
+      "flutterRepo": "cross_tenant_providers.dart, sign_in_out_repository.dart",
+      "table": "player, person_attendances, attendance_types, tenantUsers",
+      "ionicMethods": [
+        "getPersonIdForTenant(tenantId, userId)",
+        "getPersonAttendancesForTenant(personId, tenantId, startDate)",
+        "getAttendanceTypesForTenants(tenantIds)",
+        "loadAllPersonAttendancesAcrossTenants(userId, tenantUsers, tenants, startDate, forceRefresh)",
+        "getCrossTenantAttendanceType(att)",
+        "getUserRolesForTenants(userId)",
+        "getTenantsFromUser(userId, linkedTenants)",
+        "getUsersFromTenant(tenantId)",
+        "getPersonIdFromTenant(userId, tenantId)",
+        "getPossiblePersonsByName(firstName, lastName, linkedTenants, onlyWithAccount)"
+      ],
+      "methods": [
+        {"ionic": "getPersonIdForTenant(...)", "flutter": null, "status": "missing", "notes": "Internal helper"},
+        {"ionic": "getPersonAttendancesForTenant(...)", "flutter": null, "status": "missing", "notes": "Internal helper"},
+        {"ionic": "getAttendanceTypesForTenants(...)", "flutter": null, "status": "missing", "notes": "Internal helper"},
+        {"ionic": "loadAllPersonAttendancesAcrossTenants(...)", "flutter": "getAllPersonAttendancesAcrossTenants()", "status": "mapped"},
+        {"ionic": "getCrossTenantAttendanceType(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getUserRolesForTenants(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getTenantsFromUser(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getUsersFromTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getPersonIdFromTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getPossiblePersonsByName(...)", "flutter": null, "status": "missing", "notes": "Person handover not implemented"}
+      ],
+      "score": 10
+    },
+    {
+      "ionicService": "holiday.service.ts",
+      "flutterRepo": "holiday_providers.dart (via HolidayService)",
+      "table": null,
+      "ionicMethods": [
+        "getHolidays(region)"
+      ],
+      "methods": [
+        {"ionic": "getHolidays(region)", "flutter": "HolidayService.getHolidays(region)", "status": "mapped"}
+      ],
+      "score": 100
+    },
+    {
+      "ionicService": "conductor.service.ts",
+      "flutterRepo": "conductor_providers.dart (via player_repository)",
+      "table": "player",
+      "ionicMethods": [
+        "getConductors(mainGroupId, tenantId, all)"
+      ],
+      "methods": [
+        {"ionic": "getConductors(...)", "flutter": "getConductors(...)", "status": "mapped"}
+      ],
+      "score": 100
+    },
+    {
+      "ionicService": "history.service.ts",
+      "flutterRepo": null,
+      "table": "history",
+      "ionicMethods": [
+        "getHistory(tenantId)",
+        "getHistoryByAttendanceId(attendanceId, tenantId)",
+        "updateHistoryEntry(id, history)",
+        "addHistoryEntry(history, tenantId)",
+        "removeHistoryEntry(id)",
+        "addSongsToHistory(historyEntries)",
+        "getUpcomingHistory(tenantId)",
+        "getCurrentSongs(tenantId)"
+      ],
+      "methods": [
+        {"ionic": "getHistory(tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "getHistoryByAttendanceId(...)", "flutter": null, "status": "missing"},
+        {"ionic": "updateHistoryEntry(...)", "flutter": null, "status": "missing"},
+        {"ionic": "addHistoryEntry(...)", "flutter": null, "status": "missing"},
+        {"ionic": "removeHistoryEntry(...)", "flutter": null, "status": "missing"},
+        {"ionic": "addSongsToHistory(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getUpcomingHistory(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getCurrentSongs(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "admin.service.ts",
+      "flutterRepo": null,
+      "table": "tenantUsers",
+      "ionicMethods": [
+        "getAdmins(tenantId)",
+        "removeUserFromTenant(appId, tenantId, deleteAdmin)",
+        "updateTenantUser(updates, userId, tenantId)",
+        "getRoleFromTenantUser(appId, tenantId)",
+        "getTenantUserById(id, tenantId)",
+        "setFavoriteTenant(tenantId, userId, favorite)"
+      ],
+      "methods": [
+        {"ionic": "getAdmins(tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "removeUserFromTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "updateTenantUser(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getRoleFromTenantUser(...)", "flutter": "currentRoleProvider", "status": "mapped", "notes": "Provider-based"},
+        {"ionic": "getTenantUserById(...)", "flutter": "currentTenantUserProvider", "status": "mapped", "notes": "Provider-based"},
+        {"ionic": "setFavoriteTenant(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 33
+    },
+    {
+      "ionicService": "organisation.service.ts",
+      "flutterRepo": null,
+      "table": "tenant_groups, tenant_group_tenants",
+      "ionicMethods": [
+        "createOrganisation(name)",
+        "linkTenantToOrganisation(tenantId, organisation)",
+        "unlinkTenantFromOrganisation(tenantId, orgId)",
+        "getOrganisationFromTenant(tenantId)",
+        "getInstancesOfOrganisation(orgId)",
+        "getAllPersonsFromOrganisation(tenants)",
+        "getOrganisationsFromUser(userId)",
+        "getTenantsFromOrganisation(tenantId)",
+        "getLinkedTenants(tenantId)"
+      ],
+      "methods": [
+        {"ionic": "createOrganisation(name)", "flutter": null, "status": "missing"},
+        {"ionic": "linkTenantToOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "unlinkTenantFromOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getOrganisationFromTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getInstancesOfOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getAllPersonsFromOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getOrganisationsFromUser(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getTenantsFromOrganisation(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getLinkedTenants(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "group-category.service.ts",
+      "flutterRepo": "group_repository.dart (included)",
+      "table": "group_categories",
+      "ionicMethods": [
+        "getGroupCategories(tenantId)",
+        "addGroupCategory(name, tenantId)",
+        "updateGroupCategory(id, name)",
+        "deleteGroupCategory(id)"
+      ],
+      "methods": [
+        {"ionic": "getGroupCategories(tenantId)", "flutter": "getGroupCategories()", "status": "mapped"},
+        {"ionic": "addGroupCategory(name, tenantId)", "flutter": "createGroupCategory(...)", "status": "mapped"},
+        {"ionic": "updateGroupCategory(id, name)", "flutter": "updateGroupCategory(id, updates)", "status": "mapped"},
+        {"ionic": "deleteGroupCategory(id)", "flutter": "deleteGroupCategory(id)", "status": "mapped"}
+      ],
+      "score": 100
+    },
+    {
+      "ionicService": "song-category.service.ts",
+      "flutterRepo": "song_repository.dart (included)",
+      "table": "song_categories",
+      "ionicMethods": [
+        "getSongCategories(tenantId)",
+        "addSongCategory(category, tenantId)",
+        "updateSongCategory(category, id)",
+        "removeSongCategory(id)"
+      ],
+      "methods": [
+        {"ionic": "getSongCategories(tenantId)", "flutter": "getSongCategories()", "status": "mapped"},
+        {"ionic": "addSongCategory(category, tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "updateSongCategory(category, id)", "flutter": null, "status": "missing"},
+        {"ionic": "removeSongCategory(id)", "flutter": null, "status": "missing"}
+      ],
+      "score": 25
+    },
+    {
+      "ionicService": "handover.service.ts",
+      "flutterRepo": "player_repository.dart (included)",
+      "table": "player",
+      "ionicMethods": [
+        "prepareHandover(person, targetTenant, sourceTenantName, groupId, stayInInstance, mainGroup)",
+        "getHandoverRole(groupId, mainGroup)"
+      ],
+      "methods": [
+        {"ionic": "prepareHandover(...)", "flutter": "handoverPlayer(...)", "status": "mapped", "notes": "Full implementation in Flutter"},
+        {"ionic": "getHandoverRole(...)", "flutter": null, "status": "missing", "notes": "Role determined elsewhere"}
+      ],
+      "score": 50
+    },
+    {
+      "ionicService": "image.service.ts",
+      "flutterRepo": null,
+      "table": "player (img), attendance (img), profiles storage",
+      "ionicMethods": [
+        "removeImage(id, imgPath, newUser, appId, currentUserId)",
+        "updateImage(id, image, appId, currentUserId)",
+        "updateAttendanceImage(id, image)"
+      ],
+      "methods": [
+        {"ionic": "removeImage(...)", "flutter": null, "status": "missing"},
+        {"ionic": "updateImage(...)", "flutter": null, "status": "missing"},
+        {"ionic": "updateAttendanceImage(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "instance.service.ts",
+      "flutterRepo": null,
+      "table": "tenants, tenantUsers",
+      "ionicMethods": [
+        "deleteInstance(tenantId)",
+        "createInstance(tenant, userId, userEmail)",
+        "getTenantBySongSharingId(sharingId)",
+        "getTenantByRegisterId(registerId)"
+      ],
+      "methods": [
+        {"ionic": "deleteInstance(tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "createInstance(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getTenantBySongSharingId(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getTenantByRegisterId(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "profile.service.ts",
+      "flutterRepo": null,
+      "table": "player",
+      "ionicMethods": [
+        "getPlayerProfile(tenantId, userId)",
+        "getPlayerByAppId(tenantId, userId, showToast)",
+        "updateProfile(updates, userId, churchId)",
+        "changePassword(password)",
+        "updatePassword(password)"
+      ],
+      "methods": [
+        {"ionic": "getPlayerProfile(...)", "flutter": "getPlayerByAppId(...)", "status": "mapped", "notes": "In player_repository"},
+        {"ionic": "getPlayerByAppId(...)", "flutter": "getPlayerByAppId(...)", "status": "mapped", "notes": "In player_repository"},
+        {"ionic": "updateProfile(...)", "flutter": null, "status": "missing"},
+        {"ionic": "changePassword(...)", "flutter": null, "status": "missing", "notes": "Auth handled via Supabase directly"},
+        {"ionic": "updatePassword(...)", "flutter": null, "status": "missing", "notes": "Auth handled via Supabase directly"}
+      ],
+      "score": 40
+    },
+    {
+      "ionicService": "user-registration.service.ts",
+      "flutterRepo": null,
+      "table": "tenantUsers, player, parents, viewers",
+      "ionicMethods": [
+        "registerUser(email, name, role, tenantId, tenantName, password, self_register)",
+        "informUserAboutApproval(email, name, role, tenantName)",
+        "informUserAboutReject(email, name, tenantName)",
+        "addUserToTenant(userId, role, email, tenantId)",
+        "updateTenantUserRole(userId, tenantId, role)",
+        "getAppIdByEmail(email, tenantId, role)",
+        "createPlayerAccount(playerId, email, firstName, lastName, instrumentId, mainGroupId, tenantId, tenantName)"
+      ],
+      "methods": [
+        {"ionic": "registerUser(...)", "flutter": null, "status": "missing"},
+        {"ionic": "informUserAboutApproval(...)", "flutter": null, "status": "missing"},
+        {"ionic": "informUserAboutReject(...)", "flutter": null, "status": "missing"},
+        {"ionic": "addUserToTenant(...)", "flutter": null, "status": "missing"},
+        {"ionic": "updateTenantUserRole(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getAppIdByEmail(...)", "flutter": null, "status": "missing"},
+        {"ionic": "createPlayerAccount(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "viewer-parent.service.ts",
+      "flutterRepo": null,
+      "table": "viewers, parents",
+      "ionicMethods": [
+        "getViewers(tenantId)",
+        "createViewer(viewer, tenantId, appId)",
+        "deleteViewer(viewer)",
+        "getParents(tenantId)",
+        "createParent(parent, tenantId, appId)",
+        "deleteParent(parent)"
+      ],
+      "methods": [
+        {"ionic": "getViewers(tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "createViewer(...)", "flutter": null, "status": "missing"},
+        {"ionic": "deleteViewer(...)", "flutter": null, "status": "missing"},
+        {"ionic": "getParents(tenantId)", "flutter": null, "status": "missing"},
+        {"ionic": "createParent(...)", "flutter": null, "status": "missing"},
+        {"ionic": "deleteParent(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "church.service.ts",
+      "flutterRepo": null,
+      "table": "churches",
+      "ionicMethods": [
+        "getChurches()",
+        "createChurch(name, userId)"
+      ],
+      "methods": [
+        {"ionic": "getChurches()", "flutter": null, "status": "missing"},
+        {"ionic": "createChurch(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "telegram.service.ts",
+      "flutterRepo": null,
+      "table": "attendances storage, Supabase Functions",
+      "ionicMethods": [
+        "sendPlanPerTelegram(blob, name, chatId, asImage)",
+        "sendSongPerTelegram(url, chatId)",
+        "notifyPerTelegram(attId, type, reason, isParents, notes)"
+      ],
+      "methods": [
+        {"ionic": "sendPlanPerTelegram(...)", "flutter": null, "status": "missing"},
+        {"ionic": "sendSongPerTelegram(...)", "flutter": null, "status": "missing"},
+        {"ionic": "notifyPerTelegram(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "notification.service.ts",
+      "flutterRepo": null,
+      "table": "notifications",
+      "ionicMethods": [
+        "getNotificationConfig(userId)",
+        "updateNotificationConfig(config)",
+        "notifyPerTelegram(attId, type, reason, isParents, notes)",
+        "sendPlanPerTelegram(blob, name, chatId, asImage)",
+        "sendSongPerTelegram(url, chatId)"
+      ],
+      "methods": [
+        {"ionic": "getNotificationConfig(...)", "flutter": null, "status": "missing"},
+        {"ionic": "updateNotificationConfig(...)", "flutter": null, "status": "missing"},
+        {"ionic": "notifyPerTelegram(...)", "flutter": null, "status": "missing"},
+        {"ionic": "sendPlanPerTelegram(...)", "flutter": null, "status": "missing"},
+        {"ionic": "sendSongPerTelegram(...)", "flutter": null, "status": "missing"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "auth.service.ts",
+      "flutterRepo": null,
+      "table": "Supabase Auth",
+      "ionicMethods": [
+        "checkToken()",
+        "login(email, password, returnEarly)",
+        "register(email, password)",
+        "logout()",
+        "changePassword(password)",
+        "resetPassword(email)",
+        "updatePassword(password)",
+        "registerUser(...)",
+        "informUserAboutApproval(...)",
+        "informUserAboutReject(...)",
+        "removeEmailFromAuth(...)"
+      ],
+      "methods": [
+        {"ionic": "checkToken()", "flutter": "Supabase Auth (direct)", "status": "mapped", "notes": "Via Supabase SDK"},
+        {"ionic": "login(...)", "flutter": "Supabase Auth (direct)", "status": "mapped", "notes": "Via Supabase SDK"},
+        {"ionic": "register(...)", "flutter": "Supabase Auth (direct)", "status": "mapped", "notes": "Via Supabase SDK"},
+        {"ionic": "logout()", "flutter": "Supabase Auth (direct)", "status": "mapped", "notes": "Via Supabase SDK"},
+        {"ionic": "changePassword(...)", "flutter": "Supabase Auth (direct)", "status": "mapped", "notes": "Via Supabase SDK"},
+        {"ionic": "resetPassword(...)", "flutter": "Supabase Auth (direct)", "status": "mapped", "notes": "Via Supabase SDK"},
+        {"ionic": "updatePassword(...)", "flutter": "Supabase Auth (direct)", "status": "mapped", "notes": "Via Supabase SDK"},
+        {"ionic": "registerUser(...)", "flutter": null, "status": "missing", "notes": "External API calls"},
+        {"ionic": "informUserAboutApproval(...)", "flutter": null, "status": "missing", "notes": "External API calls"},
+        {"ionic": "informUserAboutReject(...)", "flutter": null, "status": "missing", "notes": "External API calls"},
+        {"ionic": "removeEmailFromAuth(...)", "flutter": null, "status": "missing", "notes": "External API calls"}
+      ],
+      "score": 64
+    },
+    {
+      "ionicService": "ai.service.ts",
+      "flutterRepo": null,
+      "table": "Supabase Functions",
+      "ionicMethods": [
+        "getGroupSynonyms(group)"
+      ],
+      "methods": [
+        {"ionic": "getGroupSynonyms(group)", "flutter": null, "status": "not_migrating", "notes": "AI features not planned for migration"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "data.service.ts",
+      "flutterRepo": null,
+      "table": null,
+      "ionicMethods": [
+        "setHandoverData(data)",
+        "getHandoverData()"
+      ],
+      "methods": [
+        {"ionic": "setHandoverData(data)", "flutter": null, "status": "not_migrating", "notes": "UI state service - not data layer"},
+        {"ionic": "getHandoverData()", "flutter": null, "status": "not_migrating", "notes": "UI state service - not data layer"}
+      ],
+      "score": 0
+    },
+    {
+      "ionicService": "db.service.ts",
+      "flutterRepo": null,
+      "table": "all",
+      "ionicMethods": [
+        "Facade for all services"
+      ],
+      "methods": [
+        {"ionic": "Facade methods", "flutter": null, "status": "not_migrating", "notes": "Facade pattern - Flutter uses repositories directly"}
+      ],
+      "score": 0
+    }
+  ],
+  "missingServices": [
+    {
+      "service": "history.service.ts",
+      "table": "history",
+      "reason": "Song history feature not implemented",
+      "priority": "medium"
+    },
+    {
+      "service": "organisation.service.ts",
+      "table": "tenant_groups, tenant_group_tenants",
+      "reason": "Organisation/tenant grouping not implemented",
+      "priority": "low"
+    },
+    {
+      "service": "image.service.ts",
+      "table": "profiles storage",
+      "reason": "Image upload/management not implemented",
+      "priority": "high"
+    },
+    {
+      "service": "instance.service.ts",
+      "table": "tenants",
+      "reason": "Tenant/instance creation not implemented",
+      "priority": "low"
+    },
+    {
+      "service": "user-registration.service.ts",
+      "table": "tenantUsers",
+      "reason": "User registration workflow not implemented",
+      "priority": "medium"
+    },
+    {
+      "service": "viewer-parent.service.ts",
+      "table": "viewers, parents",
+      "reason": "Viewer/parent management not implemented",
+      "priority": "medium"
+    },
+    {
+      "service": "church.service.ts",
+      "table": "churches",
+      "reason": "Church feature specific to certain tenants",
+      "priority": "low"
+    },
+    {
+      "service": "telegram.service.ts",
+      "table": "Supabase Functions",
+      "reason": "Telegram integration not implemented",
+      "priority": "medium"
+    },
+    {
+      "service": "notification.service.ts",
+      "table": "notifications",
+      "reason": "Notification system not implemented",
+      "priority": "high"
+    }
+  ],
+  "servicesByScore": {
+    "fullyMigrated": [
+      "meeting.service.ts",
+      "group.service.ts",
+      "teacher.service.ts",
+      "feedback.service.ts",
+      "holiday.service.ts",
+      "conductor.service.ts",
+      "group-category.service.ts"
+    ],
+    "partiallyMigrated": [
+      "attendance.service.ts",
+      "player.service.ts",
+      "song.service.ts",
+      "shift.service.ts",
+      "attendance-type.service.ts",
+      "sign-in-out.service.ts",
+      "cross-tenant.service.ts",
+      "handover.service.ts",
+      "profile.service.ts",
+      "auth.service.ts",
+      "admin.service.ts",
+      "song-category.service.ts"
+    ],
+    "notMigrated": [
+      "history.service.ts",
+      "organisation.service.ts",
+      "image.service.ts",
+      "instance.service.ts",
+      "user-registration.service.ts",
+      "viewer-parent.service.ts",
+      "church.service.ts",
+      "telegram.service.ts",
+      "notification.service.ts",
+      "tenant.service.ts"
+    ],
+    "notApplicable": [
+      "ai.service.ts",
+      "data.service.ts",
+      "db.service.ts"
+    ]
+  },
+  "recommendations": [
+    {
+      "priority": "high",
+      "service": "image.service.ts",
+      "action": "Implement image upload/removal for player profiles",
+      "effort": "medium"
+    },
+    {
+      "priority": "high",
+      "service": "notification.service.ts",
+      "action": "Implement notification configuration management",
+      "effort": "high"
+    },
+    {
+      "priority": "high",
+      "service": "song.service.ts",
+      "action": "Add file upload/download methods for song files",
+      "effort": "high"
+    },
+    {
+      "priority": "medium",
+      "service": "tenant.service.ts",
+      "action": "Create TenantRepository with full CRUD operations",
+      "effort": "high"
+    },
+    {
+      "priority": "medium",
+      "service": "history.service.ts",
+      "action": "Implement song history tracking",
+      "effort": "medium"
+    },
+    {
+      "priority": "medium",
+      "service": "user-registration.service.ts",
+      "action": "Implement user registration and account creation workflow",
+      "effort": "high"
+    },
+    {
+      "priority": "low",
+      "service": "organisation.service.ts",
+      "action": "Implement multi-tenant organisation features",
+      "effort": "high"
+    }
+  ]
+}
