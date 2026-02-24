@@ -61,6 +61,30 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Automatically open calendar with today's date pre-selected
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pickDatesWithInitialSelection();
+    });
+  }
+
+  /// Opens calendar dialog with today's date pre-selected
+  Future<void> _pickDatesWithInitialSelection() async {
+    final today = DateTime.now();
+    final normalizedToday = DateTime(today.year, today.month, today.day, 12);
+
+    final result = await MultiDateCalendarDialog.show(
+      context,
+      initialDates: [normalizedToday], // Today pre-selected in calendar
+    );
+
+    if (result != null && mounted) {
+      setState(() => _selectedDates = result);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final typesAsync = ref.watch(visibleAttendanceTypesProvider);
     final isAllDay = _selectedType?.allDay == true;
@@ -69,21 +93,6 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Anwesenheit hinzufügen'),
-        actions: [
-          TextButton.icon(
-            onPressed: _isLoading || _selectedDates.isEmpty
-                ? null
-                : _createAttendances,
-            icon: _isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.check),
-            label: Text(_selectedDates.length > 1 ? 'Erstellen' : 'Erstellen'),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppDimensions.paddingM),
@@ -92,7 +101,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
           children: [
             // Date picker (multi-select)
             _SectionCard(
-              title: 'Datum (Mehrfachauswahl möglich)',
+              title: 'Datum *',
               trailing: IconButton(
                 icon: const Icon(Icons.info_outline, size: 20),
                 onPressed: _showHolidayInfo,
@@ -115,7 +124,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
             // Attendance type
             _SectionCard(
-              title: 'Typ',
+              title: 'Typ *',
               child: typesAsync.when(
                 loading: () => const Padding(
                   padding: EdgeInsets.all(AppDimensions.paddingM),
@@ -306,6 +315,9 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
             const SizedBox(height: AppDimensions.paddingXL),
 
+            // Summary (only shown when date and type are selected)
+            _buildSummary(),
+
             // Create button at bottom
             SizedBox(
               width: double.infinity,
@@ -331,6 +343,127 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Build summary section showing what will be created
+  Widget _buildSummary() {
+    if (_selectedDates.isEmpty || _selectedType == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Determine what will be displayed as the title in the attendance list
+    final displayTitle = _typeInfo?.isNotEmpty == true ? _typeInfo! : _selectedType!.name;
+    final typeColor = _selectedType!.color != null
+        ? _parseColor(_selectedType!.color!)
+        : AppColors.primary;
+
+    return Column(
+      children: [
+        _SectionCard(
+          title: 'Vorschau (so wird es angezeigt)',
+          child: Column(
+            children: [
+              // Preview card - mimics how it will look in the attendance list
+              Container(
+                margin: const EdgeInsets.all(AppDimensions.paddingM),
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                decoration: BoxDecoration(
+                  color: typeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: typeColor.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Date
+                    Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 16, color: typeColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _getDateDisplayText(),
+                            style: TextStyle(
+                              color: AppColors.dark,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Title (typeInfo or type name)
+                    Text(
+                      displayTitle,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: typeColor,
+                      ),
+                    ),
+                    // Show original type if typeInfo is set
+                    if (_typeInfo?.isNotEmpty == true)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Typ: ${_selectedType!.name}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.medium,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    // Time or all-day
+                    Text(
+                      _selectedType!.allDay != true
+                          ? '${_getDisplayStartTime()} - ${_getDisplayEndTime()}'
+                          : 'Ganztägig${_durationDays > 1 ? ' ($_durationDays Tage)' : ''}',
+                      style: TextStyle(
+                        color: AppColors.medium,
+                      ),
+                    ),
+                    // Songs
+                    if (_songEntries.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.music_note, size: 14, color: AppColors.tertiary),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_songEntries.length} Werk${_songEntries.length == 1 ? '' : 'e'}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.tertiary),
+                          ),
+                        ],
+                      ),
+                    ],
+                    // Notes preview
+                    if (_notes?.isNotEmpty == true) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.notes, size: 14, color: AppColors.medium),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _notes!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12, color: AppColors.medium),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppDimensions.paddingM),
+      ],
     );
   }
 
