@@ -2,145 +2,152 @@
 
 ## Übersicht
 
-**Ionic Projekt:** `/Users/I576226/repositories/attendance` (~25K Zeilen TypeScript)
-**Flutter Projekt:** `/Users/I576226/repositories/attendix`
-**Migrationsfortschritt:** ~70% (Kern-Features + Statistics + Attendance Types)
+**Ionic Projekt:** `/Users/I576226/repositories/attendance` (~12.600 Zeilen TypeScript)
+**Flutter Projekt:** `/Users/I576226/repositories/attendix` (~16.800 Zeilen Dart)
+**Migrationsfortschritt:** ~75-80%
+
+| Metrik | Wert |
+|--------|------|
+| Ionic Pages | 35 |
+| Flutter Pages | 38 |
+| Flutter Repositories | 8 |
+
+*Zuletzt aktualisiert: 2026-02-24*
 
 ---
 
-## Abgeschlossene Phasen
+## Vollständig Migrierte Features ✅
 
-### Phase 1: Shared Widgets & Utils ✅
-- `lib/shared/widgets/display/avatar.dart` - Avatar mit Bild oder Initialen
-- `lib/shared/widgets/display/status_badge.dart` - Farbcodierte Status-Badges
-- `lib/shared/widgets/common/empty_state.dart` - Leerzustands-Widget
-- `lib/core/utils/toast_helper.dart` - Toast-Nachrichten (success/error/info/warning)
-- `lib/core/utils/dialog_helper.dart` - Bestätigungs- und Alert-Dialoge
-- `lib/core/utils/date_helper.dart` - Deutsche Datumsformatierung (Heute, Morgen, etc.)
-
-### Phase 2: Attendance Detail ✅
-- `lib/features/attendance/presentation/pages/attendance_detail_page.dart`
-  - Personen-Liste gruppiert nach Instrument
-  - Tap → Status-Cycle (Present → Absent → Excused → etc.)
-  - Long-Press → Selection Mode für Batch-Updates
-  - "Alle anwesend" / "Alle abwesend" Quick-Actions
-  - Speichern-Funktion mit Backend-Sync
-- `lib/data/repositories/attendance_repository.dart`
-  - `batchUpdatePersonAttendances()` hinzugefügt
-- `lib/core/providers/attendance_providers.dart`
-  - AttendanceNotifier mit Batch-Update-Support
-
-### Phase 3: Self-Service Portal ✅
-- `lib/data/repositories/sign_in_out_repository.dart` (NEU)
-  - `signIn()`, `signOut()`, `updateAttendanceNote()`
-  - `getAllPersonAttendancesAcrossTenants()` - Cross-Tenant Abfragen
-  - `CrossTenantPersonAttendance` Model
-- `lib/core/providers/self_service_providers.dart` (NEU)
-  - `allPersonAttendancesAcrossTenantsProvider`
-  - `upcomingAttendancesAcrossTenantsProvider`
-  - `pastAttendancesAcrossTenantsProvider`
-  - `currentAttendanceProvider`
-  - `attendanceStatsProvider`
-  - `SignInOutNotifier`
-- `lib/features/self_service/presentation/pages/self_service_overview_page.dart` (NEU)
-  - Statistik-Header (Anwesenheit %, Verspätungen)
-  - Aktueller Termin Card mit Sign-In/Out Buttons
-  - Kommende und vergangene Termine Listen
-  - Gruppierung: Chronologisch oder nach Tenant
-
-### Phase 4: Real-time Subscriptions ✅
-- `lib/core/providers/realtime_providers.dart` (NEU)
-  - `realtimePlayersProvider` - Live Player-Updates
-  - `realtimeAttendancesProvider` - Live Attendance-Updates
-  - `realtimeAttendanceDetailProvider` - Live Detail-Updates
-  - `RealtimeManager` Klasse für manuelle Channel-Verwaltung
-
-### Phase 5: Statistics & Charts ✅
-- `lib/core/providers/statistics_providers.dart` (NEU)
-  - `statisticsDateRangeProvider` - Zeitraum-Filter
-  - `filteredAttendancesForStatsProvider` - Gefilterte Attendances
-  - `allPersonAttendancesForStatsProvider` - Person-Attendance Daten
-  - `attendanceStatisticsProvider` - Berechnete Statistiken
-  - `trendChartDataProvider` - Trend Line Chart Daten
-  - `groupChartDataProvider` - Instrument Bar Chart Daten
-  - `topPlayersChartDataProvider` - Top 20 Spieler
-  - `divaIndexChartDataProvider` - Unentschuldigte Abwesenheiten
-  - `ageDistributionProvider` - Altersverteilung
-  - `avgAgePerInstrumentProvider` - Durchschnittsalter pro Instrument
-- `lib/features/statistics/presentation/pages/statistics_page.dart` (NEU)
-  - 7 Charts mit fl_chart
-  - Date Range Picker
-  - Pull-to-refresh
-
-### Phase 6.1: Attendance Types ✅
-- `lib/features/settings/presentation/pages/attendance_types_page.dart` (NEU)
-  - Liste aller Typen
-  - Drag & Drop Reordering
-  - Create-Dialog
-- `lib/features/settings/presentation/pages/attendance_type_edit_page.dart` (NEU)
-  - Name, Farbe, Zeiten bearbeiten
-  - Default-Status und verfügbare Status
-  - Optionen (manageSongs, visible, highlight, etc.)
-  - Delete mit Bestätigung
-- Routes: `/settings/types`, `/settings/types/:id`
+| Feature | Status |
+|---------|--------|
+| Login/Auth | ✅ |
+| Attendance List | ✅ |
+| Attendance Detail | ✅ |
+| Attendance Create | ✅ |
+| People List | ✅ |
+| Person Detail | ✅ |
+| Person Create | ✅ |
+| Members | ✅ |
+| Statistics (7 Charts) | ✅ |
+| Settings | ✅ |
+| General Settings | ✅ |
+| Attendance Types | ✅ |
+| Self-Service | ✅ |
+| Teachers | ✅ |
+| Instruments | ✅ |
+| Tenant Selection | ✅ |
+| Notifications Page | ✅ |
+| Notification Settings | ✅ |
+| Voice Leader | ✅ |
+| User Management | ✅ |
+| Pending Players | ✅ |
+| Left Players | ✅ |
+| Registration | ✅ |
+| Profile | ✅ |
+| Parents Portal | ✅ |
+| Calendar Subscription | ✅ |
+| Songs (CRUD + Filter) | ✅ |
+| History | ✅ |
+| Export | ✅ |
+| Planning (Basis) | ✅ |
 
 ---
 
-## Ausstehende Phasen
-- `lib/features/settings/presentation/pages/attendance_types_page.dart`
-- Typen: Probe, Konzert, Generalprobe, etc.
+## Ausstehende Features
 
-#### 6.4 General Settings
-- `lib/features/settings/presentation/pages/settings_page.dart`
-- Tenant-Einstellungen, Benachrichtigungen, etc.
+### Hohe Priorität 🔴
 
-**Ionic Referenz:**
-- `src/app/teacher/`
-- `src/app/settings/`
+| Feature | Ionic-Dateien | Komplexität | Beschreibung |
+|---------|---------------|-------------|--------------|
+| Meeting Detail | `meeting.page.ts` | Niedrig | Notizen bearbeiten, Teilnehmer verwalten |
+| Song Viewer (PDF) | `song-viewer.page.ts` | Mittel | PDF-Anzeige für Noten |
+| Telegram Integration | `telegram.service.ts` | Mittel | Plan per Telegram senden |
 
----
+### Mittlere Priorität 🟡
 
-### Phase 7: Advanced Features 🚀
-**Priorität:** Niedrig
-**Geschätzte Zeit:** 15-20 Stunden
+| Feature | Ionic-Dateien | Komplexität | Beschreibung |
+|---------|---------------|-------------|--------------|
+| Shifts/Schichtpläne | `shifts.page.ts`, `shift.service.ts` | Mittel | Schichtplan-Verwaltung |
+| Handover | `handover.page.ts`, `handover.service.ts` | Mittel | Spieler zu anderem Tenant übertragen |
+| Sign-out Page | `signout.page.ts` | Niedrig | Abmelde-Flow |
 
-#### 7.1 Song Detail mit PDF Viewer
-- `lib/features/songs/presentation/pages/song_detail_page.dart`
-- PDF-Anzeige für Noten
-- **Dependency:** `flutter_pdfview` oder `syncfusion_flutter_pdfviewer`
+### Niedrige Priorität 🟢
 
-#### 7.2 Export (PDF/Excel)
-- `lib/core/services/export_service.dart`
-- Anwesenheitslisten als PDF
-- Statistiken als Excel
-- **Dependencies:** `pdf`, `excel`
-
-#### 7.3 History/Timeline
-- `lib/features/history/presentation/pages/history_page.dart`
-- Änderungsverlauf für Personen und Attendances
-
-#### 7.4 Planning/Probenplan
-- `lib/features/planning/presentation/pages/planning_page.dart`
-- Kalender-Ansicht
-- Termin-Erstellung
-
-#### 7.5 Notifications
-- Push-Benachrichtigungen
-- Erinnerungen vor Terminen
-- **Dependency:** `firebase_messaging`
+| Feature | Komplexität | Beschreibung |
+|---------|-------------|--------------|
+| Holiday Service | Niedrig | Feiertage/Schulferien anzeigen |
+| AI Service | Niedrig | GPT-basierte Gruppen-Synonyme |
+| Cross-Tenant | Mittel | Daten zwischen Tenants teilen |
+| Feedback Service | Niedrig | Feedback-Funktion |
 
 ---
 
-## Noch nicht geplante Features
+## Services-Migrationsstatus
 
-Diese Features existieren in Ionic, sind aber noch nicht im Migrationsplan:
+| Ionic Service | Flutter Equivalent | Status |
+|---------------|-------------------|--------|
+| `attendance.service.ts` | `attendance_repository.dart` | ✅ |
+| `attendance-type.service.ts` | `attendance_type_repository.dart` | ✅ |
+| `player.service.ts` | `player_repository.dart` | ✅ |
+| `teacher.service.ts` | `teacher_repository.dart` | ✅ |
+| `group.service.ts` | `group_repository.dart` | ✅ |
+| `sign-in-out.service.ts` | `sign_in_out_repository.dart` | ✅ |
+| `song.service.ts` | `song_repository.dart` | ✅ |
+| `holiday.service.ts` | `holiday_service.dart` | ✅ |
+| `meeting.service.ts` | - | ⚠️ Inline |
+| `shift.service.ts` | - | ❌ |
+| `handover.service.ts` | - | ❌ |
+| `telegram.service.ts` | `telegram_service.dart` | ⚠️ Teilweise |
+| `ai.service.ts` | - | ❌ |
+| `cross-tenant.service.ts` | - | ❌ |
 
-1. **Parents Portal** - Eltern-Zugang für Minderjährige
-2. **Registration Flow** - Neuen Spieler registrieren
-3. **Handover Management** - Übergabe von Noten/Instrumenten
-4. **Telegram Integration** - Bot für Benachrichtigungen
-5. **Holiday Management** - Ferien-/Urlaubsverwaltung
-6. **Instrument Matcher** - Automatische Instrumenten-Zuordnung
+---
+
+## Empfohlene Migrationsreihenfolge
+
+### Phase 1: Vervollständigung (1-2 Stunden)
+1. **Meeting Detail Page** - Einfache CRUD-Seite
+2. **Sign-out Page** - Nutzt vorhandene Providers
+
+### Phase 2: Erweiterungen (3-5 Stunden)
+3. **Song Viewer mit PDF** - Package evaluieren
+4. **Planning Telegram-Versand** - Service existiert
+
+### Phase 3: Neue Features (5-8 Stunden)
+5. **Handover System** - Cross-tenant Logik
+6. **Shifts/Schichtpläne** - Falls benötigt
+
+### Phase 4: Nice-to-Have (2-4 Stunden)
+7. **Holiday Integration** - Feiertage in Kalender
+8. **AI Service** - GPT-Synonyme
+
+---
+
+## Untracked Dateien (zum Committen)
+
+Diese Dateien wurden kürzlich erstellt:
+- `lib/core/providers/conductor_providers.dart`
+- `lib/core/providers/holiday_providers.dart`
+- `lib/core/providers/song_filter_providers.dart`
+- `lib/core/providers/song_providers.dart`
+- `lib/core/services/holiday_service.dart`
+- `lib/core/utils/shift_utils.dart`
+- `lib/data/models/song/song_filter.dart`
+- `lib/data/repositories/song_repository.dart`
+- `lib/features/songs/presentation/pages/song_create_page.dart`
+- `lib/features/songs/presentation/pages/song_edit_page.dart`
+- `lib/features/songs/presentation/widgets/`
+- `lib/features/attendance/presentation/widgets/`
+
+---
+
+## Nächste Schritte
+
+- [ ] Meeting Detail Page erstellen (`/meetings/:id`)
+- [ ] PDF-Viewer evaluieren (flutter_pdfview vs syncfusion)
+- [ ] Telegram-Versand vervollständigen
+- [ ] Untracked Dateien committen
+- [ ] Shifts-Feature prüfen (wird es benötigt?)
 
 ---
 
@@ -155,7 +162,7 @@ class MyRepository extends BaseRepository with TenantAwareRepository {
     final response = await supabase
         .from('my_table')
         .select()
-        .eq('tenantId', tenantId);
+        .eq('tenantId', currentTenantId);  // KRITISCH!
     return (response as List).map((e) => MyModel.fromJson(e)).toList();
   }
 }
@@ -163,40 +170,10 @@ class MyRepository extends BaseRepository with TenantAwareRepository {
 
 ### Provider Pattern
 ```dart
-final myRepositoryProvider = Provider<MyRepository>((ref) {
-  return MyRepository(ref);
-});
-
 final myListProvider = FutureProvider<List<MyModel>>((ref) async {
-  final repo = ref.watch(myRepositoryProvider);
+  final repo = ref.watch(myRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return [];
   return repo.getAll();
-});
-```
-
-### Realtime Pattern
-```dart
-final realtimeMyDataProvider = StreamProvider.autoDispose<List<MyModel>>((ref) async* {
-  final supabase = ref.watch(supabaseClientProvider);
-
-  // Initial data
-  yield await fetchInitialData();
-
-  // Setup channel
-  final channel = supabase.channel('my_channel')
-    .onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      table: 'my_table',
-      callback: (payload) async {
-        controller.add(await fetchFreshData());
-      },
-    )
-    .subscribe();
-
-  ref.onDispose(() => channel.unsubscribe());
-
-  await for (final data in controller.stream) {
-    yield data;
-  }
 });
 ```
 
@@ -206,30 +183,10 @@ final realtimeMyDataProvider = StreamProvider.autoDispose<List<MyModel>>((ref) a
 
 | Feature | Ionic Datei | Zeilen |
 |---------|-------------|--------|
-| Attendance Detail | `src/app/attendance/attendance/attendance.page.ts` | ~470 |
-| Self-Service | `src/app/selfService/overview/overview.page.ts` | ~403 |
-| Statistics | `src/app/services/stats/stats.service.ts` | ~200 |
-| Realtime | `src/app/services/db.service.ts` (350-450) | ~100 |
-| Interfaces | `src/app/utilities/interfaces.ts` | ~500 |
-| Constants | `src/app/utilities/Constants.ts` | ~150 |
-| Utils | `src/app/utilities/Utils.ts` | ~300 |
-
----
-
-## Nächste Schritte
-
-1. **Entscheidung:** Welche Phase als nächstes?
-   - Phase 5 (Statistics) für Datenvisualisierung
-   - Phase 6 (Admin) für vollständiges Admin-Backend
-   - Phase 7.x (einzelnes Feature) nach Bedarf
-
-2. **Testing:** Bestehende Features testen
-   - `flutter analyze` ausführen
-   - Manuelle Tests auf Gerät/Emulator
-   - Multi-User Realtime testen
-
-3. **Router Integration:** Alle neuen Routes in `app_router.dart` hinzufügen
-
----
-
-*Zuletzt aktualisiert: 2026-02-19*
+| Attendance Detail | `attendance/attendance.page.ts` | ~470 |
+| Self-Service | `selfService/overview/overview.page.ts` | ~403 |
+| Planning | `planning/planning.page.ts` | ~610 |
+| Statistics | `services/stats/stats.service.ts` | ~200 |
+| Songs | `songs/songs.page.ts` | ~500 |
+| Handover | `handover/handover.page.ts` | ~180 |
+| Shifts | `shifts/shifts.page.ts` | ~250 |
