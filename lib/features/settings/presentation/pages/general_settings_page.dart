@@ -761,7 +761,8 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                         defaultValue = DateTime.now().toIso8601String().split('T')[0];
                         break;
                       case 'select':
-                        defaultValue = options.first;
+                        // Safe access with guard (Issue #7)
+                        defaultValue = options.isNotEmpty ? options.first : '';
                         break;
                     }
 
@@ -777,7 +778,9 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                     });
 
                     Navigator.of(ctx).pop();
-                    ToastHelper.showSuccess(context, 'Feld hinzugefügt');
+                    if (context.mounted) {
+                      ToastHelper.showSuccess(context, 'Feld hinzugefügt');
+                    }
                   },
                   child: const Text('Feld hinzufügen'),
                 ),
@@ -927,14 +930,19 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                         id: field.id, // Keep original ID
                         name: name,
                         type: field.type,
-                        defaultValue: field.type == 'select' ? options.first : field.defaultValue,
+                        // Safe access with guard (Issue #7)
+                        defaultValue: field.type == 'select' && options.isNotEmpty
+                            ? options.first
+                            : field.defaultValue,
                         options: field.type == 'select' ? options : null,
                       );
                       _markChanged();
                     });
 
                     Navigator.of(ctx).pop();
-                    ToastHelper.showSuccess(context, 'Feld aktualisiert');
+                    if (context.mounted) {
+                      ToastHelper.showSuccess(context, 'Feld aktualisiert');
+                    }
                   },
                   child: const Text('Speichern'),
                 ),
