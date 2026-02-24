@@ -34,6 +34,8 @@ PHASE 4: IMPLEMENTIERUNG
            ▼
 PHASE 5: VERIFICATION & COMMIT
   • dart analyze lib/
+  • flutter-reviewer Agent (PFLICHT!)
+  • Kritische Probleme fixen
   • /commit Skill
   • migration-status.md aktualisieren
 ```
@@ -170,19 +172,48 @@ Prüfe die neu erstellten Dateien in lib/features/$ARGUMENTS/ auf:
 dart analyze lib/
 ```
 
-### Schritt 5.2: Optional - Tests
+### Schritt 5.2: Code Review (PFLICHT!)
+
+Starte den `flutter-reviewer` Agent mit folgendem Prompt:
+
+```
+Führe ein vollständiges Code Review durch für die Migration von "$ARGUMENTS":
+
+1. Prüfe ALLE neu erstellten/geänderten Dateien:
+   - lib/features/$ARGUMENTS/**
+   - lib/data/repositories/*$ARGUMENTS* (falls vorhanden)
+   - lib/core/providers/*$ARGUMENTS* (falls vorhanden)
+
+2. Checke diese kritischen Punkte:
+   - Multi-tenant Security: tenantId in ALLEN Supabase-Queries?
+   - Repository mit Tenant: xxxRepositoryWithTenantProvider verwendet?
+   - Riverpod Patterns: Naming korrekt (xxxsProvider, xxxByIdProvider)?
+   - Async-Handling: .when() Pattern statt direktem .value?
+   - Error Handling: try-catch mit mounted-Check?
+   - Deutsche Labels: Alle UI-Texte auf Deutsch?
+   - PWA-Kompatibilität: Native APIs in try-catch?
+
+3. Gib einen Review-Report mit:
+   - 🔴 Kritische Probleme (müssen gefixt werden)
+   - 🟡 Verbesserungsvorschläge
+   - 🟢 Was gut gemacht wurde
+```
+
+**WICHTIG:** Bei kritischen Problemen (🔴) ERST fixen, dann weiter!
+
+### Schritt 5.3: Optional - Tests
 
 Frage: "Soll ich Tests generieren?"
 Falls ja: Starte `test-generator` Agent.
 
-### Schritt 5.3: Commit
+### Schritt 5.4: Commit
 
 Rufe den `/commit` Skill auf mit Message:
 ```
 feat: Migrate $ARGUMENTS from Ionic to Flutter
 ```
 
-### Schritt 5.4: Migration-Status aktualisieren
+### Schritt 5.5: Migration-Status aktualisieren
 
 Aktualisiere `.claude/migration-status.md`:
 - Feature von "Ausstehend" nach "Vollständig migriert" verschieben
@@ -315,7 +346,8 @@ Aus `lib/shared/widgets/`:
 - [ ] Deutsche Labels verwendet
 - [ ] Route in `app_router.dart`
 - [ ] Provider in `providers.dart` exportiert
-- [ ] Code Review mit flutter-reviewer
 - [ ] `dart analyze lib/` ohne Fehler
+- [ ] **Code Review mit flutter-reviewer (PFLICHT!)**
+- [ ] Kritische Probleme gefixt
 - [ ] Committed
 - [ ] `migration-status.md` aktualisiert
