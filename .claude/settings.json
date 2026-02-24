@@ -11,17 +11,14 @@
       "Bash(git checkout *)",
       "Bash(git add *)",
       "Bash(git commit *)",
+      "Bash(git push *)",
       "Bash(ls *)",
       "Bash(mkdir *)",
       "Bash(xcrun devicectl *)",
       "Bash(npx supabase *)",
-      "Read(lib/**)",
-      "Read(test/**)",
-      "Read(assets/**)",
-      "Edit(lib/**)",
-      "Edit(test/**)",
-      "Write(lib/**)",
-      "Write(test/**)"
+      "Read(**)",
+      "Edit(**)",
+      "Write(**)"
     ],
     "deny": [
       "Bash(rm -rf *)",
