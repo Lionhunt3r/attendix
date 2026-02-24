@@ -133,11 +133,13 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
     try {
       for (int i = 0; i < _localTypes.length; i++) {
         final type = _localTypes[i];
-        if (type.id != null) {
+        // Safe access without force unwrap (Issue #16 RT-008)
+        final typeId = type.id;
+        if (typeId != null) {
           await supabase
               .from('attendance_types')
               .update({'index': i})
-              .eq('id', type.id!)
+              .eq('id', typeId)
               .eq('tenant_id', tenantId);
         }
       }
@@ -207,13 +209,14 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
       await supabase.from('attendance_types').insert({
         'name': name,
         'tenant_id': tenantId,
-        'default_status': AttendanceStatus.present.value,
+        // Use .name for consistency with edit page (Issue #15)
+        'default_status': AttendanceStatus.present.name,
         'available_statuses': [
-          AttendanceStatus.neutral.value,
-          AttendanceStatus.present.value,
-          AttendanceStatus.absent.value,
-          AttendanceStatus.excused.value,
-          AttendanceStatus.late.value,
+          AttendanceStatus.neutral.name,
+          AttendanceStatus.present.name,
+          AttendanceStatus.absent.name,
+          AttendanceStatus.excused.name,
+          AttendanceStatus.late.name,
         ],
         'manage_songs': false,
         'start_time': '19:00',

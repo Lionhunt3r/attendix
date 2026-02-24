@@ -536,13 +536,26 @@ class _UserTile extends ConsumerWidget {
       subtitle: Text(_getRoleLabel(user.roleEnum)),
       trailing: PopupMenuButton<Role>(
         onSelected: (role) => _changeRole(context, ref, role),
-        itemBuilder: (context) => Role.values
-            .where((r) => r != Role.none && r != Role.applicant)
-            .map((role) => PopupMenuItem(
-                  value: role,
-                  child: Text(_getRoleLabel(role)),
-                ))
-            .toList(),
+        itemBuilder: (context) {
+          // Only show assignable roles (Issue #12)
+          // Exclude: none, applicant, player, helper, voiceLeader, voiceLeaderHelper
+          const assignableRoles = [
+            Role.admin,
+            Role.responsible,
+            Role.viewer,
+            Role.parent,
+          ];
+          final tenant = ref.read(currentTenantProvider);
+          final showParent = tenant?.parents ?? false;
+
+          return assignableRoles
+              .where((r) => r != Role.parent || showParent)
+              .map((role) => PopupMenuItem(
+                    value: role,
+                    child: Text(_getRoleLabel(role)),
+                  ))
+              .toList();
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(

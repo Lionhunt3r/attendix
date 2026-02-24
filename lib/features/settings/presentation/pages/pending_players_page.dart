@@ -16,10 +16,14 @@ final pendingPlayersProvider = FutureProvider<List<Person>>((ref) async {
 
   if (tenant == null) return [];
 
+  // Safe tenant.id access (Issue #16 RT-005)
+  final tenantId = tenant.id;
+  if (tenantId == null) return [];
+
   final response = await supabase
       .from('player')
       .select('*, instruments(id, name)')
-      .eq('tenantId', tenant.id!)
+      .eq('tenantId', tenantId)
       .eq('pending', true)
       .order('created_at', ascending: false);
 
@@ -128,10 +132,18 @@ class PendingPlayersPage extends ConsumerWidget {
           ToastHelper.showError(context, 'Kein Tenant ausgewählt');
           return;
         }
+
+        // Safe player.id access (Issue #16 RT-006)
+        final playerId = player.id;
+        if (playerId == null) {
+          ToastHelper.showError(context, 'Ungültige Spieler-ID');
+          return;
+        }
+
         await supabase
             .from('player')
             .update({'pending': false})
-            .eq('id', player.id!)
+            .eq('id', playerId)
             .eq('tenantId', tenantId);
 
         ref.invalidate(pendingPlayersProvider);
@@ -175,10 +187,18 @@ class PendingPlayersPage extends ConsumerWidget {
           ToastHelper.showError(context, 'Kein Tenant ausgewählt');
           return;
         }
+
+        // Safe player.id access (Issue #16 RT-007)
+        final playerId = player.id;
+        if (playerId == null) {
+          ToastHelper.showError(context, 'Ungültige Spieler-ID');
+          return;
+        }
+
         await supabase
             .from('player')
             .delete()
-            .eq('id', player.id!)
+            .eq('id', playerId)
             .eq('tenantId', tenantId);
 
         ref.invalidate(pendingPlayersProvider);
