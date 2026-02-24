@@ -4,10 +4,11 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/shift/shift_definition.dart';
+import '../../../../data/models/shift/shift_instance.dart';
 import '../../../../data/models/shift/shift_plan.dart';
 
 /// Shows a preview sheet with calculated shifts for the next 30 days
-void showShiftPreviewSheet(BuildContext context, ShiftPlan plan) {
+void showShiftPreviewSheet(BuildContext context, ShiftPlan plan, {ShiftInstance? startInstance}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -19,6 +20,7 @@ void showShiftPreviewSheet(BuildContext context, ShiftPlan plan) {
       builder: (context, scrollController) => ShiftPreviewSheet(
         plan: plan,
         scrollController: scrollController,
+        startInstance: startInstance,
       ),
     ),
   );
@@ -28,17 +30,21 @@ void showShiftPreviewSheet(BuildContext context, ShiftPlan plan) {
 class ShiftPreviewSheet extends StatelessWidget {
   final ShiftPlan plan;
   final ScrollController scrollController;
+  final ShiftInstance? startInstance;
 
   const ShiftPreviewSheet({
     super.key,
     required this.plan,
     required this.scrollController,
+    this.startInstance,
   });
 
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
+    final startDate = startInstance?.dateTime ?? today;
     final dateFormat = DateFormat('E, d. MMM', 'de_DE');
+    final hasCustomStart = startInstance != null;
 
     return Column(
       children: [
@@ -63,13 +69,17 @@ class ShiftPreviewSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Beispiel-Rechnung',
+                      hasCustomStart
+                          ? 'Vorschau: ${startInstance!.name}'
+                          : 'Beispiel-Rechnung',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                     ),
                     Text(
-                      'Nächste 30 Tage ab heute',
+                      hasCustomStart
+                          ? 'Nächste 30 Tage ab ${dateFormat.format(startDate)}'
+                          : 'Nächste 30 Tage ab heute',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.medium,
                           ),
@@ -100,8 +110,11 @@ class ShiftPreviewSheet extends StatelessWidget {
                   const SizedBox(width: AppDimensions.paddingM),
                   Expanded(
                     child: Text(
-                      'Startdatum: Heute (${dateFormat.format(today)})\n'
-                      'Zyklus: ${plan.cycleLengthDays} Tage',
+                      hasCustomStart
+                          ? 'Startdatum: ${dateFormat.format(startDate)} (${startInstance!.name})\n'
+                              'Zyklus: ${plan.cycleLengthDays} Tage'
+                          : 'Startdatum: Heute (${dateFormat.format(today)})\n'
+                              'Zyklus: ${plan.cycleLengthDays} Tage',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
@@ -139,16 +152,22 @@ class ShiftPreviewSheet extends StatelessWidget {
                   controller: scrollController,
                   itemCount: 30,
                   itemBuilder: (context, index) {
-                    final date = today.add(Duration(days: index));
-                    final dayInCycle = plan.getDayInCycle(date, today);
+                    final date = startDate.add(Duration(days: index));
+                    final dayInCycle = plan.getDayInCycle(date, startDate);
                     final segment = plan.getSegmentForDay(dayInCycle);
+                    final isStartDate = index == 0;
+                    final isTodayDate = date.year == today.year &&
+                        date.month == today.month &&
+                        date.day == today.day;
 
                     return _DayPreviewTile(
                       date: date,
                       dateFormat: dateFormat,
                       dayInCycle: dayInCycle,
                       segment: segment,
-                      isToday: index == 0,
+                      isToday: isTodayDate,
+                      isStartDate: isStartDate && hasCustomStart,
+                      startInstanceName: hasCustomStart ? startInstance!.name : null,
                     );
                   },
                 ),
@@ -164,6 +183,8 @@ class _DayPreviewTile extends StatelessWidget {
   final int dayInCycle;
   final ShiftDefinition? segment;
   final bool isToday;
+  final bool isStartDate;
+  final String? startInstanceName;
 
   const _DayPreviewTile({
     required this.date,
@@ -171,16 +192,19 @@ class _DayPreviewTile extends StatelessWidget {
     required this.dayInCycle,
     required this.segment,
     required this.isToday,
+    this.isStartDate = false,
+    this.startInstanceName,
   });
 
   @override
   Widget build(BuildContext context) {
     final isFree = segment?.free ?? true;
     final isWeekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+    final isHighlighted = isToday || isStartDate;
 
     return Container(
       decoration: BoxDecoration(
-        color: isToday ? AppColors.primary.withValues(alpha: 0.05) : null,
+        color: isHighlighted ? AppColors.primary.withValues(alpha: 0.05) : null,
         border: Border(
           bottom: BorderSide(
             color: AppColors.medium.withValues(alpha: 0.1),
@@ -196,7 +220,7 @@ class _DayPreviewTile extends StatelessWidget {
                 ? AppColors.success.withValues(alpha: 0.2)
                 : AppColors.warning.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
-            border: isToday
+            border: isHighlighted
                 ? Border.all(color: AppColors.primary, width: 2)
                 : null,
           ),
@@ -215,7 +239,7 @@ class _DayPreviewTile extends StatelessWidget {
             Text(
               dateFormat.format(date),
               style: TextStyle(
-                fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w500,
                 color: isWeekend ? AppColors.medium : null,
               ),
             ),
@@ -229,6 +253,24 @@ class _DayPreviewTile extends StatelessWidget {
                 ),
                 child: const Text(
                   'Heute',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+            if (isStartDate) ...[
+              const SizedBox(width: AppDimensions.paddingS),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Start',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 10,

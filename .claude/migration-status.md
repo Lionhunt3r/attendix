@@ -4,7 +4,7 @@
 
 **Ionic Projekt:** `/Users/I576226/repositories/attendance` (~12.600 Zeilen TypeScript)
 **Flutter Projekt:** `/Users/I576226/repositories/attendix` (~16.800 Zeilen Dart)
-**Migrationsfortschritt:** ~75-80%
+**Migrationsfortschritt:** ~90%
 
 | Metrik | Wert |
 |--------|------|
@@ -59,6 +59,10 @@
 | Besetzungs-Chips | ✅ |
 | Share-Link (Songs) | ✅ |
 | Copy to Tenant | ✅ |
+| Shifts/Schichtpläne | ✅ |
+| Shift Instances (feste Schichten) | ✅ |
+| Shift Copy to Tenant | ✅ |
+| Handover (Spieler-Transfer) | ✅ |
 
 ---
 
@@ -70,11 +74,7 @@
 
 ### Mittlere Priorität 🟡
 
-| Feature | Ionic-Dateien | Komplexität | Beschreibung |
-|---------|---------------|-------------|--------------|
-| Shifts/Schichtpläne | `shifts.page.ts`, `shift.service.ts` | Mittel | Schichtplan-Verwaltung |
-| Handover | `handover.page.ts`, `handover.service.ts` | Mittel | Spieler zu anderem Tenant übertragen |
-| Sign-out Page | `signout.page.ts` | Niedrig | Abmelde-Flow |
+*Keine offenen mittleren Prioritäten!*
 
 ### Niedrige Priorität 🟢
 
@@ -100,8 +100,8 @@
 | `song.service.ts` | `song_repository.dart` | ✅ |
 | `holiday.service.ts` | `holiday_service.dart` | ✅ |
 | `meeting.service.ts` | `meeting_repository.dart` | ✅ |
-| `shift.service.ts` | - | ❌ |
-| `handover.service.ts` | - | ❌ |
+| `shift.service.ts` | `shift_repository.dart` | ✅ |
+| `handover.service.ts` | `player_repository.dart` (handover methods) | ✅ |
 | `telegram.service.ts` | `telegram_service.dart` | ✅ |
 | `ai.service.ts` | - | ❌ |
 | `cross-tenant.service.ts` | - | ❌ |

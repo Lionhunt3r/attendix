@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/shift_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/shift/shift_definition.dart';
+import '../../../../data/models/shift/shift_instance.dart';
 import '../../../../data/models/shift/shift_plan.dart';
+import '../widgets/copy_shift_to_tenant_sheet.dart';
 import '../widgets/shift_preview_sheet.dart';
 
 /// Shift Detail Page
 ///
-/// Shows and edits a single shift plan with definition segments.
+/// Shows and edits a single shift plan with definition segments and fixed shifts.
 class ShiftDetailPage extends ConsumerStatefulWidget {
   final String shiftId;
 
@@ -26,6 +30,7 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
   List<ShiftDefinition> _definitions = [];
+  List<ShiftInstance> _shifts = [];
   bool _isLoading = false;
   bool _hasChanges = false;
   bool _isInitialized = false;
@@ -49,6 +54,7 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
       _nameController.text = shift.name;
       _descriptionController.text = shift.description;
       _definitions = List.from(shift.definition);
+      _shifts = List.from(shift.shifts);
       _isInitialized = true;
     }
   }
@@ -57,15 +63,34 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
   Widget build(BuildContext context) {
     final shiftAsync = ref.watch(shiftByIdProvider(widget.shiftId));
     final usageCount = ref.watch(shiftUsageCountProvider(widget.shiftId));
+    final tenantsAsync = ref.watch(userTenantsProvider);
+    final currentTenantId = ref.watch(currentTenantIdProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Schichtplan bearbeiten'),
         actions: [
+          // Copy to tenant button
+          tenantsAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (tenants) {
+              final otherTenants =
+                  tenants.where((t) => t.id != currentTenantId).toList();
+              if (otherTenants.isEmpty) return const SizedBox.shrink();
+
+              return IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: 'In andere Instanz kopieren',
+                onPressed: () => _showCopySheet(context, shiftAsync.valueOrNull),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Löschen',
-            onPressed: () => _confirmDelete(context, usageCount.valueOrNull ?? 0),
+            onPressed: () =>
+                _confirmDelete(context, usageCount.valueOrNull ?? 0),
           ),
         ],
       ),
@@ -240,7 +265,7 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => _showPreview(context, shift),
+                      onPressed: () => _showPreview(context, shift, null),
                       child: const Text('Beispiel-Rechnung'),
                     ),
                   ],
@@ -248,6 +273,76 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
               ),
             ),
           ],
+
+          const SizedBox(height: AppDimensions.paddingL),
+
+          // Fixed shifts section (optional)
+          _buildSectionHeader(
+            context,
+            'Feste Schichten (optional)',
+            action: TextButton.icon(
+              onPressed: _addShiftInstance,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Schicht hinzufügen'),
+            ),
+          ),
+
+          Card(
+            color: AppColors.warning.withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.paddingS),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 16, color: AppColors.warning),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Feste Schichten definieren konkrete Startdaten für den Schichtzyklus.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: AppDimensions.paddingS),
+
+          if (_shifts.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          size: 32, color: AppColors.medium),
+                      const SizedBox(height: AppDimensions.paddingS),
+                      const Text(
+                        'Keine festen Schichten',
+                        style: TextStyle(color: AppColors.medium),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            ...List.generate(_shifts.length, (index) {
+              return _ShiftInstanceTile(
+                key: ValueKey('shift_$index'),
+                instance: _shifts[index],
+                index: index,
+                onNameChanged: (name) => _updateShiftName(index, name),
+                onDateChanged: (date) => _updateShiftDate(index, date),
+                onDelete: () => _deleteShiftInstance(index),
+                onShowPreview: () => _showPreview(context, shift, _shifts[index]),
+              );
+            }),
 
           const SizedBox(height: 100), // Space for FAB
         ],
@@ -284,6 +379,7 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
     }
   }
 
+  // Definition segment methods
   void _addSegment() {
     setState(() {
       _definitions.add(ShiftDefinition(
@@ -312,6 +408,38 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
   void _deleteSegment(int index) {
     setState(() {
       _definitions.removeAt(index);
+      _markChanged();
+    });
+  }
+
+  // Shift instance methods
+  void _addShiftInstance() {
+    setState(() {
+      _shifts.add(ShiftInstance(
+        name: '',
+        date: DateTime.now().toIso8601String(),
+      ));
+      _markChanged();
+    });
+  }
+
+  void _updateShiftName(int index, String name) {
+    setState(() {
+      _shifts[index] = _shifts[index].copyWith(name: name);
+      _markChanged();
+    });
+  }
+
+  void _updateShiftDate(int index, DateTime date) {
+    setState(() {
+      _shifts[index] = _shifts[index].copyWith(date: date.toIso8601String());
+      _markChanged();
+    });
+  }
+
+  void _deleteShiftInstance(int index) {
+    setState(() {
+      _shifts.removeAt(index);
       _markChanged();
     });
   }
@@ -442,6 +570,7 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
       name: _nameController.text.trim(),
       description: _descriptionController.text.trim(),
       definition: _definitions,
+      shifts: _shifts,
     );
 
     final result = await notifier.updateShift(updatedPlan);
@@ -503,15 +632,35 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
     }
   }
 
-  void _showPreview(BuildContext context, ShiftPlan shift) {
+  void _showPreview(BuildContext context, ShiftPlan shift, ShiftInstance? startInstance) {
     // Create a plan with current edits
     final previewPlan = shift.copyWith(
       name: _nameController.text.trim(),
       description: _descriptionController.text.trim(),
       definition: _definitions,
+      shifts: _shifts,
     );
 
-    showShiftPreviewSheet(context, previewPlan);
+    showShiftPreviewSheet(context, previewPlan, startInstance: startInstance);
+  }
+
+  Future<void> _showCopySheet(BuildContext context, ShiftPlan? shift) async {
+    if (shift == null) return;
+
+    // Create updated plan with current edits
+    final currentPlan = shift.copyWith(
+      name: _nameController.text.trim(),
+      description: _descriptionController.text.trim(),
+      definition: _definitions,
+      shifts: _shifts,
+    );
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => CopyShiftToTenantSheet(shift: currentPlan),
+    );
   }
 }
 
@@ -593,5 +742,97 @@ class _DefinitionSegmentTile extends StatelessWidget {
     }
 
     return parts.join(' • ');
+  }
+}
+
+/// Tile for a fixed shift instance
+class _ShiftInstanceTile extends StatelessWidget {
+  final ShiftInstance instance;
+  final int index;
+  final ValueChanged<String> onNameChanged;
+  final ValueChanged<DateTime> onDateChanged;
+  final VoidCallback onDelete;
+  final VoidCallback onShowPreview;
+
+  const _ShiftInstanceTile({
+    super.key,
+    required this.instance,
+    required this.index,
+    required this.onNameChanged,
+    required this.onDateChanged,
+    required this.onDelete,
+    required this.onShowPreview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final date = DateTime.tryParse(instance.date) ?? DateTime.now();
+    final dateFormat = DateFormat('EEE, dd.MM.yyyy', 'de');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.paddingM),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Name field
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Bezeichnung',
+                hintText: 'z.B. Frühdienst',
+                isDense: true,
+              ),
+              controller: TextEditingController(text: instance.name),
+              onChanged: onNameChanged,
+            ),
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Date picker and actions
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context, date),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Anfangsdatum',
+                        isDense: true,
+                        suffixIcon: Icon(Icons.calendar_today, size: 18),
+                      ),
+                      child: Text(dateFormat.format(date)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: onShowPreview,
+                  child: const Text('Vorschau'),
+                ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, color: AppColors.danger),
+                  onPressed: onDelete,
+                  tooltip: 'Löschen',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectDate(BuildContext context, DateTime currentDate) async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: currentDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      locale: const Locale('de'),
+    );
+
+    if (selected != null) {
+      onDateChanged(selected);
+    }
   }
 }
