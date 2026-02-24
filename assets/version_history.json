@@ -1,6 +1,18 @@
 {
   "versions": [
     {
+      "version": "0.1.4",
+      "date": "24.2.2026",
+      "changes": [
+        "📋 Legende für Anwesenheitsstatus hinzugefügt",
+        "📝 Anmelden mit Notiz möglich",
+        "👋 Persönliche Begrüßung 'Shalom [Name]!'",
+        "⏸️ Pause-Status wird in der Übersicht angezeigt",
+        "🆕 Spezielle Ansicht für Bewerber (Applicant)",
+        "🎯 Aktionen basierend auf erlaubten Status gefiltert"
+      ]
+    },
+    {
       "version": "0.1.3",
       "date": "24.2.2026",
       "changes": [

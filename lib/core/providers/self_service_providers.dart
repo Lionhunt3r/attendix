@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config/supabase_config.dart';
 import '../../core/constants/enums.dart';
+import '../../data/models/person/person.dart';
 import '../../data/repositories/sign_in_out_repository.dart';
+import 'tenant_providers.dart';
 
 export '../../core/constants/enums.dart' show AttendanceStatus;
 export '../../data/repositories/sign_in_out_repository.dart'
@@ -157,3 +160,30 @@ class AttendanceStats {
     required this.presentCount,
   });
 }
+
+/// Provider for current player (user's linked player record across all tenants)
+/// Returns the first player linked to the current user
+final currentSelfServicePlayerProvider = FutureProvider<Person?>((ref) async {
+  final supabase = ref.watch(supabaseClientProvider);
+  final userId = supabase.auth.currentUser?.id;
+
+  if (userId == null) return null;
+
+  final response = await supabase
+      .from('player')
+      .select('*')
+      .eq('appId', userId)
+      .limit(1)
+      .maybeSingle();
+
+  if (response == null) return null;
+  return Person.fromJson(response);
+});
+
+/// Provider to check if current user is an applicant in the current tenant
+final isApplicantProvider = Provider<bool>((ref) {
+  final tenantUser = ref.watch(currentTenantUserProvider).valueOrNull;
+  if (tenantUser == null) return false;
+  return Role.fromValue(tenantUser.role).isApplicant;
+});
+
