@@ -806,7 +806,11 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      // Dispose controllers to prevent memory leak (Issue #22)
+      nameController.dispose();
+      optionController.dispose();
+    });
   }
 
   Future<void> _showEditExtraFieldDialog(int index) async {
@@ -968,7 +972,11 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      // Dispose controllers to prevent memory leak (Issue #22)
+      nameController.dispose();
+      optionController.dispose();
+    });
   }
 
   Future<void> _confirmDeleteExtraField(int index) async {
