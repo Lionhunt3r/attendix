@@ -11,3 +11,7 @@ export 'song_repository.dart';
 export 'meeting_repository.dart';
 export 'shift_repository.dart';
 export 'feedback_repository.dart';
+export 'organisation_repository.dart';
+export 'viewer_repository.dart';
+export 'parent_repository.dart';
+export 'church_repository.dart';

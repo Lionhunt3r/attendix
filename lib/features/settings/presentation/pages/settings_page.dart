@@ -123,6 +123,22 @@ class SettingsPage extends ConsumerWidget {
                     subtitle: 'Rollen und Berechtigungen verwalten',
                     onTap: () => context.push('/settings/users'),
                   ),
+                // Only Admin can manage viewers
+                if (role.isAdmin)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.visibility),
+                    title: 'Beobachter',
+                    subtitle: 'Externe Beobachter verwalten',
+                    onTap: () => context.push('/settings/viewers'),
+                  ),
+                // Only Admin can manage parents (if feature enabled)
+                if (role.isAdmin && tenant?.parents == true)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.family_restroom),
+                    title: 'Elternteile',
+                    subtitle: 'Eltern-Accounts verwalten',
+                    onTap: () => context.push('/settings/parents'),
+                  ),
               ],
             ),
             const SizedBox(height: AppDimensions.paddingM),

@@ -10,7 +10,9 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/providers/organisation_providers.dart';
 import '../../../../data/models/tenant/tenant.dart';
+import '../../../../data/models/organisation/organisation.dart';
 
 /// German holiday regions
 const _holidayRegions = [
@@ -535,6 +537,12 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                   ),
 
                   const SizedBox(height: AppDimensions.paddingXL),
+
+                  // Organisation section
+                  _buildSectionHeader('Organisation'),
+                  _buildOrganisationSection(),
+
+                  const SizedBox(height: AppDimensions.paddingXL),
                 ],
               ),
             ),
@@ -552,6 +560,227 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildOrganisationSection() {
+    final currentOrgAsync = ref.watch(currentOrganisationProvider);
+
+    return currentOrgAsync.when(
+      loading: () => const Card(
+        child: ListTile(
+          leading: CircularProgressIndicator(),
+          title: Text('Lade Organisation...'),
+        ),
+      ),
+      error: (e, _) => Card(
+        child: ListTile(
+          leading: const Icon(Icons.error, color: AppColors.danger),
+          title: const Text('Fehler beim Laden'),
+          subtitle: Text('$e'),
+        ),
+      ),
+      data: (organisation) => Card(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(
+                Icons.corporate_fare,
+                color: organisation != null ? AppColors.primary : AppColors.medium,
+              ),
+              title: Text(organisation?.name ?? 'Keine Organisation'),
+              subtitle: Text(
+                organisation != null
+                    ? 'Verknüpft mit Organisation'
+                    : 'Verknüpfe diesen Mandanten mit einer Organisation, um ihn mit anderen Mandanten zu gruppieren.',
+              ),
+              trailing: organisation != null
+                  ? IconButton(
+                      icon: Icon(Icons.link_off, color: AppColors.danger),
+                      onPressed: () => _unlinkOrganisation(organisation),
+                    )
+                  : null,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(
+                left: AppDimensions.paddingM,
+                right: AppDimensions.paddingM,
+                bottom: AppDimensions.paddingM,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showOrganisationDialog(organisation),
+                  icon: Icon(organisation != null ? Icons.swap_horiz : Icons.add_link),
+                  label: Text(organisation != null ? 'Organisation wechseln' : 'Mit Organisation verknüpfen'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showOrganisationDialog(Organisation? currentOrg) async {
+    final userOrgsAsync = ref.read(userOrganisationsProvider);
+
+    final organisations = await userOrgsAsync.when(
+      data: (orgs) async => orgs,
+      loading: () async => <Organisation>[],
+      error: (_, __) async => <Organisation>[],
+    );
+
+    if (!mounted) return;
+
+    final selectedOrgId = await showDialog<int?>(
+      context: context,
+      builder: (ctx) {
+        int? selected = currentOrg?.id;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: const Text('Organisation auswählen'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (organisations.isEmpty)
+                  const Text('Keine existierenden Organisationen gefunden. Erstelle eine neue.')
+                else ...[
+                  ...organisations.map((org) => RadioListTile<int?>(
+                    value: org.id,
+                    groupValue: selected,
+                    title: Text(org.name),
+                    onChanged: (v) => setDialogState(() => selected = v),
+                  )),
+                  const Divider(),
+                ],
+                ListTile(
+                  leading: const Icon(Icons.add),
+                  title: const Text('Neue Organisation erstellen'),
+                  onTap: () {
+                    Navigator.of(ctx).pop(-1); // Special value for "create new"
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: const Text('Abbrechen'),
+              ),
+              if (organisations.isNotEmpty)
+                ElevatedButton(
+                  onPressed: selected != null && selected != currentOrg?.id
+                      ? () => Navigator.of(ctx).pop(selected)
+                      : null,
+                  child: const Text('Verknüpfen'),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    if (selectedOrgId == -1) {
+      // Create new organisation
+      await _showCreateOrganisationDialog();
+    } else if (selectedOrgId != null) {
+      // Link to existing organisation
+      final notifier = ref.read(organisationNotifierProvider.notifier);
+      final success = await notifier.linkCurrentTenant(selectedOrgId);
+      if (mounted) {
+        if (success) {
+          ToastHelper.showSuccess(context, 'Organisation verknüpft');
+        } else {
+          ToastHelper.showError(context, 'Fehler beim Verknüpfen');
+        }
+      }
+    }
+  }
+
+  Future<void> _showCreateOrganisationDialog() async {
+    final nameController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Neue Organisation'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Name der Organisation',
+            hintText: 'z.B. Musikverein Musterstadt',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Erstellen & Verknüpfen'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && mounted) {
+      final name = nameController.text.trim();
+      if (name.isEmpty) {
+        ToastHelper.showError(context, 'Name ist erforderlich');
+        return;
+      }
+
+      final notifier = ref.read(organisationNotifierProvider.notifier);
+      final org = await notifier.create(name);
+      if (org != null && mounted) {
+        await notifier.linkCurrentTenant(org.id!);
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Organisation erstellt und verknüpft');
+        }
+      }
+    }
+  }
+
+  Future<void> _unlinkOrganisation(Organisation organisation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Verknüpfung aufheben?'),
+        content: Text(
+          'Möchtest du die Verknüpfung mit "${organisation.name}" aufheben?\n\n'
+          'Wenn keine anderen Mandanten mehr in dieser Organisation sind, '
+          'wird die Organisation automatisch gelöscht.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Aufheben'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final notifier = ref.read(organisationNotifierProvider.notifier);
+      final success = await notifier.unlinkCurrentTenant(organisation.id!);
+      if (mounted) {
+        if (success) {
+          ToastHelper.showSuccess(context, 'Verknüpfung aufgehoben');
+        } else {
+          ToastHelper.showError(context, 'Fehler beim Aufheben');
+        }
+      }
+    }
   }
 
   // Extra field helper methods
