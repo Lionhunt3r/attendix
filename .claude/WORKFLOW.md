@@ -22,6 +22,46 @@ Dieser Workflow ermöglicht parallele Migration von Ionic→Flutter Features.
 
 ---
 
+## Schnellstart: `/migrate` Command
+
+Der einfachste Weg eine Migration zu starten:
+
+```
+/migrate shifts
+```
+
+Dies aktiviert den `migrate-full` Skill, der automatisch:
+1. Ionic und Flutter Code parallel analysiert
+2. Migrations-Plan mit Tasks erstellt
+3. Nach Bestätigung implementiert
+4. Code Review durchführt
+5. Committed und Status aktualisiert
+
+---
+
+## Verfügbare Skills & Agents
+
+### Skills
+
+| Skill | Trigger | Beschreibung |
+|-------|---------|--------------|
+| `migrate-full` | `/migrate [feature]` | **Vollständiger Workflow** - orchestriert alles |
+| `ionic-migrate` | `/ionic-migrate [feature]` | Nur Pattern-Mapping und Code-Generierung |
+| `flutter-feature` | `/flutter-feature` | Neues Flutter Feature erstellen |
+| `freezed-model` | - | Freezed Model erstellen |
+| `supabase-repo` | - | Repository mit Tenant-Support |
+
+### Agents
+
+| Agent | Zweck | Wann nutzen |
+|-------|-------|-------------|
+| `migration-analyzer` | Ionic analysieren | Automatisch von migrate-full |
+| `flutter-reviewer` | Code prüfen | Nach Implementierung |
+| `test-generator` | Tests erstellen | Optional am Ende |
+| `Explore` | Codebase durchsuchen | Bei Unklarheiten |
+
+---
+
 ## Workflow für ein Feature
 
 ### 1. Feature auswählen
