@@ -8,6 +8,7 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
@@ -69,18 +70,6 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   bool _isLoading = true;
   bool _hasChanges = false;
   AttendanceType? _originalType;
-
-  final List<String> _availableColors = [
-    'primary',
-    'secondary',
-    'tertiary',
-    'success',
-    'warning',
-    'danger',
-    'rosa',
-    'mint',
-    'orange',
-  ];
 
   @override
   void initState() {
@@ -179,8 +168,8 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
               child: Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _availableColors.map((colorName) {
-                  final color = _getColor(colorName);
+                children: ColorUtils.availableColors.map((colorName) {
+                  final color = ColorUtils.getColorForPicker(colorName);
                   final isSelected = _color == colorName;
                   return GestureDetector(
                     onTap: () => setState(() {
@@ -401,31 +390,6 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         return 'Verspätet (entsch.)';
       case AttendanceStatus.neutral:
         return 'Neutral';
-    }
-  }
-
-  Color _getColor(String? colorName) {
-    switch (colorName) {
-      case 'primary':
-        return AppColors.primary;
-      case 'secondary':
-        return AppColors.secondary;
-      case 'tertiary':
-        return Colors.purple;
-      case 'success':
-        return AppColors.success;
-      case 'warning':
-        return AppColors.warning;
-      case 'danger':
-        return AppColors.danger;
-      case 'rosa':
-        return Colors.pink;
-      case 'mint':
-        return Colors.teal;
-      case 'orange':
-        return Colors.orange;
-      default:
-        return AppColors.primary;
     }
   }
 

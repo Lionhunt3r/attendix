@@ -5,6 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/self_service_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/date_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
@@ -225,7 +226,7 @@ class _SelfServiceOverviewPageState
       widgets.add(SliverToBoxAdapter(
         child: _SectionHeader(
           title: tenantName,
-          color: _parseColor(tenantColor),
+          color: ColorUtils.parseNamedColor(tenantColor),
         ),
       ));
 
@@ -665,15 +666,6 @@ class _SelfServiceOverviewPageState
         ),
       ),
     );
-  }
-
-  Color _parseColor(String hexColor) {
-    try {
-      return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
-    } catch (e) {
-      debugPrint('Warning: Failed to parse color "$hexColor", using primary color');
-      return AppColors.primary;
-    }
   }
 }
 

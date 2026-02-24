@@ -7,6 +7,7 @@ import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/holiday_providers.dart';
 import '../../../../core/services/holiday_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/color_utils.dart';
 import '../../../../data/models/attendance/attendance.dart';
 
 /// Calendar highlight info for a specific date
@@ -209,7 +210,7 @@ class _MultiDateCalendarState extends ConsumerState<MultiDateCalendar> {
       );
 
       if (type.name.isNotEmpty) {
-        final color = _parseColor(type.color);
+        final color = ColorUtils.parseNamedColor(type.color);
         return CalendarHighlight(
           backgroundColor: color.withValues(alpha: 0.18),
           textColor: color,
@@ -258,41 +259,6 @@ class _MultiDateCalendarState extends ConsumerState<MultiDateCalendar> {
             dayNormalized.isBefore(endNormalized));
   }
 
-  Color _parseColor(String? colorStr) {
-    if (colorStr == null || colorStr.isEmpty) return AppColors.primary;
-
-    try {
-      if (colorStr.startsWith('#')) {
-        return Color(int.parse('FF${colorStr.substring(1)}', radix: 16));
-      }
-      // Handle color names like "primary", "danger", etc.
-      switch (colorStr.toLowerCase()) {
-        case 'primary':
-          return AppColors.primary;
-        case 'secondary':
-          return AppColors.secondary;
-        case 'success':
-          return AppColors.success;
-        case 'warning':
-          return AppColors.warning;
-        case 'danger':
-          return AppColors.danger;
-        case 'tertiary':
-          return AppColors.tertiary;
-        case 'rosa':
-          return const Color(0xFFE91E63); // Pink/Rosa
-        case 'mint':
-          return Colors.teal;
-        case 'orange':
-          return Colors.orange;
-        default:
-          return AppColors.primary;
-      }
-    } catch (_) {
-      return AppColors.primary;
-    }
-  }
-
   Widget _buildLegend(List<AttendanceType> types, HolidayData? holidays) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -301,7 +267,7 @@ class _MultiDateCalendarState extends ConsumerState<MultiDateCalendar> {
         children: [
           // Attendance types
           ...types.where((t) => t.visible == true).take(4).map((type) {
-            final color = _parseColor(type.color);
+            final color = ColorUtils.parseNamedColor(type.color);
             return Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Row(

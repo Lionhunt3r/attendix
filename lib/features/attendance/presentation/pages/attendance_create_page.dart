@@ -12,6 +12,7 @@ import '../../../../core/providers/holiday_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/shift_utils.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../widgets/multi_date_calendar.dart';
@@ -169,7 +170,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
                                       width: 24,
                                       height: 24,
                                       decoration: BoxDecoration(
-                                        color: _parseColor(type.color!),
+                                        color: ColorUtils.parseNamedColor(type.color),
                                         shape: BoxShape.circle,
                                       ),
                                     )
@@ -354,9 +355,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
     // Determine what will be displayed as the title in the attendance list
     final displayTitle = _typeInfo?.isNotEmpty == true ? _typeInfo! : _selectedType!.name;
-    final typeColor = _selectedType!.color != null
-        ? _parseColor(_selectedType!.color!)
-        : AppColors.primary;
+    final typeColor = ColorUtils.parseNamedColor(_selectedType!.color);
 
     return Column(
       children: [
@@ -954,39 +953,6 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
-
-  Color _parseColor(String colorStr) {
-    try {
-      if (colorStr.startsWith('#')) {
-        return Color(int.parse('FF${colorStr.substring(1)}', radix: 16));
-      }
-      // Handle named colors
-      switch (colorStr.toLowerCase()) {
-        case 'primary':
-          return AppColors.primary;
-        case 'secondary':
-          return AppColors.secondary;
-        case 'success':
-          return AppColors.success;
-        case 'warning':
-          return AppColors.warning;
-        case 'danger':
-          return AppColors.danger;
-        case 'tertiary':
-          return AppColors.tertiary;
-        case 'rosa':
-          return Colors.pink;
-        case 'mint':
-          return Colors.teal;
-        case 'orange':
-          return Colors.orange;
-        default:
-          return AppColors.primary;
-      }
-    } catch (_) {
-      return AppColors.primary;
-    }
   }
 }
 

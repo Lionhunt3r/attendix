@@ -7,6 +7,7 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 
@@ -250,7 +251,7 @@ class _AttendanceTypeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _getColor(type.color);
+    final color = ColorUtils.getColorForPicker(type.color);
 
     return ListTile(
       leading: Container(
@@ -291,30 +292,5 @@ class _AttendanceTypeTile extends StatelessWidget {
     }
 
     return parts.isEmpty ? 'Standard' : parts.join(' • ');
-  }
-
-  Color _getColor(String? colorName) {
-    switch (colorName) {
-      case 'primary':
-        return AppColors.primary;
-      case 'secondary':
-        return AppColors.secondary;
-      case 'tertiary':
-        return Colors.purple;
-      case 'success':
-        return AppColors.success;
-      case 'warning':
-        return AppColors.warning;
-      case 'danger':
-        return AppColors.danger;
-      case 'rosa':
-        return Colors.pink;
-      case 'mint':
-        return Colors.teal;
-      case 'orange':
-        return Colors.orange;
-      default:
-        return AppColors.primary;
-    }
   }
 }
