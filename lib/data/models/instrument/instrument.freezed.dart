@@ -590,7 +590,9 @@ mixin _$Group {
   @JsonKey(name: 'category_id')
   int? get categoryId => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
-  DateTime? get createdAt => throw _privateConstructorUsedError;
+  DateTime? get createdAt => throw _privateConstructorUsedError; // Fields from Ionic instruments table
+  bool? get maingroup => throw _privateConstructorUsedError;
+  String? get synonyms => throw _privateConstructorUsedError;
 
   /// Serializes this Group to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -615,6 +617,8 @@ abstract class $GroupCopyWith<$Res> {
     int? index,
     @JsonKey(name: 'category_id') int? categoryId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
+    bool? maingroup,
+    String? synonyms,
   });
 }
 
@@ -641,6 +645,8 @@ class _$GroupCopyWithImpl<$Res, $Val extends Group>
     Object? index = freezed,
     Object? categoryId = freezed,
     Object? createdAt = freezed,
+    Object? maingroup = freezed,
+    Object? synonyms = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -684,6 +690,16 @@ class _$GroupCopyWithImpl<$Res, $Val extends Group>
                     ? _value.createdAt
                     : createdAt // ignore: cast_nullable_to_non_nullable
                         as DateTime?,
+            maingroup:
+                freezed == maingroup
+                    ? _value.maingroup
+                    : maingroup // ignore: cast_nullable_to_non_nullable
+                        as bool?,
+            synonyms:
+                freezed == synonyms
+                    ? _value.synonyms
+                    : synonyms // ignore: cast_nullable_to_non_nullable
+                        as String?,
           )
           as $Val,
     );
@@ -707,6 +723,8 @@ abstract class _$$GroupImplCopyWith<$Res> implements $GroupCopyWith<$Res> {
     int? index,
     @JsonKey(name: 'category_id') int? categoryId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
+    bool? maingroup,
+    String? synonyms,
   });
 }
 
@@ -732,6 +750,8 @@ class __$$GroupImplCopyWithImpl<$Res>
     Object? index = freezed,
     Object? categoryId = freezed,
     Object? createdAt = freezed,
+    Object? maingroup = freezed,
+    Object? synonyms = freezed,
   }) {
     return _then(
       _$GroupImpl(
@@ -775,6 +795,16 @@ class __$$GroupImplCopyWithImpl<$Res>
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
                     as DateTime?,
+        maingroup:
+            freezed == maingroup
+                ? _value.maingroup
+                : maingroup // ignore: cast_nullable_to_non_nullable
+                    as bool?,
+        synonyms:
+            freezed == synonyms
+                ? _value.synonyms
+                : synonyms // ignore: cast_nullable_to_non_nullable
+                    as String?,
       ),
     );
   }
@@ -792,6 +822,8 @@ class _$GroupImpl implements _Group {
     this.index,
     @JsonKey(name: 'category_id') this.categoryId,
     @JsonKey(name: 'created_at') this.createdAt,
+    this.maingroup = false,
+    this.synonyms,
   });
 
   factory _$GroupImpl.fromJson(Map<String, dynamic> json) =>
@@ -815,10 +847,16 @@ class _$GroupImpl implements _Group {
   @override
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
+  // Fields from Ionic instruments table
+  @override
+  @JsonKey()
+  final bool? maingroup;
+  @override
+  final String? synonyms;
 
   @override
   String toString() {
-    return 'Group(id: $id, tenantId: $tenantId, name: $name, shortName: $shortName, color: $color, index: $index, categoryId: $categoryId, createdAt: $createdAt)';
+    return 'Group(id: $id, tenantId: $tenantId, name: $name, shortName: $shortName, color: $color, index: $index, categoryId: $categoryId, createdAt: $createdAt, maingroup: $maingroup, synonyms: $synonyms)';
   }
 
   @override
@@ -837,7 +875,11 @@ class _$GroupImpl implements _Group {
             (identical(other.categoryId, categoryId) ||
                 other.categoryId == categoryId) &&
             (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt));
+                other.createdAt == createdAt) &&
+            (identical(other.maingroup, maingroup) ||
+                other.maingroup == maingroup) &&
+            (identical(other.synonyms, synonyms) ||
+                other.synonyms == synonyms));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -852,6 +894,8 @@ class _$GroupImpl implements _Group {
     index,
     categoryId,
     createdAt,
+    maingroup,
+    synonyms,
   );
 
   /// Create a copy of Group
@@ -878,6 +922,8 @@ abstract class _Group implements Group {
     final int? index,
     @JsonKey(name: 'category_id') final int? categoryId,
     @JsonKey(name: 'created_at') final DateTime? createdAt,
+    final bool? maingroup,
+    final String? synonyms,
   }) = _$GroupImpl;
 
   factory _Group.fromJson(Map<String, dynamic> json) = _$GroupImpl.fromJson;
@@ -899,7 +945,11 @@ abstract class _Group implements Group {
   int? get categoryId;
   @override
   @JsonKey(name: 'created_at')
-  DateTime? get createdAt;
+  DateTime? get createdAt; // Fields from Ionic instruments table
+  @override
+  bool? get maingroup;
+  @override
+  String? get synonyms;
 
   /// Create a copy of Group
   /// with the given fields replaced by the non-null parameter values.

@@ -43,6 +43,9 @@ class Group with _$Group {
     int? index,
     @JsonKey(name: 'category_id') int? categoryId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
+    // Fields from Ionic instruments table
+    @Default(false) bool? maingroup,
+    String? synonyms,
   }) = _Group;
 
   factory Group.fromJson(Map<String, dynamic> json) => _$GroupFromJson(json);

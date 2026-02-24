@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "0.1.6",
+      "date": "24.2.2026",
+      "changes": [
+        "✏️ Werke direkt in der Detailansicht bearbeiten (ohne separate Seite)",
+        "🎵 Besetzungs-Chips zeigen grün/rot für vorhandene/fehlende Instrumente",
+        "🔗 Link-Button zum Kopieren des Werk-Links in Zwischenablage",
+        "📋 Werke in andere Instanzen kopieren (inkl. Dateien)",
+        "👁 Leseansicht für Spieler ohne Bearbeitungsrechte"
+      ]
+    },
+    {
       "version": "0.1.5",
       "date": "24.2.2026",
       "changes": [

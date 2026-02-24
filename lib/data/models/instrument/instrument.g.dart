@@ -64,6 +64,8 @@ _$GroupImpl _$$GroupImplFromJson(Map<String, dynamic> json) => _$GroupImpl(
       json['created_at'] == null
           ? null
           : DateTime.parse(json['created_at'] as String),
+  maingroup: json['maingroup'] as bool? ?? false,
+  synonyms: json['synonyms'] as String?,
 );
 
 Map<String, dynamic> _$$GroupImplToJson(_$GroupImpl instance) =>
@@ -76,6 +78,8 @@ Map<String, dynamic> _$$GroupImplToJson(_$GroupImpl instance) =>
       'index': instance.index,
       'category_id': instance.categoryId,
       'created_at': instance.createdAt?.toIso8601String(),
+      'maingroup': instance.maingroup,
+      'synonyms': instance.synonyms,
     };
 
 _$GroupCategoryImpl _$$GroupCategoryImplFromJson(Map<String, dynamic> json) =>

@@ -270,6 +270,63 @@ class SongFileService {
     }
   }
 
+  /// Upload file from bytes (for copying between tenants)
+  Future<String> uploadFileBytes({
+    required int songId,
+    required int tenantId,
+    required String fileName,
+    required String fileType,
+    required Uint8List bytes,
+    int? instrumentId,
+    String? note,
+  }) async {
+    // Generate unique storage path
+    final fileId = _encodeFilename(fileName);
+    final storagePath = 'songs/$tenantId/$songId/$fileId';
+
+    // Upload to storage
+    await _supabase.storage.from(_bucketName).uploadBinary(
+          storagePath,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: _getContentType(fileType),
+            upsert: true,
+          ),
+        );
+
+    // Get public URL
+    final url = _supabase.storage.from(_bucketName).getPublicUrl(storagePath);
+
+    // Get current song to update files array
+    final songResponse = await _supabase
+        .from('songs')
+        .select('files')
+        .eq('id', songId)
+        .eq('tenantId', tenantId)
+        .single();
+
+    // Build new files array
+    final existingFiles = (songResponse['files'] as List?) ?? [];
+    final newFile = {
+      'storageName': fileId,
+      'fileName': fileName,
+      'fileType': fileType,
+      'url': url,
+      'instrumentId': instrumentId,
+      'note': note,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    final updatedFiles = [...existingFiles, newFile];
+
+    // Update song with new files array
+    await _supabase.from('songs').update({
+      'files': updatedFiles,
+    }).eq('id', songId).eq('tenantId', tenantId);
+
+    return url;
+  }
+
   /// Get content type for file
   String _getContentType(String extension) {
     switch (extension.toLowerCase()) {
@@ -280,6 +337,14 @@ class SongFileService {
       case 'jpg':
       case 'jpeg':
         return 'image/jpeg';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'wav':
+        return 'audio/wav';
+      case 'ogg':
+        return 'audio/ogg';
+      case 'm4a':
+        return 'audio/mp4';
       default:
         return 'application/octet-stream';
     }

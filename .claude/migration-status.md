@@ -55,6 +55,10 @@
 | Telegram Song-Versand | ✅ |
 | Smart Print (Kopien) | ✅ |
 | ZIP-Download | ✅ |
+| Song Detail Inline-Edit | ✅ |
+| Besetzungs-Chips | ✅ |
+| Share-Link (Songs) | ✅ |
+| Copy to Tenant | ✅ |
 
 ---
 
@@ -71,7 +75,6 @@
 | Shifts/Schichtpläne | `shifts.page.ts`, `shift.service.ts` | Mittel | Schichtplan-Verwaltung |
 | Handover | `handover.page.ts`, `handover.service.ts` | Mittel | Spieler zu anderem Tenant übertragen |
 | Sign-out Page | `signout.page.ts` | Niedrig | Abmelde-Flow |
-| Share-Link (Songs) | - | Mittel | Öffentlicher Song-Link ohne Login |
 
 ### Niedrige Priorität 🟢
 
@@ -151,7 +154,10 @@ Diese Dateien wurden kürzlich erstellt:
 - [x] Smart Print mit Kopien pro Instrument
 - [x] ZIP-Download für alle Song-Dateien
 - [x] Telegram-Versand für Song-Dateien
-- [ ] Share-Link für Songs (benötigt DB-Änderung)
+- [x] Share-Link für Songs
+- [x] Song Detail Inline-Bearbeitung wie Ionic
+- [x] Besetzungs-Chips mit grün/rot Logik
+- [x] Copy to Tenant Feature
 - [ ] Untracked Dateien committen
 - [ ] Shifts-Feature prüfen (wird es benötigt?)
 

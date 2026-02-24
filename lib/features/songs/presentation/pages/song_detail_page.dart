@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -11,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/song_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/song_file_service.dart';
 import '../../../../core/services/telegram_service.dart';
 import '../../../../core/services/zip_service.dart';
@@ -20,12 +22,14 @@ import '../../../../core/utils/instrument_matcher.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/instrument/instrument.dart';
 import '../../../../data/models/song/song.dart';
+import '../../../../data/models/tenant/tenant.dart';
 import '../../../../shared/widgets/sheets/image_viewer_sheet.dart';
+import '../widgets/copy_to_tenant_sheet.dart';
 import '../widgets/file_upload_sheet.dart';
 import '../widgets/pdf_viewer_sheet.dart';
 import '../widgets/smart_print_dialog.dart';
 
-/// Song Detail Page
+/// Song Detail Page - with inline editing like Ionic
 class SongDetailPage extends ConsumerStatefulWidget {
   final String songId;
 
@@ -36,145 +40,192 @@ class SongDetailPage extends ConsumerStatefulWidget {
 }
 
 class _SongDetailPageState extends ConsumerState<SongDetailPage> {
+  // Edit state
+  late TextEditingController _prefixController;
+  late TextEditingController _numberController;
+  late TextEditingController _nameController;
+  late TextEditingController _linkController;
+
+  bool _initialized = false;
+  bool _isSaving = false;
+
+  // Local state for toggles and selects
+  bool _withChoir = false;
+  bool _withSolo = false;
+  int? _difficulty;
+  String? _category;
+  List<int> _selectedInstrumentIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _prefixController = TextEditingController();
+    _numberController = TextEditingController();
+    _nameController = TextEditingController();
+    _linkController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _prefixController.dispose();
+    _numberController.dispose();
+    _nameController.dispose();
+    _linkController.dispose();
+    super.dispose();
+  }
+
+  void _initializeFromSong(Song song) {
+    if (_initialized) return;
+    _prefixController.text = song.prefix ?? '';
+    _numberController.text = song.number?.toString() ?? '';
+    _nameController.text = song.name;
+    _linkController.text = song.link ?? '';
+    _withChoir = song.withChoir;
+    _withSolo = song.withSolo;
+    _difficulty = song.difficulty;
+    _category = song.category;
+    _selectedInstrumentIds = List.from(song.instrumentIds ?? []);
+    _initialized = true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final songId = int.tryParse(widget.songId);
     if (songId == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Lied')),
+        appBar: AppBar(title: const Text('Werk')),
         body: const Center(child: Text('Ungültige Song-ID')),
       );
     }
 
     final songAsync = ref.watch(songByIdProvider(songId));
+    final role = ref.watch(currentRoleProvider);
+    final tenant = ref.watch(currentTenantProvider);
+    final isOrchestra = tenant?.type == 'orchestra';
+
+    // ReadOnly mode: only admin/responsible can edit
+    final readOnly = !(role.isAdmin || role.isResponsible);
 
     return songAsync.when(
       loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Lied')),
+        appBar: AppBar(title: const Text('Werk')),
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (error, _) => Scaffold(
-        appBar: AppBar(title: const Text('Lied')),
+        appBar: AppBar(title: const Text('Werk')),
         body: Center(child: Text('Fehler: $error')),
       ),
       data: (song) {
         if (song == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Lied')),
-            body: const Center(child: Text('Lied nicht gefunden')),
+            appBar: AppBar(title: const Text('Werk')),
+            body: const Center(child: Text('Werk nicht gefunden')),
           );
         }
 
+        _initializeFromSong(song);
+
         return Scaffold(
           appBar: AppBar(
-            title: Text(song.displayName),
+            title: Text(readOnly ? song.displayName : 'Werk bearbeiten'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () => context.push('/settings/songs/${widget.songId}/edit'),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _deleteSong(context, song),
-              ),
+              // Share link button
+              if (tenant?.songSharingId != null)
+                IconButton(
+                  icon: const Icon(Icons.link),
+                  tooltip: 'Link kopieren',
+                  onPressed: () => _copyShareLink(context, song.id!, tenant!.songSharingId!),
+                ),
+              // Delete button (only for non-readOnly)
+              if (!readOnly)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => _deleteSong(context, song),
+                ),
             ],
           ),
           body: ListView(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             children: [
-              // Song header card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppDimensions.paddingM),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (song.fullNumber.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withAlpha(20),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            song.fullNumber,
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      Text(
-                        song.name,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      if (song.conductor != null) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.person,
-                                size: 16, color: AppColors.medium),
-                            const SizedBox(width: 4),
-                            Text(
-                              song.conductor!,
-                              style: const TextStyle(color: AppColors.medium),
-                            ),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (song.withChoir)
-                            const Chip(
-                              label: Text('Mit Chor'),
-                              avatar: Icon(Icons.groups, size: 16),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          if (song.withSolo)
-                            const Chip(
-                              label: Text('Mit Solo'),
-                              avatar: Icon(Icons.mic, size: 16),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          if (song.difficultyLabel != null)
-                            Chip(
-                              label: Text(song.difficultyLabel!),
-                              avatar: const Icon(Icons.speed, size: 16),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          if (song.category != null)
-                            Chip(
-                              label: Text(song.category!),
-                              avatar: const Icon(Icons.category, size: 16),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
+              // Editable fields section (only shown in edit mode)
+              if (!readOnly) ...[
+                _EditableFieldsCard(
+                  prefixController: _prefixController,
+                  numberController: _numberController,
+                  nameController: _nameController,
+                  linkController: _linkController,
+                  withChoir: _withChoir,
+                  withSolo: _withSolo,
+                  difficulty: _difficulty,
+                  category: _category,
+                  selectedInstrumentIds: _selectedInstrumentIds,
+                  isOrchestra: isOrchestra,
+                  isSaving: _isSaving,
+                  onWithChoirChanged: (v) => _updateAndSave(song.id!, () => _withChoir = v),
+                  onWithSoloChanged: (v) => _updateAndSave(song.id!, () => _withSolo = v),
+                  onDifficultyChanged: (v) => _updateAndSave(song.id!, () => _difficulty = v),
+                  onCategoryChanged: (v) => _updateAndSave(song.id!, () => _category = v),
+                  onInstrumentIdsChanged: (v) => _updateAndSave(song.id!, () => _selectedInstrumentIds = v),
+                  onFieldBlur: () => _saveChanges(song.id!),
                 ),
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
+                const SizedBox(height: AppDimensions.paddingM),
+              ],
 
-              // Instruments section
-              if (song.instrumentIds != null && song.instrumentIds!.isNotEmpty)
-                _InstrumentsSection(instrumentIds: song.instrumentIds!),
+              // Read-only header card (shown in readOnly mode)
+              if (readOnly) ...[
+                _ReadOnlyHeaderCard(song: song),
+                const SizedBox(height: AppDimensions.paddingM),
+              ],
 
+              // Category chip (read-only mode)
+              if (readOnly && song.category != null) ...[
+                _SectionHeader(title: 'Kategorie'),
+                Wrap(
+                  children: [
+                    Chip(
+                      label: Text(song.category!),
+                      backgroundColor: AppColors.secondary.withAlpha(30),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppDimensions.paddingM),
+              ],
+
+              // Besetzungs-Chips section (read-only mode with green/red logic)
+              if (readOnly && (song.withChoir || song.withSolo || (isOrchestra && song.instrumentIds?.isNotEmpty == true)))
+                _BesetzungsSection(
+                  song: song,
+                  isOrchestra: isOrchestra,
+                ),
+
+              // Instruments section (edit mode - multi-select already in _EditableFieldsCard)
               // Files section
               _FilesSection(
                 files: song.files ?? [],
                 songId: song.id!,
                 songName: song.displayName,
+                readOnly: readOnly,
                 onFileAdded: () => ref.invalidate(songByIdProvider(songId)),
               ),
+
+              // External link (read-only mode)
+              if (readOnly && song.link != null && song.link!.isNotEmpty) ...[
+                const SizedBox(height: AppDimensions.paddingM),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.link, color: AppColors.primary),
+                    title: const Text('Externen Noten-Link öffnen'),
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: () => _openLink(song.link!),
+                  ),
+                ),
+              ],
+
+              // Copy to other instance (only for admin/responsible)
+              if (!readOnly) ...[
+                const SizedBox(height: AppDimensions.paddingM),
+                _CopyToTenantButton(song: song),
+              ],
 
               // Last sung
               if (song.lastSung != null) ...[
@@ -187,29 +238,59 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
                   ),
                 ),
               ],
-
-              // External link
-              if (song.link != null && song.link!.isNotEmpty) ...[
-                const SizedBox(height: AppDimensions.paddingM),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.link),
-                    title: const Text('Externer Link'),
-                    subtitle: Text(
-                      song.link!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: const Icon(Icons.open_in_new),
-                    onTap: () => _openLink(song.link!),
-                  ),
-                ),
-              ],
             ],
           ),
         );
       },
     );
+  }
+
+  Future<void> _updateAndSave(int songId, VoidCallback update) async {
+    setState(update);
+    await _saveChanges(songId);
+  }
+
+  Future<void> _saveChanges(int songId) async {
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final notifier = ref.read(songNotifierProvider.notifier);
+
+      final updates = <String, dynamic>{
+        'name': _nameController.text.trim(),
+        'number': int.tryParse(_numberController.text.trim()),
+        'prefix': _prefixController.text.trim().isNotEmpty
+            ? _prefixController.text.trim()
+            : null,
+        'link': _linkController.text.trim().isNotEmpty
+            ? _linkController.text.trim()
+            : null,
+        'withChoir': _withChoir,
+        'withSolo': _withSolo,
+        'difficulty': _difficulty,
+        'category': _category,
+        'instrument_ids':
+            _selectedInstrumentIds.isNotEmpty ? _selectedInstrumentIds : null,
+      };
+
+      await notifier.updateSong(songId, updates);
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler beim Speichern: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  void _copyShareLink(BuildContext context, int songId, String sharingId) {
+    final link = '${Uri.base.origin}/$sharingId/$songId';
+    Clipboard.setData(ClipboardData(text: link));
+    ToastHelper.showSuccess(context, 'Link in Zwischenablage kopiert');
   }
 
   Future<void> _openLink(String url) async {
@@ -222,7 +303,7 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
   Future<void> _deleteSong(BuildContext context, Song song) async {
     final confirmed = await DialogHelper.showConfirmation(
       context,
-      title: 'Lied löschen',
+      title: 'Werk löschen',
       message: 'Möchtest du "${song.name}" wirklich löschen?',
       confirmText: 'Löschen',
       cancelText: 'Abbrechen',
@@ -235,7 +316,7 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
           await ref.read(songNotifierProvider.notifier).deleteSong(song.id!);
 
       if (mounted && success) {
-        ToastHelper.showSuccess(context, 'Lied gelöscht');
+        ToastHelper.showSuccess(context, 'Werk gelöscht');
         context.pop();
       }
     } catch (e) {
@@ -246,65 +327,512 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
   }
 }
 
-class _InstrumentsSection extends ConsumerWidget {
-  final List<int> instrumentIds;
+/// Section header widget
+class _SectionHeader extends StatelessWidget {
+  final String title;
 
-  const _InstrumentsSection({required this.instrumentIds});
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.medium,
+        ),
+      ),
+    );
+  }
+}
+
+/// Editable fields card for edit mode
+class _EditableFieldsCard extends ConsumerWidget {
+  final TextEditingController prefixController;
+  final TextEditingController numberController;
+  final TextEditingController nameController;
+  final TextEditingController linkController;
+  final bool withChoir;
+  final bool withSolo;
+  final int? difficulty;
+  final String? category;
+  final List<int> selectedInstrumentIds;
+  final bool isOrchestra;
+  final bool isSaving;
+  final ValueChanged<bool> onWithChoirChanged;
+  final ValueChanged<bool> onWithSoloChanged;
+  final ValueChanged<int?> onDifficultyChanged;
+  final ValueChanged<String?> onCategoryChanged;
+  final ValueChanged<List<int>> onInstrumentIdsChanged;
+  final VoidCallback onFieldBlur;
+
+  const _EditableFieldsCard({
+    required this.prefixController,
+    required this.numberController,
+    required this.nameController,
+    required this.linkController,
+    required this.withChoir,
+    required this.withSolo,
+    required this.difficulty,
+    required this.category,
+    required this.selectedInstrumentIds,
+    required this.isOrchestra,
+    required this.isSaving,
+    required this.onWithChoirChanged,
+    required this.onWithSoloChanged,
+    required this.onDifficultyChanged,
+    required this.onCategoryChanged,
+    required this.onInstrumentIdsChanged,
+    required this.onFieldBlur,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final groupsAsync = ref.watch(groupsProvider);
+    final categoriesAsync = ref.watch(songCategoriesProvider);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.paddingM),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Saving indicator
+            if (isSaving)
+              const LinearProgressIndicator(),
+
+            // Prefix input
+            TextFormField(
+              controller: prefixController,
+              decoration: const InputDecoration(
+                labelText: 'Präfix (optional)',
+                helperText: 'z.B. W für Weihnachten → W1',
+              ),
+              onEditingComplete: onFieldBlur,
+            ),
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Number input
+            TextFormField(
+              controller: numberController,
+              decoration: const InputDecoration(
+                labelText: 'Nummer',
+              ),
+              keyboardType: TextInputType.number,
+              onEditingComplete: onFieldBlur,
+            ),
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Name input
+            TextFormField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+              ),
+              onEditingComplete: onFieldBlur,
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+
+            // Difficulty dropdown
+            DropdownButtonFormField<int?>(
+              value: difficulty,
+              decoration: const InputDecoration(
+                labelText: 'Schwierigkeitsgrad',
+              ),
+              items: const [
+                DropdownMenuItem(value: null, child: Text('Nicht definiert')),
+                DropdownMenuItem(value: 1, child: Text('1 - Leicht')),
+                DropdownMenuItem(value: 2, child: Text('2 - Mittel')),
+                DropdownMenuItem(value: 3, child: Text('3 - Schwer')),
+              ],
+              onChanged: onDifficultyChanged,
+            ),
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Toggles
+            SwitchListTile(
+              title: const Text('Chor & Orchester'),
+              value: withChoir,
+              onChanged: onWithChoirChanged,
+              contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              title: const Text('Mit Solo-Gesang'),
+              value: withSolo,
+              onChanged: onWithSoloChanged,
+              contentPadding: EdgeInsets.zero,
+            ),
+
+            // Instruments multi-select (Orchestra only)
+            if (isOrchestra)
+              groupsAsync.when(
+                loading: () => const LinearProgressIndicator(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (groups) {
+                  final instruments = groups.where((g) => g.maingroup != true).toList();
+                  if (instruments.isEmpty) return const SizedBox.shrink();
+
+                  return _InstrumentMultiSelect(
+                    instruments: instruments,
+                    selectedIds: selectedInstrumentIds,
+                    onChanged: onInstrumentIdsChanged,
+                  );
+                },
+              ),
+
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Category dropdown
+            categoriesAsync.when(
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (categories) => categories.isNotEmpty
+                  ? DropdownButtonFormField<String?>(
+                      value: category,
+                      decoration: const InputDecoration(
+                        labelText: 'Kategorie',
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('Keine Kategorie')),
+                        ...categories.map((c) => DropdownMenuItem(
+                              value: c.name,
+                              child: Text(c.name),
+                            )),
+                      ],
+                      onChanged: onCategoryChanged,
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Link textarea
+            TextFormField(
+              controller: linkController,
+              decoration: const InputDecoration(
+                labelText: 'Link',
+              ),
+              maxLines: 2,
+              onEditingComplete: onFieldBlur,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Multi-select for instruments with modal interface
+class _InstrumentMultiSelect extends StatelessWidget {
+  final List<Group> instruments;
+  final List<int> selectedIds;
+  final ValueChanged<List<int>> onChanged;
+
+  const _InstrumentMultiSelect({
+    required this.instruments,
+    required this.selectedIds,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Besetzung'),
+      subtitle: Text(
+        selectedIds.isEmpty
+            ? 'Keine Instrumente ausgewählt'
+            : '${selectedIds.length} Instrumente ausgewählt',
+      ),
+      trailing: const Icon(Icons.arrow_drop_down),
+      onTap: () => _showSelectionDialog(context),
+    );
+  }
+
+  Future<void> _showSelectionDialog(BuildContext context) async {
+    final result = await showDialog<List<int>>(
+      context: context,
+      builder: (context) => _InstrumentSelectionDialog(
+        instruments: instruments,
+        initialSelection: selectedIds,
+      ),
+    );
+
+    if (result != null) {
+      onChanged(result);
+    }
+  }
+}
+
+/// Dialog for instrument multi-selection
+class _InstrumentSelectionDialog extends StatefulWidget {
+  final List<Group> instruments;
+  final List<int> initialSelection;
+
+  const _InstrumentSelectionDialog({
+    required this.instruments,
+    required this.initialSelection,
+  });
+
+  @override
+  State<_InstrumentSelectionDialog> createState() => _InstrumentSelectionDialogState();
+}
+
+class _InstrumentSelectionDialogState extends State<_InstrumentSelectionDialog> {
+  late List<int> _selection;
+
+  @override
+  void initState() {
+    super.initState();
+    _selection = List.from(widget.initialSelection);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Besetzung'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: widget.instruments.length,
+          itemBuilder: (context, index) {
+            final instrument = widget.instruments[index];
+            final isSelected = _selection.contains(instrument.id);
+
+            return CheckboxListTile(
+              title: Text(instrument.name),
+              value: isSelected,
+              onChanged: (checked) {
+                setState(() {
+                  if (checked == true && instrument.id != null) {
+                    _selection.add(instrument.id!);
+                  } else {
+                    _selection.remove(instrument.id);
+                  }
+                });
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Abbrechen'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selection),
+          child: const Text('Speichern'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Read-only header card showing song info
+class _ReadOnlyHeaderCard extends StatelessWidget {
+  final Song song;
+
+  const _ReadOnlyHeaderCard({required this.song});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.paddingM),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (song.fullNumber.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(20),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  song.fullNumber,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Text(
+              song.name,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            if (song.conductor != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.person, size: 16, color: AppColors.medium),
+                  const SizedBox(width: 4),
+                  Text(
+                    song.conductor!,
+                    style: const TextStyle(color: AppColors.medium),
+                  ),
+                ],
+              ),
+            ],
+            if (song.difficultyLabel != null) ...[
+              const SizedBox(height: 8),
+              Chip(
+                label: Text(song.difficultyLabel!),
+                avatar: const Icon(Icons.speed, size: 16),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Besetzungs-Chips section with green/red color logic
+class _BesetzungsSection extends ConsumerWidget {
+  final Song song;
+  final bool isOrchestra;
+
+  const _BesetzungsSection({
+    required this.song,
+    required this.isOrchestra,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(groupsProvider);
 
-    return groupsAsync.when(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader(title: 'Besetzung'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (song.withChoir)
+              const Chip(
+                label: Text('Chor & Orchester'),
+                backgroundColor: Color(0xFFE3F2FD), // Light blue
+              ),
+            if (song.withSolo)
+              const Chip(
+                label: Text('Mit Solo-Gesang'),
+                backgroundColor: Color(0xFFE3F2FD), // Light blue
+              ),
+          ],
+        ),
+        if (isOrchestra && song.instrumentIds?.isNotEmpty == true)
+          groupsAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (groups) {
+              // Filter to only instruments (not main groups)
+              final instruments = groups.where((g) => g.maingroup != true).toList();
+
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: instruments.map((instrument) {
+                    // Green if song has this instrument, red if not
+                    final hasInstrument = song.instrumentIds!.contains(instrument.id);
+                    final color = hasInstrument ? AppColors.success : AppColors.danger;
+
+                    return Chip(
+                      label: Text(
+                        instrument.name,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 12,
+                        ),
+                      ),
+                      backgroundColor: color.withAlpha(30),
+                      side: BorderSide(color: color.withAlpha(80)),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    );
+                  }).toList(),
+                ),
+              );
+            },
+          ),
+        const SizedBox(height: AppDimensions.paddingM),
+      ],
+    );
+  }
+}
+
+/// Copy to Tenant button
+class _CopyToTenantButton extends ConsumerWidget {
+  final Song song;
+
+  const _CopyToTenantButton({required this.song});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tenantsAsync = ref.watch(userTenantsProvider);
+    final currentTenantId = ref.watch(currentTenantIdProvider);
+
+    return tenantsAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
-      data: (groups) {
-        final matchedGroups =
-            groups.where((g) => instrumentIds.contains(g.id)).toList();
+      data: (tenants) {
+        // Filter out current tenant
+        final otherTenants = tenants.where((t) => t.id != currentTenantId).toList();
+        if (otherTenants.isEmpty) return const SizedBox.shrink();
 
-        if (matchedGroups.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Instrumente/Gruppen',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.medium,
-                ),
-              ),
-            ),
-            Card(
-              child: Column(
-                children: matchedGroups
-                    .map((g) => ListTile(
-                          leading: const Icon(Icons.music_note),
-                          title: Text(g.name),
-                        ))
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.paddingM),
-          ],
+        return Card(
+          child: ListTile(
+            leading: const Icon(Icons.copy),
+            title: const Text('Werk in andere Instanz kopieren'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showCopySheet(context, otherTenants),
+          ),
         );
       },
     );
   }
+
+  Future<void> _showCopySheet(BuildContext context, List<Tenant> tenants) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => CopyToTenantSheet(
+        song: song,
+        availableTenants: tenants,
+      ),
+    );
+  }
 }
+
+// ============================================================================
+// FILES SECTION
+// ============================================================================
 
 class _FilesSection extends ConsumerStatefulWidget {
   final List<SongFile> files;
   final int songId;
   final String songName;
+  final bool readOnly;
   final VoidCallback onFileAdded;
 
   const _FilesSection({
     required this.files,
     required this.songId,
     required this.songName,
+    required this.readOnly,
     required this.onFileAdded,
   });
 
@@ -352,7 +880,7 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
                     tooltip: 'Mehr Aktionen',
                     onSelected: (value) => _handleBulkAction(context, value),
                     itemBuilder: (context) => [
-                      if (_hasPdfFiles())
+                      if (_hasPdfFiles() && !widget.readOnly)
                         const PopupMenuItem(
                           value: 'print_group',
                           child: Row(
@@ -374,17 +902,18 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
                             ],
                           ),
                         ),
-                      const PopupMenuItem(
-                        value: 'upload',
-                        child: Row(
-                          children: [
-                            Icon(Icons.cloud_upload),
-                            SizedBox(width: 8),
-                            Text('Dateien hochladen'),
-                          ],
+                      if (!widget.readOnly)
+                        const PopupMenuItem(
+                          value: 'upload',
+                          child: Row(
+                            children: [
+                              Icon(Icons.cloud_upload),
+                              SizedBox(width: 8),
+                              Text('Dateien hochladen'),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (widget.files.isNotEmpty) ...[
+                      if (widget.files.isNotEmpty && !widget.readOnly) ...[
                         const PopupMenuDivider(),
                         const PopupMenuItem(
                           value: 'delete_all',
@@ -400,12 +929,13 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
                       ],
                     ],
                   ),
-                  // Quick upload button
-                  IconButton(
-                    icon: const Icon(Icons.add, size: 20),
-                    onPressed: () => _showUploadSheet(context, groups),
-                    tooltip: 'Dateien hinzufügen',
-                  ),
+                  // Quick upload button (only for non-readOnly)
+                  if (!widget.readOnly)
+                    IconButton(
+                      icon: const Icon(Icons.add, size: 20),
+                      onPressed: () => _showUploadSheet(context, groups),
+                      tooltip: 'Dateien hinzufügen',
+                    ),
                 ],
               ),
             ],
@@ -431,6 +961,7 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
                         songId: widget.songId,
                         songName: widget.songName,
                         groups: groups,
+                        readOnly: widget.readOnly,
                         onDeleted: widget.onFileAdded,
                       ))
                   .toList(),
@@ -556,6 +1087,7 @@ class _FileTile extends ConsumerWidget {
   final int songId;
   final String songName;
   final List<Group> groups;
+  final bool readOnly;
   final VoidCallback onDeleted;
 
   const _FileTile({
@@ -563,6 +1095,7 @@ class _FileTile extends ConsumerWidget {
     required this.songId,
     required this.songName,
     required this.groups,
+    required this.readOnly,
     required this.onDeleted,
   });
 
@@ -687,28 +1220,30 @@ class _FileTile extends ConsumerWidget {
               ],
             ),
           ),
-          const PopupMenuDivider(),
-          const PopupMenuItem(
-            value: 'change_category',
-            child: Row(
-              children: [
-                Icon(Icons.category),
-                SizedBox(width: 8),
-                Text('Kategorie ändern'),
-              ],
+          if (!readOnly) ...[
+            const PopupMenuDivider(),
+            const PopupMenuItem(
+              value: 'change_category',
+              child: Row(
+                children: [
+                  Icon(Icons.category),
+                  SizedBox(width: 8),
+                  Text('Kategorie ändern'),
+                ],
+              ),
             ),
-          ),
-          const PopupMenuDivider(),
-          const PopupMenuItem(
-            value: 'delete',
-            child: Row(
-              children: [
-                Icon(Icons.delete, color: AppColors.danger),
-                SizedBox(width: 8),
-                Text('Löschen', style: TextStyle(color: AppColors.danger)),
-              ],
+            const PopupMenuDivider(),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Row(
+                children: [
+                  Icon(Icons.delete, color: AppColors.danger),
+                  SizedBox(width: 8),
+                  Text('Löschen', style: TextStyle(color: AppColors.danger)),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
       onTap: () => _openInAppViewer(context),
