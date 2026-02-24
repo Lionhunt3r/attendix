@@ -124,6 +124,7 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
           .from('instruments')
           .update(updates)
           .eq('id', id)
+          .eq('tenantId', currentTenantId)
           .select()
           .single();
 
@@ -148,7 +149,8 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
       await supabase
           .from('instruments')
           .delete()
-          .eq('id', id);
+          .eq('id', id)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'deleteGroup');
       rethrow;
@@ -209,6 +211,7 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
           .from('group_categories')
           .update(updates)
           .eq('id', id)
+          .eq('tenant_id', currentTenantId)
           .select()
           .single();
 
@@ -225,7 +228,8 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
       await supabase
           .from('group_categories')
           .delete()
-          .eq('id', id);
+          .eq('id', id)
+          .eq('tenant_id', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'deleteGroupCategory');
       rethrow;

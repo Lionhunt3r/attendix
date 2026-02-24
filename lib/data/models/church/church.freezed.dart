@@ -1,0 +1,253 @@
+// coverage:ignore-file
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint
+// ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
+
+part of 'church.dart';
+
+// **************************************************************************
+// FreezedGenerator
+// **************************************************************************
+
+T _$identity<T>(T value) => value;
+
+final _privateConstructorUsedError = UnsupportedError(
+  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
+);
+
+Church _$ChurchFromJson(Map<String, dynamic> json) {
+  return _Church.fromJson(json);
+}
+
+/// @nodoc
+mixin _$Church {
+  String? get id =>
+      throw _privateConstructorUsedError; // Note: String, not int!
+  @JsonKey(name: 'created_at')
+  DateTime? get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_from')
+  String? get createdFrom => throw _privateConstructorUsedError;
+  String get name => throw _privateConstructorUsedError;
+
+  /// Serializes this Church to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of Church
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $ChurchCopyWith<Church> get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $ChurchCopyWith<$Res> {
+  factory $ChurchCopyWith(Church value, $Res Function(Church) then) =
+      _$ChurchCopyWithImpl<$Res, Church>;
+  @useResult
+  $Res call({
+    String? id,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'created_from') String? createdFrom,
+    String name,
+  });
+}
+
+/// @nodoc
+class _$ChurchCopyWithImpl<$Res, $Val extends Church>
+    implements $ChurchCopyWith<$Res> {
+  _$ChurchCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of Church
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = freezed,
+    Object? createdAt = freezed,
+    Object? createdFrom = freezed,
+    Object? name = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            id:
+                freezed == id
+                    ? _value.id
+                    : id // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            createdAt:
+                freezed == createdAt
+                    ? _value.createdAt
+                    : createdAt // ignore: cast_nullable_to_non_nullable
+                        as DateTime?,
+            createdFrom:
+                freezed == createdFrom
+                    ? _value.createdFrom
+                    : createdFrom // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            name:
+                null == name
+                    ? _value.name
+                    : name // ignore: cast_nullable_to_non_nullable
+                        as String,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$ChurchImplCopyWith<$Res> implements $ChurchCopyWith<$Res> {
+  factory _$$ChurchImplCopyWith(
+    _$ChurchImpl value,
+    $Res Function(_$ChurchImpl) then,
+  ) = __$$ChurchImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String? id,
+    @JsonKey(name: 'created_at') DateTime? createdAt,
+    @JsonKey(name: 'created_from') String? createdFrom,
+    String name,
+  });
+}
+
+/// @nodoc
+class __$$ChurchImplCopyWithImpl<$Res>
+    extends _$ChurchCopyWithImpl<$Res, _$ChurchImpl>
+    implements _$$ChurchImplCopyWith<$Res> {
+  __$$ChurchImplCopyWithImpl(
+    _$ChurchImpl _value,
+    $Res Function(_$ChurchImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of Church
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = freezed,
+    Object? createdAt = freezed,
+    Object? createdFrom = freezed,
+    Object? name = null,
+  }) {
+    return _then(
+      _$ChurchImpl(
+        id:
+            freezed == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        createdAt:
+            freezed == createdAt
+                ? _value.createdAt
+                : createdAt // ignore: cast_nullable_to_non_nullable
+                    as DateTime?,
+        createdFrom:
+            freezed == createdFrom
+                ? _value.createdFrom
+                : createdFrom // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        name:
+            null == name
+                ? _value.name
+                : name // ignore: cast_nullable_to_non_nullable
+                    as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$ChurchImpl implements _Church {
+  const _$ChurchImpl({
+    this.id,
+    @JsonKey(name: 'created_at') this.createdAt,
+    @JsonKey(name: 'created_from') this.createdFrom,
+    required this.name,
+  });
+
+  factory _$ChurchImpl.fromJson(Map<String, dynamic> json) =>
+      _$$ChurchImplFromJson(json);
+
+  @override
+  final String? id;
+  // Note: String, not int!
+  @override
+  @JsonKey(name: 'created_at')
+  final DateTime? createdAt;
+  @override
+  @JsonKey(name: 'created_from')
+  final String? createdFrom;
+  @override
+  final String name;
+
+  @override
+  String toString() {
+    return 'Church(id: $id, createdAt: $createdAt, createdFrom: $createdFrom, name: $name)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChurchImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.createdFrom, createdFrom) ||
+                other.createdFrom == createdFrom) &&
+            (identical(other.name, name) || other.name == name));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode =>
+      Object.hash(runtimeType, id, createdAt, createdFrom, name);
+
+  /// Create a copy of Church
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChurchImplCopyWith<_$ChurchImpl> get copyWith =>
+      __$$ChurchImplCopyWithImpl<_$ChurchImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$ChurchImplToJson(this);
+  }
+}
+
+abstract class _Church implements Church {
+  const factory _Church({
+    final String? id,
+    @JsonKey(name: 'created_at') final DateTime? createdAt,
+    @JsonKey(name: 'created_from') final String? createdFrom,
+    required final String name,
+  }) = _$ChurchImpl;
+
+  factory _Church.fromJson(Map<String, dynamic> json) = _$ChurchImpl.fromJson;
+
+  @override
+  String? get id; // Note: String, not int!
+  @override
+  @JsonKey(name: 'created_at')
+  DateTime? get createdAt;
+  @override
+  @JsonKey(name: 'created_from')
+  String? get createdFrom;
+  @override
+  String get name;
+
+  /// Create a copy of Church
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChurchImplCopyWith<_$ChurchImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
