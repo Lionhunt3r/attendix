@@ -4,7 +4,7 @@
 
 **Ionic Projekt:** `/Users/I576226/repositories/attendance` (~12.600 Zeilen TypeScript)
 **Flutter Projekt:** `/Users/I576226/repositories/attendix` (~16.800 Zeilen Dart)
-**Migrationsfortschritt:** ~90%
+**Migrationsfortschritt:** ~95%
 
 | Metrik | Wert |
 |--------|------|
@@ -63,6 +63,7 @@
 | Shift Instances (feste Schichten) | ✅ |
 | Shift Copy to Tenant | ✅ |
 | Handover (Spieler-Transfer) | ✅ |
+| Holiday Service (Feiertage/Ferien) | ✅ |
 
 ---
 
@@ -80,9 +81,8 @@
 
 | Feature | Komplexität | Beschreibung |
 |---------|-------------|--------------|
-| Holiday Service | Niedrig | Feiertage/Schulferien anzeigen |
 | AI Service | Niedrig | GPT-basierte Gruppen-Synonyme |
-| Cross-Tenant | Mittel | Daten zwischen Tenants teilen |
+| Cross-Tenant Service | Mittel | Allgemeiner Cross-Tenant Service (Copy-Features bereits implementiert) |
 | Feedback Service | Niedrig | Feedback-Funktion |
 
 ---
@@ -104,7 +104,7 @@
 | `handover.service.ts` | `player_repository.dart` (handover methods) | ✅ |
 | `telegram.service.ts` | `telegram_service.dart` | ✅ |
 | `ai.service.ts` | - | ❌ |
-| `cross-tenant.service.ts` | - | ❌ |
+| `cross-tenant.service.ts` | `copy_to_tenant_sheet.dart`, `shift_copy_to_tenant_sheet.dart` | 🟡 (teilweise) |
 
 ---
 
