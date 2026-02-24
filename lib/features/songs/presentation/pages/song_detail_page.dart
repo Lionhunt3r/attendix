@@ -7,10 +7,15 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/services/song_file_service.dart';
+import '../../../../core/services/telegram_service.dart';
+import '../../../../core/services/zip_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/song/song.dart';
+import '../../../../shared/widgets/sheets/image_viewer_sheet.dart';
+import '../widgets/pdf_viewer_sheet.dart';
+import '../widgets/smart_print_dialog.dart';
 
 /// Song Detail Page
 class SongDetailPage extends ConsumerStatefulWidget {
@@ -159,6 +164,7 @@ class _SongDetailPageState extends ConsumerState<SongDetailPage> {
               _FilesSection(
                 files: song.files ?? [],
                 songId: song.id!,
+                songName: song.displayName,
                 onFileAdded: () => ref.invalidate(songByIdProvider(songId)),
               ),
 
@@ -284,11 +290,13 @@ class _InstrumentsSection extends ConsumerWidget {
 class _FilesSection extends ConsumerStatefulWidget {
   final List<SongFile> files;
   final int songId;
+  final String songName;
   final VoidCallback onFileAdded;
 
   const _FilesSection({
     required this.files,
     required this.songId,
+    required this.songName,
     required this.onFileAdded,
   });
 
@@ -298,6 +306,7 @@ class _FilesSection extends ConsumerStatefulWidget {
 
 class _FilesSectionState extends ConsumerState<_FilesSection> {
   bool _isUploading = false;
+  bool _isDownloadingAll = false;
 
   @override
   Widget build(BuildContext context) {
@@ -316,17 +325,37 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
                   color: AppColors.medium,
                 ),
               ),
-              _isUploading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : TextButton.icon(
-                      onPressed: () => _addFile(context),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Hinzufügen'),
-                    ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.files.length > 1)
+                    _isDownloadingAll
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            icon: const Icon(Icons.download, size: 20),
+                            onPressed: () => _downloadAllFiles(context),
+                            tooltip: 'Alle herunterladen (ZIP)',
+                          ),
+                  _isUploading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : TextButton.icon(
+                          onPressed: () => _addFile(context),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Hinzufügen'),
+                        ),
+                ],
+              ),
             ],
           ),
         ),
@@ -346,6 +375,7 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
                   .map((file) => _FileTile(
                         file: file,
                         songId: widget.songId,
+                        songName: widget.songName,
                         onDeleted: widget.onFileAdded,
                       ))
                   .toList(),
@@ -353,6 +383,30 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
           ),
       ],
     );
+  }
+
+  Future<void> _downloadAllFiles(BuildContext context) async {
+    setState(() => _isDownloadingAll = true);
+
+    try {
+      final zipService = ref.read(zipServiceProvider);
+      await zipService.downloadSongFilesAsZip(
+        files: widget.files,
+        songName: widget.songName,
+      );
+
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'ZIP-Download gestartet');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Erstellen der ZIP: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloadingAll = false);
+      }
+    }
   }
 
   Future<void> _addFile(BuildContext context) async {
@@ -427,10 +481,18 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
 class _FileTile extends ConsumerWidget {
   final SongFile file;
   final int songId;
+  final String songName;
   final VoidCallback onDeleted;
 
-  const _FileTile(
-      {required this.file, required this.songId, required this.onDeleted});
+  const _FileTile({
+    required this.file,
+    required this.songId,
+    required this.songName,
+    required this.onDeleted,
+  });
+
+  bool get _isPdf => file.fileType.toLowerCase() == 'pdf';
+  bool get _isImage => ['png', 'jpg', 'jpeg'].contains(file.fileType.toLowerCase());
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -442,24 +504,50 @@ class _FileTile extends ConsumerWidget {
       title: Text(file.fileName),
       subtitle: file.note != null ? Text(file.note!) : null,
       trailing: PopupMenuButton<String>(
-        onSelected: (value) async {
-          if (value == 'open') {
-            await _openFile(context);
-          } else if (value == 'delete') {
-            await _deleteFile(context, ref);
-          }
-        },
+        onSelected: (value) => _handleMenuAction(context, ref, value),
         itemBuilder: (context) => [
           const PopupMenuItem(
-            value: 'open',
+            value: 'view',
+            child: Row(
+              children: [
+                Icon(Icons.visibility),
+                SizedBox(width: 8),
+                Text('Ansehen'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'open_external',
             child: Row(
               children: [
                 Icon(Icons.open_in_new),
                 SizedBox(width: 8),
-                Text('Öffnen'),
+                Text('Extern öffnen'),
               ],
             ),
           ),
+          if (_isPdf)
+            const PopupMenuItem(
+              value: 'print',
+              child: Row(
+                children: [
+                  Icon(Icons.print),
+                  SizedBox(width: 8),
+                  Text('Drucken'),
+                ],
+              ),
+            ),
+          const PopupMenuItem(
+            value: 'telegram',
+            child: Row(
+              children: [
+                Icon(Icons.send),
+                SizedBox(width: 8),
+                Text('Per Telegram senden'),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
           const PopupMenuItem(
             value: 'delete',
             child: Row(
@@ -472,8 +560,29 @@ class _FileTile extends ConsumerWidget {
           ),
         ],
       ),
-      onTap: () => _openFile(context),
+      onTap: () => _openInAppViewer(context),
     );
+  }
+
+  Future<void> _handleMenuAction(
+      BuildContext context, WidgetRef ref, String value) async {
+    switch (value) {
+      case 'view':
+        await _openInAppViewer(context);
+        break;
+      case 'open_external':
+        await _openExternally(context);
+        break;
+      case 'print':
+        await _showPrintDialog(context, ref);
+        break;
+      case 'telegram':
+        await _sendViaTelegram(context, ref);
+        break;
+      case 'delete':
+        await _deleteFile(context, ref);
+        break;
+    }
   }
 
   IconData _getFileIcon(String fileType) {
@@ -489,7 +598,28 @@ class _FileTile extends ConsumerWidget {
     }
   }
 
-  Future<void> _openFile(BuildContext context) async {
+  Future<void> _openInAppViewer(BuildContext context) async {
+    if (file.url.isEmpty) return;
+
+    if (_isPdf) {
+      await showPdfViewerSheet(
+        context,
+        url: file.url,
+        fileName: file.fileName,
+      );
+    } else if (_isImage) {
+      await showImageViewerSheet(
+        context,
+        url: file.url,
+        fileName: file.fileName,
+      );
+    } else {
+      // For other file types, open externally
+      await _openExternally(context);
+    }
+  }
+
+  Future<void> _openExternally(BuildContext context) async {
     if (file.url.isEmpty) return;
 
     final uri = Uri.parse(file.url);
@@ -498,6 +628,51 @@ class _FileTile extends ConsumerWidget {
     } else {
       if (context.mounted) {
         ToastHelper.showError(context, 'Konnte Datei nicht öffnen');
+      }
+    }
+  }
+
+  Future<void> _showPrintDialog(BuildContext context, WidgetRef ref) async {
+    if (!_isPdf) {
+      ToastHelper.showError(context, 'Nur PDF-Dateien können gedruckt werden');
+      return;
+    }
+
+    await showSmartPrintDialog(
+      context,
+      ref: ref,
+      url: file.url,
+      fileName: file.fileName,
+      instrumentId: file.instrumentId,
+    );
+  }
+
+  Future<void> _sendViaTelegram(BuildContext context, WidgetRef ref) async {
+    final telegramService = ref.read(telegramServiceProvider);
+    final notificationConfig = await ref.read(notificationConfigProvider.future);
+
+    if (notificationConfig == null || !notificationConfig.isConnected) {
+      if (context.mounted) {
+        ToastHelper.showError(
+          context,
+          'Telegram nicht verbunden. Bitte zuerst in den Einstellungen verbinden.',
+        );
+      }
+      return;
+    }
+
+    try {
+      await telegramService.sendDocumentPerTelegram(
+        url: file.url,
+        chatId: notificationConfig.telegramChatId!,
+      );
+
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Datei per Telegram gesendet');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Senden: $e');
       }
     }
   }

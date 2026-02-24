@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "0.1.3",
+      "date": "24.2.2026",
+      "changes": [
+        "📄 PDF-Dateien werden jetzt direkt in der App angezeigt",
+        "🖼️ Bilder können mit Zoom und Vollbild betrachtet werden",
+        "📦 Alle Dateien eines Songs als ZIP herunterladen",
+        "🖨️ Intelligentes Drucken mit Kopienanzahl pro Instrument",
+        "📨 Dateien direkt per Telegram versenden"
+      ]
+    },
+    {
       "version": "0.1.2",
       "date": "23.2.2026",
       "changes": [

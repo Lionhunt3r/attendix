@@ -51,6 +51,10 @@
 | Export | ✅ |
 | Planning (Basis) | ✅ |
 | Meeting Detail | ✅ |
+| Song Viewer (PDF) | ✅ |
+| Telegram Song-Versand | ✅ |
+| Smart Print (Kopien) | ✅ |
+| ZIP-Download | ✅ |
 
 ---
 
@@ -58,10 +62,7 @@
 
 ### Hohe Priorität 🔴
 
-| Feature | Ionic-Dateien | Komplexität | Beschreibung |
-|---------|---------------|-------------|--------------|
-| Song Viewer (PDF) | `song-viewer.page.ts` | Mittel | PDF-Anzeige für Noten |
-| Telegram Integration | `telegram.service.ts` | Mittel | Plan per Telegram senden |
+*Keine - alle hohen Prioritäten sind abgeschlossen!*
 
 ### Mittlere Priorität 🟡
 
@@ -70,6 +71,7 @@
 | Shifts/Schichtpläne | `shifts.page.ts`, `shift.service.ts` | Mittel | Schichtplan-Verwaltung |
 | Handover | `handover.page.ts`, `handover.service.ts` | Mittel | Spieler zu anderem Tenant übertragen |
 | Sign-out Page | `signout.page.ts` | Niedrig | Abmelde-Flow |
+| Share-Link (Songs) | - | Mittel | Öffentlicher Song-Link ohne Login |
 
 ### Niedrige Priorität 🟢
 
@@ -97,7 +99,7 @@
 | `meeting.service.ts` | `meeting_repository.dart` | ✅ |
 | `shift.service.ts` | - | ❌ |
 | `handover.service.ts` | - | ❌ |
-| `telegram.service.ts` | `telegram_service.dart` | ⚠️ Teilweise |
+| `telegram.service.ts` | `telegram_service.dart` | ✅ |
 | `ai.service.ts` | - | ❌ |
 | `cross-tenant.service.ts` | - | ❌ |
 
@@ -144,8 +146,12 @@ Diese Dateien wurden kürzlich erstellt:
 ## Nächste Schritte
 
 - [x] Meeting Detail Page erstellen (`/meetings/:id`)
-- [ ] PDF-Viewer evaluieren (flutter_pdfview vs syncfusion)
-- [ ] Telegram-Versand vervollständigen
+- [x] PDF-Viewer evaluieren und implementieren (pdfx)
+- [x] In-App PDF/Image Viewer mit Zoom und Fullscreen
+- [x] Smart Print mit Kopien pro Instrument
+- [x] ZIP-Download für alle Song-Dateien
+- [x] Telegram-Versand für Song-Dateien
+- [ ] Share-Link für Songs (benötigt DB-Änderung)
 - [ ] Untracked Dateien committen
 - [ ] Shifts-Feature prüfen (wird es benötigt?)
 
