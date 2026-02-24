@@ -324,7 +324,7 @@ class _CopyShiftToTenantSheetState
 
         // Get players with this shift in source tenant
         final playersResponse = await supabase
-            .from('players')
+            .from('player')
             .select('id, appId, shift_id, shift_name, shift_start')
             .eq('tenantId', currentTenantId!)
             .eq('shift_id', widget.shift.id!);
@@ -344,7 +344,7 @@ class _CopyShiftToTenantSheetState
 
             // Find matching players in target tenant by appId
             final targetPlayersResponse = await supabase
-                .from('players')
+                .from('player')
                 .select('id, appId')
                 .eq('tenantId', _targetTenantId!)
                 .inFilter('appId', appIds);
@@ -366,7 +366,7 @@ class _CopyShiftToTenantSheetState
               if (appId != null && appIdToTargetId.containsKey(appId)) {
                 final targetPlayerId = appIdToTargetId[appId]!;
 
-                await supabase.from('players').update({
+                await supabase.from('player').update({
                   'shift_id': newShiftId,
                   'shift_name': sourcePlayer['shift_name'],
                   'shift_start': sourcePlayer['shift_start'],

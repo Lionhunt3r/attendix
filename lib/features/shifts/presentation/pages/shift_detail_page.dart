@@ -746,7 +746,7 @@ class _DefinitionSegmentTile extends StatelessWidget {
 }
 
 /// Tile for a fixed shift instance
-class _ShiftInstanceTile extends StatelessWidget {
+class _ShiftInstanceTile extends StatefulWidget {
   final ShiftInstance instance;
   final int index;
   final ValueChanged<String> onNameChanged;
@@ -765,8 +765,35 @@ class _ShiftInstanceTile extends StatelessWidget {
   });
 
   @override
+  State<_ShiftInstanceTile> createState() => _ShiftInstanceTileState();
+}
+
+class _ShiftInstanceTileState extends State<_ShiftInstanceTile> {
+  late TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.instance.name);
+  }
+
+  @override
+  void didUpdateWidget(_ShiftInstanceTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.instance.name != widget.instance.name) {
+      _nameController.text = widget.instance.name;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final date = DateTime.tryParse(instance.date) ?? DateTime.now();
+    final date = DateTime.tryParse(widget.instance.date) ?? DateTime.now();
     final dateFormat = DateFormat('EEE, dd.MM.yyyy', 'de');
 
     return Card(
@@ -783,8 +810,8 @@ class _ShiftInstanceTile extends StatelessWidget {
                 hintText: 'z.B. Frühdienst',
                 isDense: true,
               ),
-              controller: TextEditingController(text: instance.name),
-              onChanged: onNameChanged,
+              controller: _nameController,
+              onChanged: widget.onNameChanged,
             ),
             const SizedBox(height: AppDimensions.paddingS),
 
@@ -806,12 +833,12 @@ class _ShiftInstanceTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 TextButton(
-                  onPressed: onShowPreview,
+                  onPressed: widget.onShowPreview,
                   child: const Text('Vorschau'),
                 ),
                 IconButton(
                   icon: Icon(Icons.delete_outline, color: AppColors.danger),
-                  onPressed: onDelete,
+                  onPressed: widget.onDelete,
                   tooltip: 'Löschen',
                 ),
               ],
@@ -832,7 +859,7 @@ class _ShiftInstanceTile extends StatelessWidget {
     );
 
     if (selected != null) {
-      onDateChanged(selected);
+      widget.onDateChanged(selected);
     }
   }
 }

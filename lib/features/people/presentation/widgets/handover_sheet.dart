@@ -74,8 +74,17 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                     return _buildNoTenantsMessage();
                   }
 
-                  // Initialize target tenant if not set
-                  _targetTenantId ??= availableTenants.first.id;
+                  // Initialize target tenant if not set (using addPostFrameCallback to avoid setState during build)
+                  if (_targetTenantId == null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && _targetTenantId == null) {
+                        setState(() {
+                          _targetTenantId = availableTenants.first.id;
+                        });
+                        _loadTargetGroups();
+                      }
+                    });
+                  }
 
                   return ListView(
                     controller: scrollController,
@@ -324,6 +333,7 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
     final instrumentIds = widget.selectedPlayers
         .map((p) => p.instrument)
         .where((id) => id != null)
+        .cast<int>()
         .toSet();
 
     if (instrumentIds.isEmpty) {
@@ -405,7 +415,7 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                             ? null
                             : (value) {
                                 setState(() {
-                                  _groupMapping[instrumentId!] = value;
+                                  _groupMapping[instrumentId] = value;
                                 });
                               },
                       ),
@@ -485,6 +495,7 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
         final instrumentIds = widget.selectedPlayers
             .map((p) => p.instrument)
             .where((id) => id != null)
+            .cast<int>()
             .toSet();
 
         for (final instrumentId in instrumentIds) {
@@ -492,11 +503,19 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
             (g) => g.id == instrumentId,
             orElse: () => Group(id: instrumentId, name: 'Unbekannt'),
           );
-          _groupMapping[instrumentId!] = _autoMapGroup(sourceGroup, _targetGroups);
+          _groupMapping[instrumentId] = _autoMapGroup(sourceGroup, _targetGroups);
         }
       });
     } catch (e) {
       debugPrint('Error loading target groups: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fehler beim Laden der Gruppen'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
