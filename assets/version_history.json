@@ -9,7 +9,13 @@
         "👋 Persönliche Begrüßung 'Shalom [Name]!'",
         "⏸️ Pause-Status wird in der Übersicht angezeigt",
         "🆕 Spezielle Ansicht für Bewerber (Applicant)",
-        "🎯 Aktionen basierend auf erlaubten Status gefiltert"
+        "🎯 Aktionen basierend auf erlaubten Status gefiltert",
+        "🏷️ Dateien zeigen jetzt Instrument/Kategorie als Badge an",
+        "🔄 Kategorie von Dateien kann nachträglich geändert werden",
+        "📥 Einzelne Dateien können heruntergeladen werden (Android/Desktop)",
+        "🗑️ Alle Dateien eines Songs auf einmal löschen",
+        "📤 Verbessertes Upload-Modal mit Multi-Datei-Auswahl",
+        "🔍 Automatische Instrument-Erkennung beim Datei-Upload"
       ]
     },
     {

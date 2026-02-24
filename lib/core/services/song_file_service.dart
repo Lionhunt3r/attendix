@@ -94,6 +94,7 @@ class SongFileService {
         .from('songs')
         .select('files')
         .eq('id', songId)
+        .eq('tenantId', _tenantId)
         .single();
 
     // Build new files array
@@ -113,7 +114,7 @@ class SongFileService {
     // Update song with new files array
     await _supabase.from('songs').update({
       'files': updatedFiles,
-    }).eq('id', songId);
+    }).eq('id', songId).eq('tenantId', _tenantId);
 
     return url;
   }
@@ -140,6 +141,7 @@ class SongFileService {
         .from('songs')
         .select('files')
         .eq('id', songId)
+        .eq('tenantId', _tenantId)
         .single();
 
     final existingFiles = (songResponse['files'] as List?) ?? [];
@@ -152,7 +154,120 @@ class SongFileService {
     // Update song
     await _supabase.from('songs').update({
       'files': updatedFiles,
-    }).eq('id', songId);
+    }).eq('id', songId).eq('tenantId', _tenantId);
+  }
+
+  /// Delete all files from a song
+  Future<void> deleteAllFiles({required int songId}) async {
+    if (_tenantId == null) {
+      throw Exception('Kein Tenant ausgewählt');
+    }
+
+    // Get current song files
+    final songResponse = await _supabase
+        .from('songs')
+        .select('files')
+        .eq('id', songId)
+        .eq('tenantId', _tenantId)
+        .single();
+
+    final existingFiles = (songResponse['files'] as List?) ?? [];
+
+    // Delete each file from storage
+    for (final file in existingFiles) {
+      final storageName = file['storageName'] as String?;
+      if (storageName != null) {
+        final storagePath = 'songs/$_tenantId/$songId/$storageName';
+        try {
+          await _supabase.storage.from(_bucketName).remove([storagePath]);
+        } catch (e) {
+          // File might not exist in storage, continue anyway
+        }
+      }
+    }
+
+    // Clear files array
+    await _supabase.from('songs').update({
+      'files': [],
+    }).eq('id', songId).eq('tenantId', _tenantId);
+  }
+
+  /// Update file category (instrumentId and note)
+  Future<void> updateFileCategory({
+    required int songId,
+    required String storageName,
+    int? instrumentId,
+    String? note,
+  }) async {
+    if (_tenantId == null) {
+      throw Exception('Kein Tenant ausgewählt');
+    }
+
+    // Get current song files
+    final songResponse = await _supabase
+        .from('songs')
+        .select('files')
+        .eq('id', songId)
+        .eq('tenantId', _tenantId)
+        .single();
+
+    final existingFiles = List<Map<String, dynamic>>.from(
+      (songResponse['files'] as List?) ?? [],
+    );
+
+    // Update the matching file
+    for (var i = 0; i < existingFiles.length; i++) {
+      if (existingFiles[i]['storageName'] == storageName) {
+        existingFiles[i] = {
+          ...existingFiles[i],
+          'instrumentId': instrumentId,
+          'note': note,
+        };
+        break;
+      }
+    }
+
+    // Update song
+    await _supabase.from('songs').update({
+      'files': existingFiles,
+    }).eq('id', songId).eq('tenantId', _tenantId);
+  }
+
+  /// Pick multiple files
+  Future<List<PlatformFile>?> pickMultipleFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'mp3', 'wav', 'ogg', 'm4a'],
+      allowMultiple: true,
+      withData: kIsWeb,
+    );
+
+    if (result == null || result.files.isEmpty) return null;
+    return result.files;
+  }
+
+  /// Download a file's bytes (for saving locally)
+  Future<Uint8List?> downloadFileBytes(String url) async {
+    try {
+      // Extract storage path from URL
+      // URL format: https://xxx.supabase.co/storage/v1/object/public/songs/...
+      final uri = Uri.parse(url);
+      final pathSegments = uri.pathSegments;
+
+      // Find 'songs' in path and get everything after
+      final songsIndex = pathSegments.indexOf('songs');
+      if (songsIndex == -1 || songsIndex >= pathSegments.length - 1) {
+        return null;
+      }
+
+      final storagePath = pathSegments.sublist(songsIndex).join('/');
+      return await _supabase.storage.from(_bucketName).download(
+        storagePath.replaceFirst('songs/', ''),
+      );
+    } catch (e, stack) {
+      debugPrint('Error downloading file: $e\n$stack');
+      return null;
+    }
   }
 
   /// Get content type for file
