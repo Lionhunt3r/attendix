@@ -546,6 +546,60 @@ class _UserTile extends ConsumerWidget {
     final tenantId = ref.read(currentTenantIdProvider);
     if (tenantId == null) return;
 
+    // Get current user ID for self-demotion check
+    final currentUserId = supabase.auth.currentUser?.id;
+    final isCurrentUser = user.userId == currentUserId;
+    final isDemotion = user.roleEnum == Role.admin && newRole != Role.admin;
+
+    // Check admin count for last-admin protection
+    if (isDemotion) {
+      final tenantUsers = ref.read(tenantUsersProvider).valueOrNull ?? [];
+      final adminCount = tenantUsers.where((u) => u.roleEnum == Role.admin).length;
+      final isLastAdmin = adminCount <= 1;
+
+      // Block if this is the last admin (Issue #3)
+      if (isLastAdmin) {
+        if (context.mounted) {
+          ToastHelper.showError(
+            context,
+            'Der letzte Administrator kann nicht herabgestuft werden. '
+            'Bitte füge zuerst einen weiteren Admin hinzu.',
+          );
+        }
+        return;
+      }
+
+      // Warn on self-demotion (Issue #2)
+      if (isCurrentUser) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Eigene Rolle ändern?'),
+            content: const Text(
+              'Du bist dabei, deine eigene Admin-Rolle zu entfernen. '
+              'Du verlierst dadurch den Zugang zur Benutzerverwaltung. '
+              'Möchtest du fortfahren?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Abbrechen'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.danger,
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Ja, Rolle ändern'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed != true) return;
+      }
+    }
+
     try {
       await supabase
           .from('tenantUsers')
