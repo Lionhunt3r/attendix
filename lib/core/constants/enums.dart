@@ -212,7 +212,9 @@ enum SupabaseTable {
   shiftDefinitions('shift_definitions'),
   history('history'),
   organisations('organisations'),
-  churches('bfecg_churches');
+  churches('bfecg_churches'),
+  feedback('feedback'),
+  questions('questions');
 
   const SupabaseTable(this.tableName);
   final String tableName;

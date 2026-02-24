@@ -12,3 +12,4 @@ export 'conductor_providers.dart';
 export 'meeting_providers.dart';
 export 'shift_providers.dart';
 export 'cross_tenant_providers.dart';
+export 'feedback_providers.dart';
