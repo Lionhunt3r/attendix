@@ -166,6 +166,19 @@ open /Applications/attendix.app
 <true/>
 ```
 
+## Migration (Ionic → Flutter)
+
+Für Migrationen nutze: `/ionic-migrate [feature]`
+
+Der Skill orchestriert automatisch:
+- Worktree-Setup (optional)
+- Analyse mit `migration-analyzer` und `Explore` Agents
+- Task-Planung
+- Code Review mit `flutter-reviewer`
+- Commit und Status-Update
+
+Status: `.claude/migration-status.md`
+
 ## Weiterführende Dokumentation
 
 Für ausführliche Patterns, Ionic→Flutter Mappings und Code-Beispiele:

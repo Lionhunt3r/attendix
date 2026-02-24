@@ -1,33 +1,184 @@
 ---
 name: ionic-migrate
 description: Migrate an Ionic/Angular feature to Flutter. Use when converting existing Ionic pages, services, or components to Flutter equivalents.
-argument-hint: [ionic-file-or-feature-name]
-disable-model-invocation: false
-allowed-tools: Read, Write, Edit, Bash, Glob, Grep
+argument-hint: [feature-name]
 ---
 
-# Ionic → Flutter Migration Skill
+# Ionic → Flutter Migration
 
-Du migrierst ein Feature aus dem Ionic-Projekt nach Flutter.
+Orchestriert den kompletten Migrations-Prozess von Ionic nach Flutter.
 
-## Quell-Projekt
-**Pfad:** `/Users/I576226/repositories/attendance`
-**Stack:** Ionic 8 + Angular 18 + Capacitor + Supabase
+## Workflow
 
-## Ziel-Projekt
-**Pfad:** `/Users/I576226/repositories/attendix`
-**Stack:** Flutter 3.x + Riverpod + go_router + Supabase
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 1: SETUP                                                  │
+│  • Worktree-Frage (optional, empfohlen für paralleles Arbeiten) │
+│  • Migration-Status prüfen                                       │
+└──────────────────────────────┬──────────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 2: ANALYSE (Parallel Agents)                              │
+│  ┌─────────────────────┐  ┌─────────────────────┐               │
+│  │ migration-analyzer  │  │ Explore Agent       │               │
+│  │ (Ionic Features)    │  │ (Flutter Patterns)  │               │
+│  └─────────────────────┘  └─────────────────────┘               │
+└──────────────────────────────┬──────────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 3: PLANUNG                                                │
+│  • Feature-Scope definieren                                      │
+│  • Tasks erstellen (TaskCreate)                                  │
+│  • Benutzer-Bestätigung holen                                    │
+└──────────────────────────────┬──────────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 4: IMPLEMENTIERUNG                                        │
+│  • Tasks nacheinander abarbeiten                                 │
+│  • Pattern-Mapping anwenden (siehe unten)                        │
+│  • Nach jedem Abschnitt: flutter-reviewer Agent                  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  PHASE 5: VERIFICATION & COMMIT                                  │
+│  • dart analyze lib/                                             │
+│  • Optional: test-generator Agent                                │
+│  • /commit Skill aufrufen                                        │
+│  • migration-status.md aktualisieren                             │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-## Migrations-Workflow
+---
 
-### 1. Ionic-Quelle analysieren
+## Phase 1: Setup
 
-Lies die relevanten Ionic-Dateien aus `/Users/I576226/repositories/attendance/src/app/`:
-- Page: `<feature>/<feature>.page.ts` und `.html`
-- Service: `services/<name>/<name>.service.ts`
-- Interfaces: `utilities/interfaces.ts`
+### Schritt 1.1: Worktree-Entscheidung
 
-### 2. Pattern-Mapping anwenden
+Frage den Benutzer mit AskUserQuestion:
+
+**Frage:** "Soll ich in einem isolierten Worktree arbeiten?"
+**Optionen:**
+- **Ja, Worktree erstellen** (Empfohlen für paralleles Arbeiten, eigener Branch)
+- **Nein, im aktuellen Branch** (Schneller für einzelne Features)
+
+Falls Ja: `EnterWorktree` mit name `migrate-$ARGUMENTS` aufrufen.
+
+### Schritt 1.2: Status prüfen
+
+Lies `.claude/migration-status.md` und prüfe:
+- Ist das Feature bereits migriert?
+- Welche Abhängigkeiten bestehen?
+
+---
+
+## Phase 2: Analyse
+
+### Starte PARALLEL (ein Tool-Call mit mehreren Task-Invocations):
+
+**Agent 1: migration-analyzer**
+```
+Analysiere das Ionic-Feature "$ARGUMENTS" in /Users/I576226/repositories/attendance/src/app/
+- Welche Dateien gehören dazu? (Pages, Services, Components)
+- Welche Supabase-Tabellen werden genutzt?
+- Welche UI-Elemente sind enthalten?
+```
+
+**Agent 2: Explore (Flutter Patterns)**
+```
+Finde in /Users/I576226/repositories/attendix/lib/ ähnliche implementierte Features.
+- Welche Patterns werden verwendet?
+- Gibt es wiederverwendbare Widgets in lib/shared/widgets/?
+- Wie sind ähnliche Pages strukturiert?
+```
+
+### Ergebnisse zusammenführen
+
+Erstelle eine Zusammenfassung:
+- Ionic-Dateien zu migrieren
+- Flutter-Zielstruktur
+- Vorhandene Patterns/Widgets zum Nutzen
+
+---
+
+## Phase 3: Planung
+
+### Tasks erstellen mit TaskCreate
+
+Beispiel für ein typisches Feature:
+
+```
+Task 1: Repository erstellen (falls nötig)
+Task 2: Provider erstellen
+Task 3: Page-Widget erstellen
+Task 4: Route in app_router.dart hinzufügen
+Task 5: dart analyze ausführen
+Task 6: Code Review mit flutter-reviewer
+```
+
+### Benutzer-Bestätigung
+
+Zeige dem Benutzer:
+1. Geplante Tasks
+2. Zu erstellende Dateien
+3. Frage: "Soll ich mit der Migration beginnen?"
+
+---
+
+## Phase 4: Implementierung
+
+### Für jeden Task:
+
+1. **Task als in_progress markieren** (TaskUpdate)
+
+2. **Ionic-Code lesen** aus `/Users/I576226/repositories/attendance/src/app/`
+
+3. **Flutter-Code schreiben** mit Pattern-Mapping (siehe unten)
+
+4. **Task als completed markieren**
+
+### Nach Implementierung: Code Review
+
+Starte `flutter-reviewer` Agent:
+```
+Prüfe die neu erstellten Dateien in lib/features/$ARGUMENTS/ auf:
+- Multi-tenant Security (tenantId in allen Queries)
+- Riverpod Patterns (Naming, Repository-Zugriff)
+- Flutter Best Practices
+```
+
+---
+
+## Phase 5: Verification & Commit
+
+### Schritt 5.1: Analyse
+
+```bash
+dart analyze lib/
+```
+
+### Schritt 5.2: Optional - Tests
+
+Frage: "Soll ich Tests generieren?"
+Falls ja: Starte `test-generator` Agent.
+
+### Schritt 5.3: Commit
+
+Rufe den `/commit` Skill auf mit Message:
+```
+feat: Migrate $ARGUMENTS from Ionic to Flutter
+```
+
+### Schritt 5.4: Migration-Status aktualisieren
+
+Aktualisiere `.claude/migration-status.md`:
+- Feature von "Ausstehend" nach "Vollständig migriert" verschieben
+- Datum aktualisieren
+
+---
+
+## Pattern-Mapping Referenz
+
+### Ionic → Flutter
 
 | Ionic/Angular | Flutter Equivalent |
 |---------------|-------------------|
@@ -40,30 +191,13 @@ Lies die relevanten Ionic-Dateien aus `/Users/I576226/repositories/attendance/sr
 | `*ngFor` | `ListView.builder()` |
 | `async pipe` | `.when()` Pattern |
 | Modal | `showModalBottomSheet()` |
-| Toast | `ScaffoldMessenger.showSnackBar()` |
-| Navigation | `context.go()` / `context.push()` |
+| Toast | `ToastHelper.show...()` |
+| `this.router.navigate()` | `context.go()` / `context.push()` |
 
-### 3. Flutter-Struktur erstellen
+### Provider-Naming
 
-```
-lib/features/$ARGUMENTS/
-├── presentation/
-│   ├── pages/
-│   │   └── ${ARGUMENTS}_page.dart
-│   └── widgets/
-│       └── (custom widgets)
-```
-
-Bei Bedarf auch:
-- `lib/data/models/<name>/` - Freezed Model
-- `lib/data/repositories/<name>_repository.dart` - Repository
-- `lib/core/providers/<name>_providers.dart` - Providers
-
-### 4. Code-Konventionen
-
-**Provider-Namen:**
 ```dart
-// Daten laden
+// Daten laden (Liste)
 final ${name}sProvider = FutureProvider<List<$Model>>((ref) {...});
 
 // Mit Parameter
@@ -73,99 +207,100 @@ final ${name}ByIdProvider = FutureProvider.family<$Model?, int>((ref, id) {...})
 final ${name}NotifierProvider = NotifierProvider<${Name}Notifier, AsyncValue<void>>(...);
 ```
 
-**Multi-Tenant KRITISCH:**
+### Async-Handling
+
 ```dart
-// IMMER tenantId filtern!
-.eq('tenantId', currentTenantId)
-```
-
-**UI-Labels auf Deutsch:**
-- Anwesend, Abwesend, Entschuldigt, Verspätet
-- Speichern, Abbrechen, Löschen
-- Fehler beim Laden, Keine Daten
-
-### 5. Nach der Migration
-
-```bash
-# Falls Freezed-Models erstellt wurden
-dart run build_runner build --delete-conflicting-outputs
-
-# Code analysieren
-dart analyze lib/
-```
-
-### 6. Migration Status aktualisieren
-
-**WICHTIG:** Nach erfolgreicher Migration, aktualisiere `.claude/migration-status.md`:
-
-1. Feature von "Ausstehend" nach "Vollständig migriert" verschieben
-2. Service-Status aktualisieren falls relevant
-3. Datum am Ende aktualisieren
-
-### 7. Commit erstellen
-
-```bash
-git add .
-git commit -m "feat: Migrate $ARGUMENTS from Ionic to Flutter"
+// ✅ RICHTIG - .when() Pattern
+dataAsync.when(
+  loading: () => const ListSkeleton(),
+  error: (e, _) => EmptyStateWidget(icon: Icons.error, title: 'Fehler'),
+  data: (items) => ListView.builder(...),
+)
 ```
 
 ---
 
-## Checkliste
+## Kritische Regeln
 
-- [ ] Ionic-Quelle analysiert
-- [ ] Flutter-Code erstellt
-- [ ] tenantId-Filter vorhanden (KRITISCH!)
-- [ ] Deutsche Labels verwendet
-- [ ] Route in `app_router.dart`
-- [ ] Provider in `providers.dart` exportiert
-- [ ] `flutter analyze` ohne Fehler
-- [ ] `migration-status.md` aktualisiert
-- [ ] Committed
+### 1. Multi-Tenant Security (KRITISCH!)
 
-## Beispiel-Migration
-
-**Ionic Page:**
-```typescript
-@Component({...})
-export class PlayersPage {
-  players = signal<Player[]>([]);
-
-  ngOnInit() {
-    this.loadPlayers();
-  }
-
-  async loadPlayers() {
-    const data = await this.playerService.getPlayers();
-    this.players.set(data);
-  }
-}
-```
-
-**Flutter Equivalent:**
 ```dart
-class PlayersPage extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playersAsync = ref.watch(playersProvider);
+// ✅ RICHTIG - IMMER tenantId filtern
+.eq('tenantId', currentTenantId)
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Spieler')),
-      body: playersAsync.when(
-        loading: () => const ListSkeleton(),
-        error: (e, _) => EmptyStateWidget(icon: Icons.error, title: 'Fehler'),
-        data: (players) => ListView.builder(...),
-      ),
-    );
-  }
-}
+// ✅ RICHTIG - Repository mit Tenant nutzen
+ref.watch(xxxRepositoryWithTenantProvider)
+
+// ❌ FALSCH - Sicherheitslücke!
+.select('*')  // ohne tenantId Filter
 ```
 
-## Shared Widgets nutzen
+### 2. UI-Labels auf Deutsch
 
-Verwende vorhandene Widgets aus `lib/shared/widgets/`:
+- Anwesend, Abwesend, Entschuldigt, Verspätet
+- Speichern, Abbrechen, Löschen
+- Fehler beim Laden, Keine Daten gefunden
+
+### 3. PWA-Kompatibilität
+
+```dart
+// Native APIs in try-catch wrappen
+try {
+  await HapticFeedback.lightImpact();
+} catch (_) {}
+```
+
+---
+
+## Quell- und Ziel-Pfade
+
+| Typ | Pfad |
+|-----|------|
+| **Ionic Quelle** | `/Users/I576226/repositories/attendance/src/app/` |
+| **Flutter Ziel** | `/Users/I576226/repositories/attendix/lib/` |
+| **Migration Status** | `/Users/I576226/repositories/attendix/.claude/migration-status.md` |
+
+### Flutter-Struktur
+
+```
+lib/features/$ARGUMENTS/
+├── presentation/
+│   ├── pages/
+│   │   └── ${name}_page.dart
+│   └── widgets/
+│       └── (custom widgets)
+```
+
+Bei Bedarf auch:
+- `lib/data/models/<name>/` - Freezed Model
+- `lib/data/repositories/<name>_repository.dart` - Repository
+- `lib/core/providers/<name>_providers.dart` - Providers
+
+---
+
+## Shared Widgets (wiederverwenden!)
+
+Aus `lib/shared/widgets/`:
 - `ListSkeleton` - Loading State
 - `EmptyStateWidget` - Leere Liste
 - `Avatar` - Profilbild mit Fallback
 - `StatusBadge` - Anwesenheitsstatus
 - `AnimatedListItem` - List-Animationen
+
+---
+
+## Checkliste
+
+- [ ] Worktree-Entscheidung getroffen
+- [ ] Ionic-Quelle analysiert (migration-analyzer)
+- [ ] Flutter-Patterns gefunden (Explore)
+- [ ] Tasks erstellt und bestätigt
+- [ ] Flutter-Code erstellt
+- [ ] tenantId-Filter in allen Queries (KRITISCH!)
+- [ ] Deutsche Labels verwendet
+- [ ] Route in `app_router.dart`
+- [ ] Provider in `providers.dart` exportiert
+- [ ] Code Review mit flutter-reviewer
+- [ ] `dart analyze lib/` ohne Fehler
+- [ ] Committed
+- [ ] `migration-status.md` aktualisiert

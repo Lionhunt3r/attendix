@@ -1,41 +1,44 @@
-# Migration Workflow mit Worktrees
+# Migration Workflow
 
-## Übersicht
-
-Dieser Workflow ermöglicht parallele Migration von Ionic→Flutter Features.
+## Schnellstart
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Haupt-Terminal (Koordination)                          │
-│  - Migration-Status prüfen                              │
-│  - Code Reviews                                         │
-│  - Merges                                               │
-└─────────────────────────────────────────────────────────┘
-         │
-         ├──────────────────┬──────────────────┐
-         ▼                  ▼                  ▼
-┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
-│  Worktree 1      │ │  Worktree 2      │ │  Worktree 3      │
-│  feature-xyz     │ │  feature-abc     │ │  bugfix-123      │
-└──────────────────┘ └──────────────────┘ └──────────────────┘
+/ionic-migrate [feature]
 ```
+
+Das ist der einzige Befehl, den du brauchst. Der Skill orchestriert automatisch:
+
+1. **Worktree-Frage** - Optional für paralleles Arbeiten
+2. **Analyse** - Startet `migration-analyzer` und `Explore` parallel
+3. **Planung** - Erstellt Tasks, holt Bestätigung
+4. **Implementierung** - Code mit Pattern-Mapping
+5. **Review** - `flutter-reviewer` Agent
+6. **Commit** - `/commit` Skill + Status-Update
 
 ---
 
-## Schnellstart: `/migrate` Command
+## Manuelles Worktree-Setup
 
-Der einfachste Weg eine Migration zu starten:
+Falls du explizit in einem Worktree arbeiten möchtest:
 
+```bash
+claude --worktree migrate-[feature]
 ```
-/migrate shifts
+
+Dann im Worktree:
+```
+/ionic-migrate [feature]
 ```
 
-Dies aktiviert den `migrate-full` Skill, der automatisch:
-1. Ionic und Flutter Code parallel analysiert
-2. Migrations-Plan mit Tasks erstellt
-3. Nach Bestätigung implementiert
-4. Code Review durchführt
-5. Committed und Status aktualisiert
+### Worktree-Verwaltung
+
+```bash
+# Aktive Worktrees anzeigen
+git worktree list
+
+# Worktree entfernen (nach Merge)
+git worktree remove .claude/worktrees/[name]
+```
 
 ---
 
@@ -43,151 +46,47 @@ Dies aktiviert den `migrate-full` Skill, der automatisch:
 
 ### Skills
 
-| Skill | Trigger | Beschreibung |
-|-------|---------|--------------|
-| `migrate-full` | `/migrate [feature]` | **Vollständiger Workflow** - orchestriert alles |
-| `ionic-migrate` | `/ionic-migrate [feature]` | Nur Pattern-Mapping und Code-Generierung |
-| `flutter-feature` | `/flutter-feature` | Neues Flutter Feature erstellen |
-| `freezed-model` | - | Freezed Model erstellen |
-| `supabase-repo` | - | Repository mit Tenant-Support |
+| Skill | Beschreibung |
+|-------|--------------|
+| `/ionic-migrate [feature]` | **Vollständiger Migrations-Workflow** |
+| `/flutter-feature` | Neues Flutter Feature erstellen |
+| `/commit` | Commit erstellen |
 
-### Agents
+### Agents (automatisch von Skills genutzt)
 
-| Agent | Zweck | Wann nutzen |
-|-------|-------|-------------|
-| `migration-analyzer` | Ionic analysieren | Automatisch von migrate-full |
-| `flutter-reviewer` | Code prüfen | Nach Implementierung |
-| `test-generator` | Tests erstellen | Optional am Ende |
-| `Explore` | Codebase durchsuchen | Bei Unklarheiten |
+| Agent | Zweck |
+|-------|-------|
+| `migration-analyzer` | Ionic analysieren |
+| `flutter-reviewer` | Code prüfen |
+| `test-generator` | Tests erstellen |
+| `Explore` | Codebase durchsuchen |
 
 ---
 
-## Workflow für ein Feature
+## Migrations-Checkliste
 
-### 1. Feature auswählen
-
-Prüfe `.claude/migration-status.md` für ausstehende Features:
-
-```
-Zeig mir die ausstehenden Features aus migration-status.md
-```
-
-### 2. Worktree starten
-
-```bash
-claude --worktree feature-<name>
-```
-
-Beispiel:
-```bash
-claude --worktree feature-meeting-detail
-claude --worktree feature-handover
-claude --worktree feature-telegram
-```
-
-### 3. Migration durchführen
-
-Im Worktree sage:
-```
-/ionic-migrate meeting
-```
-
-Der Skill wird:
-1. Ionic-Quelle lesen
-2. Flutter-Code erstellen
-3. Tests optional generieren
-
-### 4. Testen
-
-```bash
-flutter analyze lib/
-flutter test
-flutter run -d chrome
-```
-
-### 5. Committen (im Worktree)
-
-```bash
-git add .
-git commit -m "feat: Migrate meeting detail from Ionic"
-```
-
-### 6. Zurück zum Hauptbranch
-
-Worktree beenden (Ctrl+C oder `/exit`), dann:
-
-```bash
-git checkout master
-git merge worktree-feature-meeting-detail
-```
-
-### 7. Status aktualisieren
-
-In der Haupt-Session:
-```
-Aktualisiere migration-status.md - Meeting Detail ist jetzt fertig
-```
-
----
-
-## Paralleles Arbeiten
-
-Du kannst mehrere Terminals gleichzeitig nutzen:
-
-```bash
-# Terminal 1
-claude --worktree feature-meeting-detail
-
-# Terminal 2
-claude --worktree feature-telegram
-
-# Terminal 3
-claude --worktree feature-handover
-```
-
-Jeder Worktree:
-- Hat eigenen Branch (`worktree-feature-<name>`)
-- Arbeitet isoliert
-- Kann unabhängig committen
-
----
-
-## Quick Reference
-
-| Aktion | Befehl |
-|--------|--------|
-| Feature starten | `claude --worktree feature-<name>` |
-| Migration ausführen | `/ionic-migrate <feature>` |
-| Status prüfen | Lies `migration-status.md` |
-| Analyzer laufen | "Lauf den migration-analyzer" |
-| Code Review | "Prüfe den Code mit flutter-reviewer" |
-| Tests generieren | "Generiere Tests mit test-generator" |
-
----
-
-## Migration-Checkliste pro Feature
-
-- [ ] Ionic-Quelle analysiert
-- [ ] Flutter-Code erstellt
-- [ ] tenantId-Filter vorhanden
-- [ ] Deutsche Labels verwendet
-- [ ] Route in `app_router.dart` hinzugefügt
-- [ ] Provider in `providers.dart` exportiert
-- [ ] `flutter analyze` ohne Fehler
-- [ ] Manuell getestet
+- [ ] `/ionic-migrate [feature]` ausgeführt
+- [ ] Worktree-Entscheidung getroffen
+- [ ] Analyse abgeschlossen
+- [ ] Tasks bestätigt
+- [ ] Code implementiert
+- [ ] tenantId-Filter vorhanden (KRITISCH!)
+- [ ] Code Review bestanden
+- [ ] `dart analyze` ohne Fehler
 - [ ] Committed
 - [ ] `migration-status.md` aktualisiert
 
 ---
 
-## Ausstehende Features (Kurzliste)
+## Ausstehende Features
 
-### Jetzt bereit zum Migrieren:
-1. **meeting-detail** - Niedrig, keine Abhängigkeiten
-2. **signout** - Niedrig, nutzt vorhandene Providers
-3. **song-viewer** - Mittel, braucht PDF-Package
+Siehe `.claude/migration-status.md` für aktuelle Liste.
 
-### Später:
-4. **telegram** - Mittel
-5. **handover** - Mittel
-6. **shifts** - Mittel (falls benötigt)
+### Quick Reference
+
+| Feature | Komplexität |
+|---------|-------------|
+| Shifts/Schichtpläne | Mittel |
+| Handover | Mittel |
+| Sign-out Page | Niedrig |
+| Share-Link (Songs) | Mittel |
