@@ -269,6 +269,8 @@ class _MultiDateCalendarState extends ConsumerState<MultiDateCalendar> {
       switch (colorStr.toLowerCase()) {
         case 'primary':
           return AppColors.primary;
+        case 'secondary':
+          return AppColors.secondary;
         case 'success':
           return AppColors.success;
         case 'warning':
@@ -279,6 +281,10 @@ class _MultiDateCalendarState extends ConsumerState<MultiDateCalendar> {
           return AppColors.tertiary;
         case 'rosa':
           return const Color(0xFFE91E63); // Pink/Rosa
+        case 'mint':
+          return Colors.teal;
+        case 'orange':
+          return Colors.orange;
         default:
           return AppColors.primary;
       }

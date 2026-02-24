@@ -965,6 +965,8 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
       switch (colorStr.toLowerCase()) {
         case 'primary':
           return AppColors.primary;
+        case 'secondary':
+          return AppColors.secondary;
         case 'success':
           return AppColors.success;
         case 'warning':
@@ -973,6 +975,12 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
           return AppColors.danger;
         case 'tertiary':
           return AppColors.tertiary;
+        case 'rosa':
+          return Colors.pink;
+        case 'mint':
+          return Colors.teal;
+        case 'orange':
+          return Colors.orange;
         default:
           return AppColors.primary;
       }
