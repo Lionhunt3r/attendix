@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/string_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/tenant/tenant.dart';
 import '../../data/providers/registration_providers.dart';
@@ -112,9 +113,10 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
                   CircleAvatar(
                     backgroundColor: AppColors.primaryLight,
                     child: Text(
-                      tenant.shortName.isNotEmpty
-                          ? tenant.shortName.substring(0, 2).toUpperCase()
-                          : tenant.longName.substring(0, 2).toUpperCase(),
+                      StringUtils.getTenantInitials(
+                        tenant.shortName,
+                        tenant.longName,
+                      ),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
