@@ -255,8 +255,13 @@ class _SelfServiceOverviewPageState
           SignInType.normal,
         );
 
+    final state = ref.read(signInOutNotifierProvider);
     if (mounted) {
-      ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+      if (state.hasError) {
+        ToastHelper.showError(context, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+      } else {
+        ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+      }
     }
   }
 
@@ -314,12 +319,17 @@ class _SelfServiceOverviewPageState
             isLateComing: isLateComing,
           );
 
+      final state = ref.read(signInOutNotifierProvider);
       if (mounted) {
-        ToastHelper.showSuccess(
-            context,
-            isLateComing
-                ? 'Vielen Dank für die Info!'
-                : 'Vielen Dank für deine rechtzeitige Abmeldung!');
+        if (state.hasError) {
+          ToastHelper.showError(context, 'Abmeldung fehlgeschlagen. Bitte versuche es erneut.');
+        } else {
+          ToastHelper.showSuccess(
+              context,
+              isLateComing
+                  ? 'Vielen Dank für die Info!'
+                  : 'Vielen Dank für deine rechtzeitige Abmeldung!');
+        }
       }
     }
   }
@@ -359,7 +369,10 @@ class _SelfServiceOverviewPageState
   }
 
   Future<void> _showActionSheet(CrossTenantPersonAttendance attendance) async {
-    if (attendance.id == null) return;
+    if (attendance.id == null) {
+      ToastHelper.showError(context, 'Dieser Termin kann nicht bearbeitet werden');
+      return;
+    }
 
     final isUpcoming = attendance.isUpcoming;
     final isPast = attendance.isPast;
@@ -531,8 +544,13 @@ class _SelfServiceOverviewPageState
             notes: note,
           );
 
+      final state = ref.read(signInOutNotifierProvider);
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+        if (state.hasError) {
+          ToastHelper.showError(context, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+        } else {
+          ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+        }
       }
     }
   }
@@ -550,7 +568,10 @@ class _SelfServiceOverviewPageState
   }
 
   Future<void> _showNoteDialog(CrossTenantPersonAttendance attendance) async {
-    if (attendance.id == null) return;
+    if (attendance.id == null) {
+      ToastHelper.showError(context, 'Fehler: Keine gültige Anwesenheits-ID');
+      return;
+    }
 
     final controller = TextEditingController(text: attendance.notes);
 
@@ -584,8 +605,13 @@ class _SelfServiceOverviewPageState
           .read(signInOutNotifierProvider.notifier)
           .updateNote(attendance.id!, note);
 
+      final state = ref.read(signInOutNotifierProvider);
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Notiz gespeichert');
+        if (state.hasError) {
+          ToastHelper.showError(context, 'Notiz konnte nicht gespeichert werden.');
+        } else {
+          ToastHelper.showSuccess(context, 'Notiz gespeichert');
+        }
       }
     }
   }
@@ -645,6 +671,7 @@ class _SelfServiceOverviewPageState
     try {
       return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
     } catch (e) {
+      debugPrint('Warning: Failed to parse color "$hexColor", using primary color');
       return AppColors.primary;
     }
   }
@@ -949,6 +976,7 @@ class _CurrentAttendanceCard extends StatelessWidget {
     try {
       return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
     } catch (e) {
+      debugPrint('Warning: Failed to parse color "$hexColor", using primary color');
       return AppColors.primary;
     }
   }
@@ -1076,6 +1104,7 @@ class _AttendanceListTile extends StatelessWidget {
     try {
       return Color(int.parse(hexColor.replaceFirst('#', '0xFF')));
     } catch (e) {
+      debugPrint('Warning: Failed to parse color "$hexColor", using primary color');
       return AppColors.primary;
     }
   }
