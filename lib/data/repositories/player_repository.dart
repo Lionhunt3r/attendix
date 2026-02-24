@@ -225,6 +225,7 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
           .from('player')
           .update(data)
           .eq('id', player.id!)
+          .eq('tenantId', currentTenantId)
           .select()
           .single();
 
@@ -262,7 +263,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
             'history': history,
             'appId': null,
           })
-          .eq('id', player.id!);
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'archivePlayer');
       rethrow;
@@ -295,7 +297,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
             'left': null,
             'history': history,
           })
-          .eq('id', player.id!);
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'reactivatePlayer');
       rethrow;
@@ -308,7 +311,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       await supabase
           .from('player')
           .delete()
-          .eq('id', playerId);
+          .eq('id', playerId)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'deletePlayer');
       rethrow;
@@ -342,7 +346,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
             'paused_until': pausedUntil,
             'history': history,
           })
-          .eq('id', player.id!);
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
 
       // Remove from upcoming attendances
       await removeFromUpcomingAttendances(player.id!);
@@ -379,7 +384,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
             'paused_until': null,
             'history': history,
           })
-          .eq('id', player.id!);
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
 
       // Add to upcoming attendances
       await addToUpcomingAttendances(player);
@@ -538,7 +544,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
           'paused': false,
           'paused_until': null,
           'history': history,
-        }).eq('id', player.id!);
+        }).eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
 
         // Add to upcoming attendances
         await addToUpcomingAttendances(player);
@@ -555,7 +562,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       await supabase
           .from('player')
           .update({'pending': false})
-          .eq('id', playerId);
+          .eq('id', playerId)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'approvePlayer');
       rethrow;
@@ -592,7 +600,8 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
             'instrument': newInstrumentId,
             'history': history,
           })
-          .eq('id', player.id!);
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
     } catch (e, stack) {
       handleError(e, stack, 'updatePlayerInstrument');
       rethrow;

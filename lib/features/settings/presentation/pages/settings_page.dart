@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/string_utils.dart';
 import '../../../../shared/widgets/sheets/feedback_sheet.dart';
 import '../../../../shared/widgets/sheets/version_history_sheet.dart';
 
@@ -36,9 +37,10 @@ class SettingsPage extends ConsumerWidget {
                   leading: CircleAvatar(
                     backgroundColor: AppColors.primaryLight,
                     child: Text(
-                      tenant.shortName.isNotEmpty
-                          ? tenant.shortName.substring(0, 2).toUpperCase()
-                          : tenant.longName.substring(0, 2).toUpperCase(),
+                      StringUtils.getTenantInitials(
+                        tenant.shortName,
+                        tenant.longName,
+                      ),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

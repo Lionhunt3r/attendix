@@ -127,6 +127,8 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
 
   Future<void> _saveOrder() async {
     final supabase = ref.read(supabaseClientProvider);
+    final tenantId = ref.read(currentTenantIdProvider);
+    if (tenantId == null) return;
 
     try {
       for (int i = 0; i < _localTypes.length; i++) {
@@ -135,7 +137,8 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
           await supabase
               .from('attendance_types')
               .update({'index': i})
-              .eq('id', type.id!);
+              .eq('id', type.id!)
+              .eq('tenant_id', tenantId);
         }
       }
 
