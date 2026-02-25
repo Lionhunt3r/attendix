@@ -465,7 +465,20 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
 
     try {
       final supabase = ref.read(supabaseClientProvider);
-      await supabase.from('song_history').delete().eq('id', entry.id!);
+      final tenant = ref.read(currentTenantProvider);
+
+      if (tenant?.id == null) {
+        if (mounted) {
+          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+        }
+        return;
+      }
+
+      await supabase
+          .from('song_history')
+          .delete()
+          .eq('id', entry.id!)
+          .eq('tenant_id', tenant!.id!);
 
       ref.invalidate(songHistoryProvider);
       if (mounted) {

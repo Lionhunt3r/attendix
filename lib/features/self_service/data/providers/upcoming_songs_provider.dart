@@ -68,7 +68,7 @@ final upcomingSongsProvider =
 
   // Get history entries for these attendances with song data
   final historyResponse = await supabase
-      .from('history')
+      .from('song_history')
       .select('''
         id, song_id, attendance_id, date, conductorName, otherConductor, count,
         song:song_id(id, name, number, prefix, link, instrument_ids, files, difficulty)
