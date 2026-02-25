@@ -48,14 +48,36 @@ import '../../features/parents/presentation/pages/parents_portal_page.dart';
 import '../../features/shifts/presentation/pages/shifts_list_page.dart';
 import '../../features/shifts/presentation/pages/shift_detail_page.dart';
 
+/// Listenable that notifies when auth state changes
+/// Used by GoRouter to re-evaluate redirects without recreating the router
+class AuthChangeNotifier extends ChangeNotifier {
+  AuthChangeNotifier(this._ref) {
+    _ref.listen(authStateProvider, (_, __) {
+      notifyListeners();
+    });
+  }
+
+  final Ref _ref;
+}
+
+/// Provider for the auth change notifier
+final authChangeNotifierProvider = Provider<AuthChangeNotifier>((ref) {
+  return AuthChangeNotifier(ref);
+});
+
 /// Router provider
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  // Use refreshListenable instead of watching authState directly
+  // This prevents router recreation on auth changes (like updateUser)
+  final authNotifier = ref.watch(authChangeNotifierProvider);
 
   return GoRouter(
     initialLocation: '/login',
     debugLogDiagnostics: true,
+    refreshListenable: authNotifier,
     redirect: (context, state) {
+      // Read auth state inside redirect (not watch)
+      final authState = ref.read(authStateProvider);
       final isLoggedIn = authState.whenOrNull(
         data: (auth) => auth.session != null,
       ) ?? false;

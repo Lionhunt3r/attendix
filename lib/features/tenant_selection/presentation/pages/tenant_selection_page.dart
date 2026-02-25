@@ -109,22 +109,18 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
   /// Navigate to the appropriate page based on role
   Future<void> _selectTenant(Tenant tenant) async {
     // Get the user's role FIRST, before any state changes
-    // This prevents a race condition where setTenant() triggers provider
-    // invalidation and widget rebuild while navigation is pending
     final role = await _getTenantUserRole(tenant.id!);
 
     // Check mounted before state change
     if (!mounted) return;
 
     // Set tenant locally WITHOUT triggering auth sync
-    // This avoids auth events that would rebuild widgets and interrupt navigation
     await ref.read(currentTenantProvider.notifier).setTenantLocal(tenant);
 
     // Navigate FIRST - before auth sync can cause rebuilds
     context.go(role.defaultRoute);
 
     // Auth sync AFTER navigation (fire and forget)
-    // This syncs to Supabase user_metadata for cross-device sync
     ref
         .read(userPreferencesNotifierProvider.notifier)
         .updateCurrentTenantId(tenant.id!);
