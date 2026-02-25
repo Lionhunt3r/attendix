@@ -68,11 +68,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
       // Load player profile if exists
       Map<String, dynamic>? player;
-      if (tenantUser?['playerId'] != null) {
+      // RT-007: Safe playerId extraction
+      final playerId = tenantUser?['playerId'];
+      if (playerId != null) {
         final playerResponse = await supabase
             .from('players')
             .select('*')
-            .eq('id', tenantUser!['playerId'])
+            .eq('id', playerId)
             .maybeSingle();
         player = playerResponse;
       }

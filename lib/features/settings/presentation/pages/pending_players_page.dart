@@ -31,11 +31,20 @@ final pendingPlayersProvider = FutureProvider<List<Person>>((ref) async {
 });
 
 /// Pending Players Page - shows self-registered members awaiting approval
-class PendingPlayersPage extends ConsumerWidget {
+/// BL-006: Converted to StatefulWidget to track processing state
+class PendingPlayersPage extends ConsumerStatefulWidget {
   const PendingPlayersPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PendingPlayersPage> createState() => _PendingPlayersPageState();
+}
+
+class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
+  // BL-006: Track IDs currently being processed to prevent double-clicks
+  final Set<int> _processingIds = {};
+
+  @override
+  Widget build(BuildContext context) {
     final playersAsync = ref.watch(pendingPlayersProvider);
 
     return Scaffold(
@@ -92,10 +101,12 @@ class PendingPlayersPage extends ConsumerWidget {
               itemCount: players.length,
               itemBuilder: (context, index) {
                 final player = players[index];
+                final isProcessing = player.id != null && _processingIds.contains(player.id);
                 return _PendingPlayerItem(
                   player: player,
-                  onApprove: () => _approvePlayer(context, ref, player),
-                  onDecline: () => _declinePlayer(context, ref, player),
+                  isProcessing: isProcessing,
+                  onApprove: isProcessing ? null : () => _approvePlayer(player),
+                  onDecline: isProcessing ? null : () => _declinePlayer(player),
                 );
               },
             ),
@@ -105,7 +116,16 @@ class PendingPlayersPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _approvePlayer(BuildContext context, WidgetRef ref, Person player) async {
+  Future<void> _approvePlayer(Person player) async {
+    final playerId = player.id;
+    if (playerId == null) {
+      ToastHelper.showError(context, 'Ungültige Spieler-ID');
+      return;
+    }
+
+    // BL-006: Guard against double-click
+    if (_processingIds.contains(playerId)) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -124,42 +144,50 @@ class PendingPlayersPage extends ConsumerWidget {
       ),
     );
 
-    if (confirmed == true && context.mounted) {
-      try {
-        final supabase = ref.read(supabaseClientProvider);
-        final tenantId = ref.read(currentTenantIdProvider);
-        if (tenantId == null) {
-          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
-          return;
-        }
+    if (confirmed != true || !mounted) return;
 
-        // Safe player.id access (Issue #16 RT-006)
-        final playerId = player.id;
-        if (playerId == null) {
-          ToastHelper.showError(context, 'Ungültige Spieler-ID');
-          return;
-        }
+    setState(() => _processingIds.add(playerId));
 
-        await supabase
-            .from('player')
-            .update({'pending': false})
-            .eq('id', playerId)
-            .eq('tenantId', tenantId);
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final tenantId = ref.read(currentTenantIdProvider);
+      if (tenantId == null) {
+        ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+        return;
+      }
 
-        ref.invalidate(pendingPlayersProvider);
+      await supabase
+          .from('player')
+          .update({'pending': false})
+          .eq('id', playerId)
+          .eq('tenantId', tenantId);
 
-        if (context.mounted) {
-          ToastHelper.showSuccess(context, '${player.fullName} wurde freigeschaltet');
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ToastHelper.showError(context, 'Fehler: $e');
-        }
+      ref.invalidate(pendingPlayersProvider);
+
+      if (mounted) {
+        ToastHelper.showSuccess(context, '${player.fullName} wurde freigeschaltet');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _processingIds.remove(playerId));
       }
     }
   }
 
-  Future<void> _declinePlayer(BuildContext context, WidgetRef ref, Person player) async {
+  Future<void> _declinePlayer(Person player) async {
+    final playerId = player.id;
+    if (playerId == null) {
+      ToastHelper.showError(context, 'Ungültige Spieler-ID');
+      return;
+    }
+
+    // BL-006: Guard against double-click
+    if (_processingIds.contains(playerId)) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -179,37 +207,36 @@ class PendingPlayersPage extends ConsumerWidget {
       ),
     );
 
-    if (confirmed == true && context.mounted) {
-      try {
-        final supabase = ref.read(supabaseClientProvider);
-        final tenantId = ref.read(currentTenantIdProvider);
-        if (tenantId == null) {
-          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
-          return;
-        }
+    if (confirmed != true || !mounted) return;
 
-        // Safe player.id access (Issue #16 RT-007)
-        final playerId = player.id;
-        if (playerId == null) {
-          ToastHelper.showError(context, 'Ungültige Spieler-ID');
-          return;
-        }
+    setState(() => _processingIds.add(playerId));
 
-        await supabase
-            .from('player')
-            .delete()
-            .eq('id', playerId)
-            .eq('tenantId', tenantId);
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final tenantId = ref.read(currentTenantIdProvider);
+      if (tenantId == null) {
+        ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+        return;
+      }
 
-        ref.invalidate(pendingPlayersProvider);
+      await supabase
+          .from('player')
+          .delete()
+          .eq('id', playerId)
+          .eq('tenantId', tenantId);
 
-        if (context.mounted) {
-          ToastHelper.showSuccess(context, 'Registrierung abgelehnt');
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ToastHelper.showError(context, 'Fehler: $e');
-        }
+      ref.invalidate(pendingPlayersProvider);
+
+      if (mounted) {
+        ToastHelper.showSuccess(context, 'Registrierung abgelehnt');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _processingIds.remove(playerId));
       }
     }
   }
@@ -218,13 +245,15 @@ class PendingPlayersPage extends ConsumerWidget {
 class _PendingPlayerItem extends StatelessWidget {
   const _PendingPlayerItem({
     required this.player,
+    required this.isProcessing,
     required this.onApprove,
     required this.onDecline,
   });
 
   final Person player;
-  final VoidCallback onApprove;
-  final VoidCallback onDecline;
+  final bool isProcessing;
+  final VoidCallback? onApprove;
+  final VoidCallback? onDecline;
 
   @override
   Widget build(BuildContext context) {
@@ -290,21 +319,29 @@ class _PendingPlayerItem extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                OutlinedButton.icon(
-                  onPressed: onDecline,
-                  icon: const Icon(Icons.close, size: 18),
-                  label: const Text('Ablehnen'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.danger,
-                    side: const BorderSide(color: AppColors.danger),
+                if (isProcessing)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else ...[
+                  OutlinedButton.icon(
+                    onPressed: onDecline,
+                    icon: const Icon(Icons.close, size: 18),
+                    label: const Text('Ablehnen'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: const BorderSide(color: AppColors.danger),
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppDimensions.paddingS),
-                ElevatedButton.icon(
-                  onPressed: onApprove,
-                  icon: const Icon(Icons.check, size: 18),
-                  label: const Text('Genehmigen'),
-                ),
+                  const SizedBox(width: AppDimensions.paddingS),
+                  ElevatedButton.icon(
+                    onPressed: onApprove,
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Genehmigen'),
+                  ),
+                ],
               ],
             ),
           ],
