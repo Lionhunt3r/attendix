@@ -152,6 +152,7 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Get person attendances for a specific person
+  /// SEC-016: Added tenant filter via inner join with attendance table
   Future<List<PersonAttendance>> getPersonAttendancesForPerson(
     int personId, {
     DateTime? since,
@@ -161,8 +162,9 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
 
       final response = await supabase
           .from('person_attendances')
-          .select('*, attendance:attendance_id(id, date, type, typeInfo, songs, type_id, start_time, end_time, deadline)')
+          .select('*, attendance:attendance_id!inner(id, date, type, typeInfo, songs, type_id, start_time, end_time, deadline, tenantId)')
           .eq('person_id', personId)
+          .eq('attendance.tenantId', currentTenantId)
           .gt('attendance.date', sinceDate.toIso8601String());
 
       return (response as List)
@@ -199,11 +201,34 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Update a single person attendance
+  /// SEC-012: Added tenant validation before update
   Future<PersonAttendance> updatePersonAttendance(
     String id,
     Map<String, dynamic> updates,
   ) async {
     try {
+      // Validate that personAttendance belongs to current tenant
+      final validation = await supabase
+          .from('person_attendances')
+          .select('id, attendance:attendance_id(tenantId)')
+          .eq('id', id)
+          .maybeSingle();
+
+      if (validation == null) {
+        throw RepositoryException(
+          message: 'PersonAttendance not found',
+          operation: 'updatePersonAttendance',
+        );
+      }
+
+      final attendanceTenantId = validation['attendance']?['tenantId'];
+      if (attendanceTenantId != currentTenantId) {
+        throw RepositoryException(
+          message: 'Access denied: PersonAttendance belongs to different tenant',
+          operation: 'updatePersonAttendance',
+        );
+      }
+
       updates.remove('id');
       updates.remove('firstName');
       updates.remove('lastName');
@@ -233,13 +258,27 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Delete person attendances for a specific person and attendance IDs
+  /// SEC-014: Added tenant validation by verifying attendance IDs belong to current tenant
   Future<void> deletePersonAttendances(int personId, List<int> attendanceIds) async {
     try {
+      // Validate that attendance IDs belong to current tenant
+      final validAttendances = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .inFilter('id', attendanceIds);
+
+      final validIds = (validAttendances as List)
+          .map((a) => a['id'] as int)
+          .toList();
+
+      if (validIds.isEmpty) return;
+
       await supabase
           .from('person_attendances')
           .delete()
           .eq('person_id', personId)
-          .inFilter('attendance_id', attendanceIds);
+          .inFilter('attendance_id', validIds);
     } catch (e, stack) {
       handleError(e, stack, 'deletePersonAttendances');
       rethrow;
@@ -247,11 +286,28 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Batch update multiple person attendances with the same status
+  /// SEC-013: Added tenant validation for all person attendance IDs
   Future<void> batchUpdatePersonAttendances(
     List<String> personAttendanceIds,
     AttendanceStatus newStatus,
   ) async {
     try {
+      // Validate all personAttendances belong to current tenant
+      final validation = await supabase
+          .from('person_attendances')
+          .select('id, attendance:attendance_id(tenantId)')
+          .inFilter('id', personAttendanceIds);
+
+      final validIds = <String>[];
+      for (final record in validation as List) {
+        final attendanceTenantId = record['attendance']?['tenantId'];
+        if (attendanceTenantId == currentTenantId) {
+          validIds.add(record['id'].toString());
+        }
+      }
+
+      if (validIds.isEmpty) return;
+
       await supabase
           .from('person_attendances')
           .update({
@@ -259,7 +315,7 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
             'changed_at': DateTime.now().toIso8601String(),
             'changed_by': supabase.auth.currentUser?.id,
           })
-          .inFilter('id', personAttendanceIds);
+          .inFilter('id', validIds);
     } catch (e, stack) {
       handleError(e, stack, 'batchUpdatePersonAttendances');
       rethrow;
@@ -290,8 +346,22 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Calculate percentage for an attendance
+  /// SEC-015: Added tenant validation before percentage calculation
   Future<void> recalculatePercentage(int attendanceId) async {
     try {
+      // Validate attendance belongs to current tenant
+      final attendanceCheck = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('id', attendanceId)
+          .eq('tenantId', currentTenantId)
+          .maybeSingle();
+
+      if (attendanceCheck == null) {
+        // Attendance doesn't belong to current tenant, skip silently
+        return;
+      }
+
       final response = await supabase
           .from('person_attendances')
           .select('status')

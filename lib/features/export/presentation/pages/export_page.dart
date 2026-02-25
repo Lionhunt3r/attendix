@@ -250,6 +250,8 @@ class _ExportPageState extends ConsumerState<ExportPage> {
 
       if (_contentType == 'player') {
         if (_exportType == 'pdf') {
+          // Fix RT-002: Check mounted before passing context to async operation
+          if (!mounted) return;
           await exportService.exportPlayerListPdf(
             context: context,
             players: activePlayers,
@@ -300,6 +302,8 @@ class _ExportPageState extends ConsumerState<ExportPage> {
         }
 
         if (_exportType == 'pdf') {
+          // Fix RT-003: Check mounted before passing context to async operation
+          if (!mounted) return;
           await exportService.exportAttendancePdf(
             context: context,
             players: activePlayers,

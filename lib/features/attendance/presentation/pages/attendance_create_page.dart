@@ -859,11 +859,15 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
           final playerValue = playerAdditionalFields?[filterKey];
 
           // Get default value from tenant's additional_fields
-          final fieldDef = tenant.additionalFields?.firstWhere(
+          // Fix RT-001: Use firstOrNull instead of firstWhere with throwing orElse
+          final fieldDef = tenant.additionalFields?.where(
             (f) => f.id == filterKey,
-            orElse: () => throw StateError('Field not found'),
-          );
-          final defaultValue = fieldDef?.defaultValue;
+          ).firstOrNull;
+
+          // If field definition not found (e.g., deleted), include player
+          if (fieldDef == null) return true;
+
+          final defaultValue = fieldDef.defaultValue;
 
           final effectiveValue = playerValue ?? defaultValue;
           if (effectiveValue != filterOption) {

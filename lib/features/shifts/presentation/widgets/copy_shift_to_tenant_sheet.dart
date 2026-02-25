@@ -397,8 +397,11 @@ class _CopyShiftToTenantSheetState
           message = 'Schichtplan nach "${targetTenant.longName}" kopiert.';
         }
 
-        ToastHelper.showSuccess(context, message);
-        Navigator.pop(context);
+        // Fix RT-005: Check mounted again after await before using context
+        if (mounted) {
+          ToastHelper.showSuccess(context, message);
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {
