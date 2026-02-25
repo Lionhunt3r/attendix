@@ -430,4 +430,91 @@ class ExportService {
     final mins = minutes % 60;
     return '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}';
   }
+
+  /// Export a single attendance to Excel
+  /// Shows all persons with their status for this attendance
+  Future<void> exportAttendanceToExcel({
+    required BuildContext context,
+    required Attendance attendance,
+    required List<Person> persons,
+    required Map<int, AttendanceStatus> statuses,
+    required String tenantName,
+  }) async {
+    final excel = Excel.createExcel();
+    final sheet = excel['Anwesenheit'];
+
+    // Format attendance date
+    final dateObj = DateTime.tryParse(attendance.date);
+    final dateStr = dateObj != null
+        ? DateFormat('dd.MM.yyyy').format(dateObj)
+        : attendance.date;
+
+    // Title row
+    sheet.appendRow([
+      TextCellValue('$tenantName - Anwesenheit $dateStr'),
+    ]);
+    sheet.appendRow([]); // Empty row
+
+    // Header row
+    sheet.appendRow([
+      TextCellValue('#'),
+      TextCellValue('Vorname'),
+      TextCellValue('Nachname'),
+      TextCellValue('Gruppe'),
+      TextCellValue('Status'),
+    ]);
+
+    // Style header
+    for (int i = 0; i < 5; i++) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 2));
+      cell.cellStyle = CellStyle(
+        bold: true,
+        backgroundColorHex: ExcelColor.fromHexString('#005238'),
+        fontColorHex: ExcelColor.white,
+      );
+    }
+
+    // Data rows
+    int row = 1;
+    for (final person in persons) {
+      final status = statuses[person.id] ?? AttendanceStatus.neutral;
+      sheet.appendRow([
+        TextCellValue(row.toString()),
+        TextCellValue(person.firstName),
+        TextCellValue(person.lastName),
+        TextCellValue(person.groupName ?? ''),
+        TextCellValue(status.label),
+      ]);
+      row++;
+    }
+
+    // Summary section
+    sheet.appendRow([]); // Empty row
+    final present = statuses.values.where((s) =>
+        s == AttendanceStatus.present ||
+        s == AttendanceStatus.late ||
+        s == AttendanceStatus.lateExcused).length;
+    final excused = statuses.values.where((s) => s == AttendanceStatus.excused).length;
+    final absent = statuses.values.where((s) => s == AttendanceStatus.absent).length;
+    final neutral = statuses.values.where((s) => s == AttendanceStatus.neutral).length;
+    final total = persons.length;
+    final percentage = total > 0 ? (present / total * 100).round() : 0;
+
+    sheet.appendRow([TextCellValue('Zusammenfassung')]);
+    sheet.appendRow([TextCellValue('Gesamt'), TextCellValue(total.toString())]);
+    sheet.appendRow([TextCellValue('Anwesend'), TextCellValue(present.toString())]);
+    sheet.appendRow([TextCellValue('Entschuldigt'), TextCellValue(excused.toString())]);
+    sheet.appendRow([TextCellValue('Abwesend'), TextCellValue(absent.toString())]);
+    sheet.appendRow([TextCellValue('Offen'), TextCellValue(neutral.toString())]);
+    sheet.appendRow([TextCellValue('Quote'), TextCellValue('$percentage%')]);
+
+    // Save and share
+    final bytes = Uint8List.fromList(excel.encode()!);
+    final fileName = '${tenantName}_Anwesenheit_$dateStr.xlsx';
+
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: fileName,
+    );
+  }
 }

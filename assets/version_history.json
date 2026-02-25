@@ -1,6 +1,20 @@
 {
   "versions": [
     {
+      "version": "0.1.8",
+      "date": "25.2.2026",
+      "changes": [
+        "✅ Checklisten-Feature: To-Dos für Termine mit Deadline-Anzeige",
+        "🎵 Werke-History: Gespielte Werke mit Dirigenten-Info verwalten",
+        "📋 Ablaufplan-Sektion: Probenplan direkt im Termin anzeigen",
+        "⏰ Anmeldefrist: Deadline für Selbstanmeldung setzen",
+        "🔄 View-Mode Toggle: Zwischen Klick- und Auswahl-Modus wechseln",
+        "🗑️ Personen entfernen: Aus Anwesenheitsliste via Swipe löschen",
+        "↩️ Neutral-Status Swipe: Schnell auf 'Nicht erfasst' zurücksetzen",
+        "📊 Excel-Export: Einzelne Anwesenheit als Excel exportieren"
+      ]
+    },
+    {
       "version": "0.1.7",
       "date": "24.2.2026",
       "changes": [
