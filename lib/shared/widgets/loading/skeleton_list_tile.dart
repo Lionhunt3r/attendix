@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../core/constants/app_constants.dart';
-import 'skeleton_base.dart';
 
 /// Skeleton for list tile items with avatar
 class SkeletonListTile extends StatelessWidget {

@@ -32,7 +32,7 @@ final personProvider =
       .maybeSingle();
 
   if (response == null) return null;
-  final person = Person.fromJson(response as Map<String, dynamic>);
+  final person = Person.fromJson(response);
 
   // Add group name from the groups map
   final groupName = person.instrument != null ? groups[person.instrument] : null;
@@ -306,8 +306,8 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   
   void _initFormData() {
     final p = widget.person;
-    _firstNameController = TextEditingController(text: p.firstName ?? '');
-    _lastNameController = TextEditingController(text: p.lastName ?? '');
+    _firstNameController = TextEditingController(text: p.firstName);
+    _lastNameController = TextEditingController(text: p.lastName);
     _phoneController = TextEditingController(text: p.phone ?? '');
     _emailController = TextEditingController(text: p.email ?? '');
     _notesController = TextEditingController(text: p.notes ?? '');
@@ -1209,11 +1209,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('Vorname', style: TextStyle(fontSize: 12, color: AppColors.medium)),
-                  Text(person.firstName ?? '', style: const TextStyle(fontSize: 16)),
+                  Text(person.firstName, style: const TextStyle(fontSize: 16)),
                 ])),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('Nachname', style: TextStyle(fontSize: 12, color: AppColors.medium)),
-                  Text(person.lastName ?? '', style: const TextStyle(fontSize: 16)),
+                  Text(person.lastName, style: const TextStyle(fontSize: 16)),
                 ])),
               ],
             ),
@@ -1252,7 +1252,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         if (person.phone != null && person.phone!.isNotEmpty)
           _InfoRow(icon: Icons.phone, label: 'Telefon', value: person.phone!, onTap: () => _launchUrl('tel:${person.phone}')),
         if (person.birthday != null && person.birthday!.isNotEmpty)
-          _InfoRow(icon: Icons.cake, label: 'Geburtsdatum', value: _formatDate(person.birthday!), highlight: !(person.correctBirthday ?? true), highlightColor: AppColors.warning),
+          _InfoRow(icon: Icons.cake, label: 'Geburtsdatum', value: _formatDate(person.birthday!), highlight: !person.correctBirthday, highlightColor: AppColors.warning),
         if (person.playsSince != null && person.playsSince!.isNotEmpty)
           _InfoRow(icon: Icons.music_note, label: 'Spielt auf dem Instrument seit', value: _formatDate(person.playsSince!)),
         if (person.joined != null && person.joined!.isNotEmpty)
