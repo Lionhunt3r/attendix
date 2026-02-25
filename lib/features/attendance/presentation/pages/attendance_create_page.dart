@@ -950,14 +950,14 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
         'song_id': entry.songId,
         'attendance_id': attendanceId,
         'date': dateString,
-        'tenantId': tenant!.id,
+        'tenant_id': tenant!.id,
         'conductorName': entry.conductorName,
         'otherConductor': entry.otherConductor,
       };
     }).toList();
 
     if (entries.isNotEmpty) {
-      await supabase.from('history').insert(entries);
+      await supabase.from('song_history').insert(entries);
     }
 
     // Invalidate song history providers
