@@ -306,6 +306,10 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   }
 
   Future<void> _disconnectTelegram() async {
+    // RT-006: Capture config at start for thread safety
+    final currentConfig = _config;
+    if (currentConfig == null) return;
+
     final confirmed = await DialogHelper.showConfirmation(
       context,
       title: 'Verbindung trennen',
@@ -319,11 +323,11 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
 
     try {
       final telegramService = ref.read(telegramServiceProvider);
-      await telegramService.disconnectTelegram(_config!.id);
+      await telegramService.disconnectTelegram(currentConfig.id);
 
       if (mounted) {
         setState(() {
-          _config = _config!.copyWith(telegramChatId: '');
+          _config = currentConfig.copyWith(telegramChatId: '');
         });
       }
 

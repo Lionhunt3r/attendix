@@ -51,6 +51,8 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
 
   // All-day duration
   int _durationDays = 1;
+  // FN-003: Duration controller as state variable to prevent memory leak
+  late final TextEditingController _durationController;
 
   // Notes
   String? _notes;
@@ -64,10 +66,17 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
   @override
   void initState() {
     super.initState();
+    _durationController = TextEditingController(text: '$_durationDays');
     // Automatically open calendar with today's date pre-selected
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pickDatesWithInitialSelection();
     });
+  }
+
+  @override
+  void dispose() {
+    _durationController.dispose();
+    super.dispose();
   }
 
   /// Opens calendar dialog with today's date pre-selected
@@ -199,8 +208,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
                             border: OutlineInputBorder(),
                             hintText: '1',
                           ),
-                          controller:
-                              TextEditingController(text: '$_durationDays'),
+                          controller: _durationController,
                           onChanged: (value) {
                             final parsed = int.tryParse(value);
                             if (parsed != null && parsed > 0) {
@@ -475,6 +483,8 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
       // Set default duration for all-day events
       if (type.allDay == true) {
         _durationDays = type.durationDays ?? 1;
+        // FN-003: Sync controller text with state
+        _durationController.text = '$_durationDays';
       }
     });
   }

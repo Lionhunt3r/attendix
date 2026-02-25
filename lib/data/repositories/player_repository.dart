@@ -227,7 +227,15 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
           .eq('id', player.id!)
           .eq('tenantId', currentTenantId)
           .select()
-          .single();
+          .maybeSingle();
+
+      // RT-008: Handle case where player was not found
+      if (response == null) {
+        throw RepositoryException(
+          message: 'Player not found or belongs to different tenant',
+          operation: 'updatePlayer',
+        );
+      }
 
       return Person.fromJson(response);
     } catch (e, stack) {

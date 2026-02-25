@@ -128,7 +128,15 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
           .eq('id', id)
           .eq('tenantId', currentTenantId)
           .select()
-          .single();
+          .maybeSingle();
+
+      // RT-008: Handle case where attendance was not found
+      if (response == null) {
+        throw RepositoryException(
+          message: 'Attendance not found or belongs to different tenant',
+          operation: 'updateAttendance',
+        );
+      }
 
       return Attendance.fromJson(response);
     } catch (e, stack) {
@@ -248,7 +256,15 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
           .update(updates)
           .eq('id', id)
           .select()
-          .single();
+          .maybeSingle();
+
+      // RT-008: Handle case where personAttendance was not found
+      if (response == null) {
+        throw RepositoryException(
+          message: 'PersonAttendance not found',
+          operation: 'updatePersonAttendance',
+        );
+      }
 
       return PersonAttendance.fromJson(response);
     } catch (e, stack) {
