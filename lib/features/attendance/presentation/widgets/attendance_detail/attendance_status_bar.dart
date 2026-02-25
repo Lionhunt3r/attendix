@@ -19,16 +19,24 @@ class AttendanceStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = persons.length;
+
+    // Only count statuses for persons that are in the persons list
+    // This excludes paused/archived persons whose status may still be in localStatuses
+    final personIds = persons.map((p) => p.id).whereType<int>().toSet();
+    final relevantStatuses = localStatuses.entries
+        .where((e) => personIds.contains(e.key))
+        .map((e) => e.value);
+
     // Count present (including late as they are physically present)
-    final present = localStatuses.values.where((s) =>
+    final present = relevantStatuses.where((s) =>
         s == AttendanceStatus.present ||
         s == AttendanceStatus.late ||
         s == AttendanceStatus.lateExcused).length;
     // Count excused (but not lateExcused as those are counted in present)
-    final excused = localStatuses.values.where((s) => s == AttendanceStatus.excused).length;
-    final absent = localStatuses.values.where((s) => s == AttendanceStatus.absent).length;
+    final excused = relevantStatuses.where((s) => s == AttendanceStatus.excused).length;
+    final absent = relevantStatuses.where((s) => s == AttendanceStatus.absent).length;
     // Unknown = neutral status (not yet recorded)
-    final unknown = localStatuses.values.where((s) => s == AttendanceStatus.neutral).length;
+    final unknown = relevantStatuses.where((s) => s == AttendanceStatus.neutral).length;
     final percentage = total > 0 ? (present / total * 100) : 0.0;
 
     return Container(
