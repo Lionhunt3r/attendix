@@ -476,6 +476,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                             onExportPdf: () async {
                               ToastHelper.showInfo(context, 'PDF-Export wird vorbereitet...');
                             },
+                            onSharePlanChanged: _toggleSharePlan,
                           ),
 
                         const SizedBox(height: AppDimensions.paddingS),
@@ -925,6 +926,35 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Anmeldefrist aktualisiert');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler: $e');
+      }
+    }
+  }
+
+  // ============== SHARE PLAN METHOD ==============
+
+  Future<void> _toggleSharePlan(bool value) async {
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final tenant = ref.read(currentTenantProvider);
+      if (tenant?.id == null) return;
+
+      await supabase
+          .from('attendance')
+          .update({'share_plan': value})
+          .eq('id', widget.attendanceId)
+          .eq('tenantId', tenant!.id!);
+
+      ref.invalidate(attendanceDetailProvider(widget.attendanceId));
+
+      if (mounted) {
+        ToastHelper.showSuccess(
+          context,
+          value ? 'Plan wird jetzt mit Mitgliedern geteilt' : 'Plan wird nicht mehr geteilt',
+        );
       }
     } catch (e) {
       if (mounted) {

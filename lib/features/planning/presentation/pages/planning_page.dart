@@ -9,6 +9,7 @@ import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../data/models/song/song.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../widgets/register_plan_sheet.dart';
 
 /// Field Selection for planning
 class FieldSelection {
@@ -126,6 +127,8 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
             onSelected: (value) {
               if (value == 'export') {
                 _exportPlan();
+              } else if (value == 'register_plan') {
+                showRegisterPlanSheet(context);
               }
             },
             itemBuilder: (context) => [
@@ -136,6 +139,16 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                     Icon(Icons.picture_as_pdf),
                     SizedBox(width: 8),
                     Text('Als PDF exportieren'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'register_plan',
+                child: Row(
+                  children: [
+                    Icon(Icons.groups),
+                    SizedBox(width: 8),
+                    Text('Registerprobenplan'),
                   ],
                 ),
               ),
@@ -595,6 +608,39 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
       return;
     }
 
+    // Show format selection dialog
+    final format = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export-Format'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text('A4 (Standard)'),
+              subtitle: const Text('Ein Plan pro Seite'),
+              onTap: () => Navigator.pop(context, 'a4'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_cut),
+              title: const Text('2x A5 auf A4'),
+              subtitle: const Text('Zwei identische Pläne (Querformat)'),
+              onTap: () => Navigator.pop(context, '2xa5'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Abbrechen'),
+          ),
+        ],
+      ),
+    );
+
+    if (format == null || !mounted) return;
+
     final tenant = ref.read(currentTenantProvider);
     if (tenant == null) {
       ToastHelper.showError(context, 'Kein Tenant ausgewählt');
@@ -613,14 +659,26 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
     try {
       final exportService = ExportService();
-      await exportService.exportPlanPdf(
-        context: context,
-        tenantName: tenant.shortName,
-        date: dateStr,
-        startTime: _formatTime(_startTime),
-        endTime: _endTime != null ? _formatTime(_endTime!) : null,
-        fields: _fields.map((f) => f.toJson()).toList(),
-      );
+
+      if (format == '2xa5') {
+        await exportService.exportPlanPdf2xA5(
+          context: context,
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: _formatTime(_startTime),
+          endTime: _endTime != null ? _formatTime(_endTime!) : null,
+          fields: _fields.map((f) => f.toJson()).toList(),
+        );
+      } else {
+        await exportService.exportPlanPdf(
+          context: context,
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: _formatTime(_startTime),
+          endTime: _endTime != null ? _formatTime(_endTime!) : null,
+          fields: _fields.map((f) => f.toJson()).toList(),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ToastHelper.showError(context, 'Fehler beim Export: $e');

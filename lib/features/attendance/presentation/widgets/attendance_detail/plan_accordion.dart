@@ -11,11 +11,13 @@ class PlanAccordion extends StatelessWidget {
     required this.attendance,
     required this.onEdit,
     required this.onExportPdf,
+    required this.onSharePlanChanged,
   });
 
   final Attendance attendance;
   final VoidCallback onEdit;
   final VoidCallback onExportPdf;
+  final void Function(bool) onSharePlanChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -58,9 +60,34 @@ class PlanAccordion extends StatelessWidget {
                   ),
                 ),
               ),
+            const Spacer(),
+            // Share plan toggle indicator
+            if (attendance.sharePlan)
+              Tooltip(
+                message: 'Plan wird mit Mitgliedern geteilt',
+                child: Icon(
+                  Icons.share,
+                  size: 16,
+                  color: AppColors.success,
+                ),
+              ),
           ],
         ),
         children: [
+          // Share plan toggle
+          SwitchListTile(
+            secondary: const Icon(Icons.share),
+            title: const Text('Plan teilen'),
+            subtitle: Text(
+              attendance.sharePlan
+                  ? 'Plan ist für Mitglieder sichtbar'
+                  : 'Plan ist nur für Dirigenten sichtbar',
+              style: TextStyle(fontSize: 12, color: AppColors.medium),
+            ),
+            value: attendance.sharePlan,
+            onChanged: onSharePlanChanged,
+          ),
+          const Divider(height: 1),
           if (!hasPlan || fields.isEmpty)
             const Padding(
               padding: EdgeInsets.all(AppDimensions.paddingM),

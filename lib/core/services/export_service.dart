@@ -349,7 +349,7 @@ class ExportService {
       final duration = int.tryParse(field['time']?.toString() ?? '0') ?? 0;
 
       final formattedTime = _formatMinutes(currentMinutes);
-      data.add([formattedTime, name, conductor, '${duration}\'']);
+      data.add([formattedTime, name, conductor, '$duration\'']);
 
       currentMinutes += duration;
     }
@@ -370,7 +370,7 @@ class ExportService {
           children: [
             // Header
             pw.Text(
-              '$tenantName',
+              tenantName,
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
             pw.SizedBox(height: 4),
@@ -515,6 +515,123 @@ class ExportService {
     await Printing.sharePdf(
       bytes: bytes,
       filename: fileName,
+    );
+  }
+
+  /// Generate plan/program PDF in 2xA5 format (two identical plans side-by-side on A4 landscape)
+  /// Useful for cutting in half to have two copies
+  Future<void> exportPlanPdf2xA5({
+    required BuildContext context,
+    required String tenantName,
+    required String date,
+    required String startTime,
+    required String? endTime,
+    required List<Map<String, dynamic>> fields,
+  }) async {
+    final pdf = pw.Document();
+
+    // Calculate times for each field
+    final data = <List<String>>[];
+    var currentMinutes = _parseTime(startTime);
+
+    for (final field in fields) {
+      final name = field['name'] as String? ?? '';
+      final conductor = field['conductor'] as String? ?? '';
+      final duration = int.tryParse(field['time']?.toString() ?? '0') ?? 0;
+
+      final formattedTime = _formatMinutes(currentMinutes);
+      data.add([formattedTime, name, conductor, '$duration\'']);
+
+      currentMinutes += duration;
+    }
+
+    // Add end time row
+    if (endTime != null) {
+      data.add([endTime, 'Ende', '', '']);
+    } else {
+      data.add([_formatMinutes(currentMinutes), 'Ende', '', '']);
+    }
+
+    // Build single plan widget
+    pw.Widget buildPlanContent() {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Header
+          pw.Text(
+            tenantName,
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            'Probenprogramm $date',
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 10),
+
+          // Table with smaller font
+          pw.TableHelper.fromTextArray(
+            headers: ['Zeit', 'Programm', 'Dirigent', ''],
+            data: data,
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            headerStyle: pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+            ),
+            headerDecoration: const pw.BoxDecoration(
+              color: PdfColor.fromInt(0xFF005238),
+            ),
+            cellAlignment: pw.Alignment.centerLeft,
+            headerAlignment: pw.Alignment.center,
+            border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+            cellPadding: const pw.EdgeInsets.all(4),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(35),
+              1: const pw.FlexColumnWidth(3),
+              2: const pw.FlexColumnWidth(2),
+              3: const pw.FixedColumnWidth(25),
+            },
+          ),
+        ],
+      );
+    }
+
+    // A4 landscape page with two identical A5 halves
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(15),
+        build: (context) => pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // Left half (A5)
+            pw.Expanded(
+              child: pw.Padding(
+                padding: const pw.EdgeInsets.only(right: 10),
+                child: buildPlanContent(),
+              ),
+            ),
+            // Vertical divider line (for cutting)
+            pw.Container(
+              width: 0.5,
+              color: PdfColors.grey400,
+            ),
+            // Right half (A5) - identical content
+            pw.Expanded(
+              child: pw.Padding(
+                padding: const pw.EdgeInsets.only(left: 10),
+                child: buildPlanContent(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: '${tenantName}_Probenprogramm_2xA5_$date.pdf',
     );
   }
 }
