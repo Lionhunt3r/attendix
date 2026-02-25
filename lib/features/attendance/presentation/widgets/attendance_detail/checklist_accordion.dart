@@ -1,0 +1,164 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
+
+import '../../../../../core/constants/app_constants.dart';
+import '../../../../../core/theme/app_colors.dart';
+import '../../../../../data/models/attendance/attendance.dart';
+
+/// Deadline status for checklist items
+enum DeadlineStatus { normal, warning, overdue }
+
+/// Accordion widget for displaying and managing checklist items
+class ChecklistAccordion extends StatelessWidget {
+  const ChecklistAccordion({
+    super.key,
+    required this.checklist,
+    required this.onToggle,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onRestore,
+    required this.getDeadlineStatus,
+    required this.formatDeadlineRelative,
+  });
+
+  final List<ChecklistItem> checklist;
+  final void Function(int index) onToggle;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+  final VoidCallback onRestore;
+  final DeadlineStatus Function(ChecklistItem) getDeadlineStatus;
+  final String Function(ChecklistItem) formatDeadlineRelative;
+
+  @override
+  Widget build(BuildContext context) {
+    final completedCount = checklist.where((item) => item.completed).length;
+    final totalCount = checklist.length;
+    final progress = totalCount > 0 ? completedCount / totalCount : 0.0;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.paddingM,
+        vertical: AppDimensions.paddingXS,
+      ),
+      child: ExpansionTile(
+        leading: const Icon(Icons.checklist, color: AppColors.primary),
+        title: Row(
+          children: [
+            const Text('Checkliste'),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: progress == 1.0
+                    ? AppColors.success.withValues(alpha: 0.2)
+                    : AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$completedCount/$totalCount',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: progress == 1.0 ? AppColors.success : AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        children: [
+          if (checklist.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(AppDimensions.paddingM),
+              child: Text(
+                'Keine To-Dos vorhanden',
+                style: TextStyle(color: AppColors.medium),
+              ),
+            )
+          else
+            ...checklist.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              final deadlineStatus = getDeadlineStatus(item);
+              final deadlineText = formatDeadlineRelative(item);
+
+              Color? tileColor;
+              if (!item.completed) {
+                if (deadlineStatus == DeadlineStatus.overdue) {
+                  tileColor = AppColors.danger.withValues(alpha: 0.1);
+                } else if (deadlineStatus == DeadlineStatus.warning) {
+                  tileColor = AppColors.warning.withValues(alpha: 0.1);
+                }
+              }
+
+              return Slidable(
+                key: ValueKey(item.id),
+                endActionPane: ActionPane(
+                  motion: const ScrollMotion(),
+                  extentRatio: 0.25,
+                  children: [
+                    SlidableAction(
+                      onPressed: (_) => onRemove(index),
+                      backgroundColor: AppColors.danger,
+                      foregroundColor: Colors.white,
+                      icon: Icons.delete,
+                      label: 'Löschen',
+                    ),
+                  ],
+                ),
+                child: Container(
+                  color: tileColor,
+                  child: CheckboxListTile(
+                    value: item.completed,
+                    onChanged: (_) => onToggle(index),
+                    title: Text(
+                      item.text,
+                      style: TextStyle(
+                        decoration: item.completed
+                            ? TextDecoration.lineThrough
+                            : null,
+                        color: item.completed ? AppColors.medium : null,
+                      ),
+                    ),
+                    subtitle: deadlineText.isNotEmpty
+                        ? Text(
+                            deadlineText,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: deadlineStatus == DeadlineStatus.overdue
+                                  ? AppColors.danger
+                                  : deadlineStatus == DeadlineStatus.warning
+                                      ? AppColors.warning
+                                      : AppColors.medium,
+                            ),
+                          )
+                        : null,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                  ),
+                ),
+              );
+            }),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(AppDimensions.paddingS),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('To-Do hinzufügen'),
+                ),
+                TextButton.icon(
+                  onPressed: onRestore,
+                  icon: const Icon(Icons.restore, size: 18),
+                  label: const Text('Wiederherstellen'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

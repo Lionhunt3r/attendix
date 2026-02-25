@@ -17,3 +17,4 @@ export 'organisation_providers.dart';
 export 'viewer_providers.dart';
 export 'parent_providers.dart';
 export 'church_providers.dart';
+export 'attendance_detail_providers.dart';
