@@ -188,6 +188,63 @@ class PlayerNotifier extends Notifier<AsyncValue<void>> {
       state = AsyncValue.error(e, stack);
     }
   }
+
+  Future<Person?> resetLateCount(Person player) async {
+    state = const AsyncValue.loading();
+    try {
+      final result = await _repo.resetLateCount(player);
+      state = const AsyncValue.data(null);
+      ref.invalidate(playersProvider);
+      ref.invalidate(playerByIdProvider(player.id!));
+      return result;
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      return null;
+    }
+  }
+
+  Future<Person?> resolveCritical(Person player, String? notes) async {
+    state = const AsyncValue.loading();
+    try {
+      final result = await _repo.resolveCritical(player, notes);
+      state = const AsyncValue.data(null);
+      ref.invalidate(playersProvider);
+      ref.invalidate(criticalPlayersProvider);
+      ref.invalidate(playerByIdProvider(player.id!));
+      return result;
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      return null;
+    }
+  }
+
+  Future<Person?> linkAccount(Person player, String appId) async {
+    state = const AsyncValue.loading();
+    try {
+      final result = await _repo.linkAccount(player, appId);
+      state = const AsyncValue.data(null);
+      ref.invalidate(playersProvider);
+      ref.invalidate(playerByIdProvider(player.id!));
+      return result;
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      return null;
+    }
+  }
+
+  Future<Person?> unlinkAccount(Person player) async {
+    state = const AsyncValue.loading();
+    try {
+      final result = await _repo.unlinkAccount(player);
+      state = const AsyncValue.data(null);
+      ref.invalidate(playersProvider);
+      ref.invalidate(playerByIdProvider(player.id!));
+      return result;
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      return null;
+    }
+  }
 }
 
 final playerNotifierProvider = NotifierProvider<PlayerNotifier, AsyncValue<void>>(() {

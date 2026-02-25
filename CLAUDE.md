@@ -243,6 +243,24 @@ Der Skill orchestriert automatisch:
 
 Status: `.claude/migration-status.md`
 
+## Code Review
+
+**WICHTIG:** Bei Code Reviews IMMER beide Reviewer parallel starten:
+
+```
+1. flutter-reviewer (Custom Agent)
+   - Flutter-spezifisch: Riverpod, Freezed, Multi-Tenant Security
+   - Kennt Attendix-Patterns und Repository-Struktur
+
+2. pr-review-toolkit:code-reviewer (Plugin)
+   - Allgemein: Style Guide, Best Practices, CLAUDE.md Regeln
+   - Prüft gegen Projekt-Guidelines
+```
+
+Beide Agents parallel starten für umfassende Review-Abdeckung:
+- `flutter-reviewer` findet Security-Issues (tenantId-Filter, Repository-Patterns)
+- `pr-review-toolkit:code-reviewer` findet Style/Convention-Issues
+
 ## Weiterführende Dokumentation
 
 Für ausführliche Patterns, Ionic→Flutter Mappings und Code-Beispiele:

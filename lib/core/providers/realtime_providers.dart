@@ -7,29 +7,40 @@ import '../config/supabase_config.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/models/person/person.dart';
 import '../../data/repositories/attendance_repository.dart';
-import '../../data/repositories/player_repository.dart';
+import 'player_providers.dart';
 import 'tenant_providers.dart';
+import 'group_providers.dart';
 
 /// Provider for realtime player changes subscription
 ///
 /// Subscribes to the player table and invalidates the player list
-/// when changes occur
+/// when changes occur. Enriches players with group names.
 final realtimePlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) async* {
   final supabase = ref.watch(supabaseClientProvider);
   final tenantId = ref.watch(currentTenantIdProvider);
-  final playerRepo = ref.watch(playerRepositoryProvider);
+  final playerRepo = ref.watch(playerRepositoryWithTenantProvider);
 
   if (tenantId == null) {
     yield [];
     return;
   }
 
-  // Set tenant ID for repository
-  playerRepo.setTenantId(tenantId);
+  // Get groups map for enrichment
+  final groupsMap = await ref.watch(groupsMapProvider.future);
+
+  // Helper function to enrich players with group names
+  List<Person> enrichPlayers(List<Person> players) {
+    return players.map((person) {
+      final groupName = person.instrument != null
+          ? groupsMap[person.instrument]
+          : null;
+      return person.copyWith(groupName: groupName);
+    }).toList();
+  }
 
   // Initial data
   final initialData = await playerRepo.getPlayers();
-  yield initialData;
+  yield enrichPlayers(initialData);
 
   // Create a stream controller to manage updates
   final controller = StreamController<List<Person>>();
@@ -51,7 +62,7 @@ final realtimePlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) a
           try {
             final freshData = await playerRepo.getPlayers();
             if (!controller.isClosed) {
-              controller.add(freshData);
+              controller.add(enrichPlayers(freshData));
             }
           } catch (e) {
             if (!controller.isClosed) {

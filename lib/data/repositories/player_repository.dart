@@ -683,6 +683,134 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Reset late count for a player (mark as resolved after conversation)
+  Future<Person> resetLateCount(Person player) async {
+    if (player.id == null) {
+      throw RepositoryException(
+        message: 'Player ID is required for resetLateCount',
+        operation: 'resetLateCount',
+      );
+    }
+
+    try {
+      // Add history entry
+      final history = List<Map<String, dynamic>>.from(
+        player.history.map((e) => e.toJson()),
+      );
+      history.add({
+        'date': DateTime.now().toIso8601String(),
+        'text': 'Verspätungen besprochen und zurückgesetzt',
+        'type': PlayerHistoryType.notes.value,
+      });
+
+      final response = await supabase
+          .from('player')
+          .update({
+            'lastSolve': DateTime.now().toIso8601String(),
+            'history': history,
+          })
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId)
+          .select()
+          .single();
+
+      return Person.fromJson(response);
+    } catch (e, stack) {
+      handleError(e, stack, 'resetLateCount');
+      rethrow;
+    }
+  }
+
+  /// Resolve critical status for a player
+  Future<Person> resolveCritical(Person player, String? notes) async {
+    if (player.id == null) {
+      throw RepositoryException(
+        message: 'Player ID is required for resolveCritical',
+        operation: 'resolveCritical',
+      );
+    }
+
+    try {
+      // Add history entry
+      final history = List<Map<String, dynamic>>.from(
+        player.history.map((e) => e.toJson()),
+      );
+      history.add({
+        'date': DateTime.now().toIso8601String(),
+        'text': notes ?? 'Problemfall besprochen und gelöst',
+        'type': PlayerHistoryType.criticalPerson.value,
+      });
+
+      final response = await supabase
+          .from('player')
+          .update({
+            'isCritical': false,
+            'lastSolve': DateTime.now().toIso8601String(),
+            'criticalReason': null,
+            'history': history,
+          })
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId)
+          .select()
+          .single();
+
+      return Person.fromJson(response);
+    } catch (e, stack) {
+      handleError(e, stack, 'resolveCritical');
+      rethrow;
+    }
+  }
+
+  /// Link an existing account to a player
+  Future<Person> linkAccount(Person player, String appId) async {
+    if (player.id == null) {
+      throw RepositoryException(
+        message: 'Player ID is required for linkAccount',
+        operation: 'linkAccount',
+      );
+    }
+
+    try {
+      final response = await supabase
+          .from('player')
+          .update({'appId': appId})
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId)
+          .select()
+          .single();
+
+      return Person.fromJson(response);
+    } catch (e, stack) {
+      handleError(e, stack, 'linkAccount');
+      rethrow;
+    }
+  }
+
+  /// Unlink account from a player
+  Future<Person> unlinkAccount(Person player) async {
+    if (player.id == null) {
+      throw RepositoryException(
+        message: 'Player ID is required for unlinkAccount',
+        operation: 'unlinkAccount',
+      );
+    }
+
+    try {
+      final response = await supabase
+          .from('player')
+          .update({'appId': null})
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId)
+          .select()
+          .single();
+
+      return Person.fromJson(response);
+    } catch (e, stack) {
+      handleError(e, stack, 'unlinkAccount');
+      rethrow;
+    }
+  }
+
   // ============= HANDOVER METHODS =============
 
   /// Result of a handover operation for a single player

@@ -8,12 +8,12 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/group_providers.dart';
+import '../../../../core/providers/player_providers.dart';
+import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
 import '../../../../core/providers/tenant_providers.dart';
-import '../../../../data/repositories/player_repository.dart';
-import 'people_list_page.dart';
 
 /// Provider for single person with group name
 final personProvider =
@@ -97,28 +97,28 @@ final personHistoryProvider =
     FutureProvider.family<List<Map<String, dynamic>>, int>((ref, personId) async {
   final supabase = ref.watch(supabaseClientProvider);
   final person = await ref.watch(personProvider(personId).future);
+  final tenant = ref.watch(currentTenantProvider);
 
-  if (person == null) return [];
+  if (person == null || tenant == null) return [];
 
   // Get today's date in ISO format for comparison
   final today = DateTime.now().toIso8601String().substring(0, 10);
 
   // Get attendance history - use attendance_id join like Ionic does
+  // FN-SEC: Added tenantId filter for Multi-Tenant Security
   final attendanceResponse = await supabase
       .from('person_attendances')
       .select('*, attendance:attendance_id(id, date, type, typeInfo, type_id)')
-      .eq('person_id', personId);
+      .eq('person_id', personId)
+      .eq('tenantId', tenant.id!);
 
   // Get attendance types for title lookup
-  final tenant = ref.watch(currentTenantProvider);
   List<Map<String, dynamic>> attendanceTypes = [];
-  if (tenant != null) {
-    final typesResponse = await supabase
-        .from('attendance_types')
-        .select('*')
-        .eq('tenant_id', tenant.id!);
-    attendanceTypes = List<Map<String, dynamic>>.from(typesResponse as List);
-  }
+  final typesResponse = await supabase
+      .from('attendance_types')
+      .select('*')
+      .eq('tenant_id', tenant.id!);
+  attendanceTypes = List<Map<String, dynamic>>.from(typesResponse as List);
 
   final attendanceHistory = (attendanceResponse as List)
       .where((a) => a['attendance'] != null) // Filter out null attendance
@@ -297,6 +297,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   bool _showAllgemein = false;
   bool _showAccount = false;
   bool _showHistorie = true;
+  bool _showProblemfall = true;
+
+  // Problem person state
+  bool _problemSolved = false;
+  String _problemNotes = '';
 
   @override
   void initState() {
@@ -379,7 +384,8 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       
       final existingHistory = person.history.map((h) => h.toJson()).toList();
       final updatedHistory = [...existingHistory, ...newHistoryEntries];
-      
+      final tenant = ref.read(currentTenantProvider);
+
       await supabase.from('player').update({
         'firstName': _firstNameController.text,
         'lastName': _lastNameController.text,
@@ -395,10 +401,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'correctBirthday': true,
         'history': updatedHistory,
         'additional_fields': _additionalFieldValues.isNotEmpty ? _additionalFieldValues : null,
-      }).eq('id', person.id!);
+      }).eq('id', person.id!).eq('tenantId', tenant!.id!);
       
       ref.invalidate(personProvider(widget.personId));
-      ref.invalidate(peopleListProvider);
+      ref.invalidate(realtimePlayersProvider);
       
       setState(() {
         _hasChanges = false;
@@ -433,115 +439,119 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     final reasonController = TextEditingController();
     DateTime? pauseUntil;
 
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: AppDimensions.paddingL,
-            right: AppDimensions.paddingL,
-            top: AppDimensions.paddingL,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.pause_circle, color: AppColors.warning, size: 28),
-                  const SizedBox(width: AppDimensions.paddingS),
-                  Expanded(
-                    child: Text(
-                      '${widget.person.firstName} pausieren',
-                      style: Theme.of(context).textTheme.titleLarge,
+    try {
+      final result = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: AppDimensions.paddingL,
+              right: AppDimensions.paddingL,
+              top: AppDimensions.paddingL,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.pause_circle, color: AppColors.warning, size: 28),
+                    const SizedBox(width: AppDimensions.paddingS),
+                    Expanded(
+                      child: Text(
+                        '${widget.person.firstName} pausieren',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppDimensions.paddingL),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Grund *',
+                    hintText: 'Warum wird pausiert?',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                  autofocus: true,
+                ),
+                const SizedBox(height: AppDimensions.paddingM),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today, color: AppColors.primary),
+                  title: const Text('Pausiert bis (optional)'),
+                  subtitle: Text(
+                    pauseUntil != null
+                        ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
+                        : 'Kein Enddatum',
+                    style: TextStyle(
+                      color: pauseUntil != null ? AppColors.primary : AppColors.medium,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimensions.paddingL),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Grund *',
-                  hintText: 'Warum wird pausiert?',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-                autofocus: true,
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.calendar_today, color: AppColors.primary),
-                title: const Text('Pausiert bis (optional)'),
-                subtitle: Text(
-                  pauseUntil != null
-                      ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
-                      : 'Kein Enddatum',
-                  style: TextStyle(
-                    color: pauseUntil != null ? AppColors.primary : AppColors.medium,
-                  ),
-                ),
-                trailing: pauseUntil != null
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, color: AppColors.medium),
-                        onPressed: () => setDialogState(() => pauseUntil = null),
-                      )
-                    : null,
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now().add(const Duration(days: 30)),
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
-                  );
-                  if (date != null) {
-                    setDialogState(() => pauseUntil = date);
-                  }
-                },
-              ),
-              const SizedBox(height: AppDimensions.paddingL),
-              FilledButton.icon(
-                onPressed: () {
-                  if (reasonController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Bitte Grund angeben')),
+                  trailing: pauseUntil != null
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: AppColors.medium),
+                          onPressed: () => setDialogState(() => pauseUntil = null),
+                        )
+                      : null,
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 30)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
-                    return;
-                  }
-                  Navigator.pop(context, {
-                    'reason': reasonController.text,
-                    'until': pauseUntil?.toIso8601String(),
-                  });
-                },
-                icon: const Icon(Icons.pause),
-                label: const Text('Pausieren'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.warning,
-                  padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+                    if (date != null) {
+                      setDialogState(() => pauseUntil = date);
+                    }
+                  },
                 ),
-              ),
-              const SizedBox(height: AppDimensions.paddingL),
-            ],
+                const SizedBox(height: AppDimensions.paddingL),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (reasonController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Bitte Grund angeben')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, {
+                      'reason': reasonController.text,
+                      'until': pauseUntil?.toIso8601String(),
+                    });
+                  },
+                  icon: const Icon(Icons.pause),
+                  label: const Text('Pausieren'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.warning,
+                    padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.paddingL),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    if (result != null) {
-      await _pausePerson(result['reason'], result['until']);
+      if (result != null && mounted) {
+        await _pausePerson(result['reason'], result['until']);
+      }
+    } finally {
+      reasonController.dispose();
     }
   }
 
   Future<void> _pausePerson(String reason, String? until) async {
-    final repository = ref.read(playerRepositoryProvider);
+    final repository = ref.read(playerRepositoryWithTenantProvider);
     final person = widget.person;
 
     // Format reason with date if provided
@@ -553,7 +563,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       await repository.pausePlayer(person, until, reasonText);
 
       ref.invalidate(personProvider(widget.personId));
-      ref.invalidate(peopleListProvider);
+      ref.invalidate(realtimePlayersProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -573,14 +583,14 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Future<void> _unpausePerson() async {
-    final repository = ref.read(playerRepositoryProvider);
+    final repository = ref.read(playerRepositoryWithTenantProvider);
     final person = widget.person;
 
     try {
       await repository.unpausePlayer(person);
 
       ref.invalidate(personProvider(widget.personId));
-      ref.invalidate(peopleListProvider);
+      ref.invalidate(realtimePlayersProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -600,76 +610,139 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     final noteController = TextEditingController();
     DateTime archiveDate = DateTime.now();
 
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Person archivieren'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Austrittsdatum'),
-                subtitle: Text(DateFormat('dd.MM.yyyy').format(archiveDate)),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: archiveDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime.now(),
-                  );
-                  if (date != null) {
-                    setDialogState(() => archiveDate = date);
-                  }
-                },
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(
-                  labelText: 'Grund (optional)',
-                  hintText: 'Warum verlässt die Person?',
+    try {
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Person archivieren'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Austrittsdatum'),
+                  subtitle: Text(DateFormat('dd.MM.yyyy').format(archiveDate)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: archiveDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setDialogState(() => archiveDate = date);
+                    }
+                  },
                 ),
-                maxLines: 2,
+                const SizedBox(height: AppDimensions.paddingM),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Grund (optional)',
+                    hintText: 'Warum verlässt die Person?',
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+                onPressed: () {
+                  Navigator.pop(context, {'date': archiveDate.toIso8601String(), 'note': noteController.text});
+                },
+                child: const Text('Archivieren'),
               ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-              onPressed: () {
-                Navigator.pop(context, {'date': archiveDate.toIso8601String(), 'note': noteController.text});
-              },
-              child: const Text('Archivieren'),
-            ),
-          ],
         ),
-      ),
-    );
+      );
 
-    if (result != null) {
-      await _archivePerson(result['date'], result['note']);
+      if (result != null && mounted) {
+        await _archivePerson(result['date'], result['note']);
+      }
+    } finally {
+      noteController.dispose();
     }
   }
 
   Future<void> _archivePerson(String date, String note) async {
-    final repository = ref.read(playerRepositoryProvider);
+    final repository = ref.read(playerRepositoryWithTenantProvider);
     final person = widget.person;
 
     try {
       await repository.archivePlayer(person, date, note.isNotEmpty ? note : null);
 
       ref.invalidate(personProvider(widget.personId));
-      ref.invalidate(peopleListProvider);
+      ref.invalidate(realtimePlayersProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Person wurde archiviert'), backgroundColor: AppColors.success),
         );
         context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _resetLateCount() async {
+    final notifier = ref.read(playerNotifierProvider.notifier);
+    final person = widget.person;
+
+    try {
+      await notifier.resetLateCount(person);
+
+      ref.invalidate(personProvider(widget.personId));
+      ref.invalidate(personAttendanceStatsProvider(widget.personId));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Verspätungen zurückgesetzt'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _resolveProblem() async {
+    if (!_problemSolved) return;
+
+    final notifier = ref.read(playerNotifierProvider.notifier);
+    final person = widget.person;
+
+    try {
+      await notifier.resolveCritical(person, _problemNotes.isNotEmpty ? _problemNotes : null);
+
+      ref.invalidate(personProvider(widget.personId));
+
+      if (mounted) {
+        setState(() {
+          _problemSolved = false;
+          _problemNotes = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Problemfall gelöst'),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -822,7 +895,17 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
             if (_isEditing)
               _buildEditForm(groupsAsync)
             else ...[
+              // Late Warning Card
+              _buildLateWarningCard(person, statsAsync),
               _buildNameSection(person),
+              // Problem Person Accordion (only for critical persons)
+              if (person.isCritical)
+                _buildAccordionSection(
+                  title: 'Problemfall',
+                  isExpanded: _showProblemfall,
+                  onToggle: () => setState(() => _showProblemfall = !_showProblemfall),
+                  child: _buildProblemfallContent(person),
+                ),
               _buildAccordionSection(
                 title: 'Allgemein',
                 isExpanded: _showAllgemein,
@@ -1185,6 +1268,128 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     );
   }
 
+  Widget _buildLateWarningCard(Person person, AsyncValue<Map<String, dynamic>> statsAsync) {
+    return statsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (stats) {
+        final lateCount = stats['lateCount'] as int? ?? 0;
+        // Get threshold from tenant's critical rules - find first rule for late status (3 = late)
+        final tenant = ref.watch(currentTenantProvider);
+        // Default threshold of 3
+        int threshold = 3;
+        // Try to find a late-specific rule
+        if (tenant?.criticalRules != null) {
+          for (final rule in tenant!.criticalRules!) {
+            // Status 3 = late
+            if (rule.statuses.contains(3)) {
+              threshold = rule.thresholdValue;
+              break;
+            }
+          }
+        }
+
+        if (lateCount < threshold) return const SizedBox.shrink();
+
+        return Card(
+          margin: const EdgeInsets.all(AppDimensions.paddingM),
+          color: Colors.orange.shade50,
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.schedule, color: Colors.orange),
+            ),
+            title: const Text(
+              'Häufige Verspätungen',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              '$lateCount× unentschuldigt zu spät (Schwelle: $threshold)',
+              style: TextStyle(color: Colors.orange.shade800),
+            ),
+            trailing: FilledButton.tonal(
+              onPressed: _resetLateCount,
+              child: const Text('Zurücksetzen'),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProblemfallContent(Person person) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (person.criticalReason != null && person.criticalReason!.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppDimensions.paddingM),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Grund',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.danger,
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.paddingXS),
+                Text(
+                  person.criticalReason!,
+                  style: const TextStyle(color: AppColors.dark),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppDimensions.paddingM),
+        ],
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Mit Person gesprochen'),
+          subtitle: const Text('Bestätigen, dass das Problem besprochen wurde'),
+          value: _problemSolved,
+          onChanged: (value) => setState(() => _problemSolved = value),
+          activeColor: AppColors.success,
+        ),
+        if (_problemSolved) ...[
+          const SizedBox(height: AppDimensions.paddingM),
+          TextField(
+            decoration: const InputDecoration(
+              labelText: 'Anmerkungen (optional)',
+              hintText: 'Was wurde besprochen?',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            onChanged: (value) => _problemNotes = value,
+          ),
+          const SizedBox(height: AppDimensions.paddingM),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _resolveProblem,
+              icon: const Icon(Icons.check_circle),
+              label: const Text('Problem als gelöst markieren'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.success,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   bool _hasStatusBadges(Person person) => person.archived || person.paused || person.isCritical || person.pending || person.isLeader;
 
   List<Widget> _buildStatusBadges(Person person) {
@@ -1327,21 +1532,436 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Widget _buildAccountContent(Person person) {
+    final tenant = ref.watch(currentTenantProvider);
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _InfoRow(icon: Icons.email, label: 'E-Mail', value: person.email ?? 'Nicht angegeben', onTap: person.email != null ? () => _launchUrl('mailto:${person.email}') : null),
-        if (person.appId != null) _InfoRow(icon: Icons.badge, label: 'Rolle', value: 'Mitglied'),
-        if (person.appId == null && person.email != null)
-          Padding(
-            padding: const EdgeInsets.only(top: AppDimensions.paddingM),
-            child: OutlinedButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account erstellen kommt bald...'))),
-              icon: const Icon(Icons.key),
+        _InfoRow(
+          icon: Icons.email,
+          label: 'E-Mail',
+          value: person.email ?? 'Nicht angegeben',
+          onTap: person.email != null ? () => _launchUrl('mailto:${person.email}') : null,
+        ),
+        if (person.appId != null) ...[
+          _InfoRow(icon: Icons.badge, label: 'Account', value: 'Verknüpft'),
+          const SizedBox(height: AppDimensions.paddingM),
+          // Role selector
+          _buildRoleSelector(person, tenant),
+          const SizedBox(height: AppDimensions.paddingM),
+          // Unlink account button
+          OutlinedButton.icon(
+            onPressed: () => _showUnlinkAccountDialog(person),
+            icon: const Icon(Icons.link_off, color: AppColors.danger),
+            label: const Text('Account-Verknüpfung aufheben'),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+          ),
+        ],
+        if (person.appId == null && person.email != null) ...[
+          const SizedBox(height: AppDimensions.paddingM),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _showCreateAccountDialog(person, tenant),
+              icon: const Icon(Icons.person_add),
               label: const Text('Account erstellen'),
+            ),
+          ),
+          const SizedBox(height: AppDimensions.paddingXS),
+          const Text(
+            'Die Person erhält eine E-Mail mit dem Link zur Passwort-Einrichtung.',
+            style: TextStyle(fontSize: 12, color: AppColors.medium),
+          ),
+        ],
+        if (person.appId == null && person.email == null)
+          Container(
+            padding: const EdgeInsets.all(AppDimensions.paddingM),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: AppColors.warning),
+                SizedBox(width: AppDimensions.paddingS),
+                Expanded(
+                  child: Text(
+                    'Um einen Account zu erstellen, muss eine E-Mail-Adresse hinterlegt werden.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
             ),
           ),
       ],
     );
+  }
+
+  Widget _buildRoleSelector(Person person, Tenant? tenant) {
+    if (person.appId == null || tenant?.id == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Available roles for selection
+    final availableRoles = [
+      Role.player,
+      Role.helper,
+      Role.viewer,
+      Role.responsible,
+      Role.admin,
+    ];
+
+    return FutureBuilder<Role?>(
+      future: _getUserRole(person.appId!, tenant!.id!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final currentRole = snapshot.data ?? Role.player;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Rolle',
+              style: TextStyle(fontSize: 12, color: AppColors.medium),
+            ),
+            const SizedBox(height: AppDimensions.paddingXS),
+            DropdownButtonFormField<Role>(
+              value: currentRole,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: AppDimensions.paddingM,
+                  vertical: AppDimensions.paddingS,
+                ),
+              ),
+              items: availableRoles.map((role) {
+                return DropdownMenuItem(
+                  value: role,
+                  child: Row(
+                    children: [
+                      Icon(_getRoleIcon(role), size: 20, color: AppColors.primary),
+                      const SizedBox(width: AppDimensions.paddingS),
+                      Text(_getRoleLabel(role)),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (newRole) async {
+                if (newRole != null && newRole != currentRole) {
+                  await _updateUserRole(person.appId!, tenant.id!, newRole);
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<Role?> _getUserRole(String userId, int tenantId) async {
+    final supabase = ref.read(supabaseClientProvider);
+    try {
+      final response = await supabase
+          .from('tenant_users')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return Role.fromValue(response['role'] as int);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _updateUserRole(String userId, int tenantId, Role newRole) async {
+    // Authorization check - only conductors can change roles
+    final currentUserRole = ref.read(currentRoleProvider);
+    if (!currentUserRole.isConductor) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine Berechtigung zum Ändern von Rollen'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
+    final supabase = ref.read(supabaseClientProvider);
+
+    try {
+      await supabase
+          .from('tenant_users')
+          .update({'role': newRole.value})
+          .eq('user_id', userId)
+          .eq('tenant_id', tenantId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rolle auf "${_getRoleLabel(newRole)}" geändert'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  String _getRoleLabel(Role role) {
+    return switch (role) {
+      Role.admin => 'Dirigent (Admin)',
+      Role.responsible => 'Verantwortlicher',
+      Role.helper => 'Helfer',
+      Role.viewer => 'Beobachter',
+      Role.player => 'Mitglied',
+      Role.voiceLeader => 'Stimmführer',
+      Role.voiceLeaderHelper => 'Stimmführer-Helfer',
+      Role.parent => 'Eltern',
+      Role.applicant => 'Bewerber',
+      Role.none => 'Keine Rolle',
+    };
+  }
+
+  IconData _getRoleIcon(Role role) {
+    return switch (role) {
+      Role.admin => Icons.admin_panel_settings,
+      Role.responsible => Icons.manage_accounts,
+      Role.helper => Icons.handshake,
+      Role.viewer => Icons.visibility,
+      Role.player => Icons.person,
+      Role.voiceLeader => Icons.record_voice_over,
+      Role.voiceLeaderHelper => Icons.support_agent,
+      Role.parent => Icons.family_restroom,
+      Role.applicant => Icons.pending,
+      Role.none => Icons.person_off,
+    };
+  }
+
+  Future<void> _showCreateAccountDialog(Person person, Tenant? tenant) async {
+    if (tenant?.id == null) return;
+
+    Role selectedRole = Role.player;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Account erstellen'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Account für ${person.fullName} erstellen?'),
+              const SizedBox(height: AppDimensions.paddingM),
+              Text('E-Mail: ${person.email}'),
+              const SizedBox(height: AppDimensions.paddingL),
+              const Text('Rolle:', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: AppDimensions.paddingS),
+              DropdownButtonFormField<Role>(
+                value: selectedRole,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: AppDimensions.paddingM,
+                    vertical: AppDimensions.paddingS,
+                  ),
+                ),
+                items: [
+                  Role.player,
+                  Role.helper,
+                  Role.viewer,
+                  Role.responsible,
+                ].map((role) {
+                  return DropdownMenuItem(
+                    value: role,
+                    child: Text(_getRoleLabel(role)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setDialogState(() => selectedRole = value);
+                  }
+                },
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+              Container(
+                padding: const EdgeInsets.all(AppDimensions.paddingS),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: AppColors.info),
+                    SizedBox(width: AppDimensions.paddingS),
+                    Expanded(
+                      child: Text(
+                        'Die Person erhält eine E-Mail zum Setzen des Passworts.',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Account erstellen'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _createAccount(person, tenant!.id!, selectedRole);
+    }
+  }
+
+  Future<void> _createAccount(Person person, int tenantId, Role role) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: AppDimensions.paddingL),
+            Text('Account wird erstellt...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Note: In production, this should be done via a server-side function
+      // to properly handle auth.admin.createUser
+      // For now, we show a message that this feature requires server setup
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account-Erstellung erfordert Server-Setup. Bitte an Administrator wenden.'),
+            backgroundColor: AppColors.warning,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+
+      // Ideal implementation would be:
+      // 1. Call a Supabase Edge Function that creates the user
+      // 2. The function uses service_role to call auth.admin.createUser
+      // 3. Update player.appId with the new user ID
+      // 4. Create tenant_users entry
+      // 5. Send password reset email
+
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _showUnlinkAccountDialog(Person person) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Account-Verknüpfung aufheben?'),
+        content: Text(
+          'Die Account-Verknüpfung für ${person.fullName} wird aufgehoben. '
+          'Die Person kann sich dann nicht mehr in der App anmelden.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Verknüpfung aufheben'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _unlinkAccount(person);
+    }
+  }
+
+  Future<void> _unlinkAccount(Person person) async {
+    // Authorization check - only conductors can unlink accounts
+    final currentUserRole = ref.read(currentRoleProvider);
+    if (!currentUserRole.isConductor) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine Berechtigung zum Aufheben von Account-Verknüpfungen'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
+    final notifier = ref.read(playerNotifierProvider.notifier);
+    final tenant = ref.read(currentTenantProvider);  // Use ref.read in async methods
+
+    try {
+      // Remove appId from player
+      await notifier.unlinkAccount(person);
+
+      // Also remove from tenant_users if possible
+      if (person.appId != null && tenant?.id != null) {
+        final supabase = ref.read(supabaseClientProvider);
+        await supabase
+            .from('tenant_users')
+            .delete()
+            .eq('user_id', person.appId!)
+            .eq('tenant_id', tenant!.id!);
+      }
+
+      ref.invalidate(personProvider(widget.personId));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account-Verknüpfung aufgehoben'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
   }
 
   Widget _buildHistoryContent() {

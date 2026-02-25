@@ -8,6 +8,7 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/player_providers.dart';
+import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
@@ -118,13 +119,64 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
 
   List<Person> _sortPeople(List<Person> people) {
     final sorted = List<Person>.from(people);
-    
+
     switch (_sortOption) {
       case 'firstName':
         sorted.sort((a, b) => a.firstName.compareTo(b.firstName));
         break;
       case 'lastName':
         sorted.sort((a, b) => a.lastName.compareTo(b.lastName));
+        break;
+      case 'birthdayAsc':
+        sorted.sort((a, b) {
+          if (a.birthday == null && b.birthday == null) return 0;
+          if (a.birthday == null) return 1;
+          if (b.birthday == null) return -1;
+          return a.birthday!.compareTo(b.birthday!);
+        });
+        break;
+      case 'birthdayDesc':
+        sorted.sort((a, b) {
+          if (a.birthday == null && b.birthday == null) return 0;
+          if (a.birthday == null) return 1;
+          if (b.birthday == null) return -1;
+          return b.birthday!.compareTo(a.birthday!);
+        });
+        break;
+      case 'nextBirthday':
+        sorted.sort((a, b) {
+          if (a.birthday == null && b.birthday == null) return 0;
+          if (a.birthday == null) return 1;
+          if (b.birthday == null) return -1;
+          final now = DateTime.now();
+          final aBirthday = DateTime.tryParse(a.birthday!);
+          final bBirthday = DateTime.tryParse(b.birthday!);
+          if (aBirthday == null && bBirthday == null) return 0;
+          if (aBirthday == null) return 1;
+          if (bBirthday == null) return -1;
+          // Calculate next birthday
+          var aNext = DateTime(now.year, aBirthday.month, aBirthday.day);
+          var bNext = DateTime(now.year, bBirthday.month, bBirthday.day);
+          if (aNext.isBefore(now)) aNext = DateTime(now.year + 1, aBirthday.month, aBirthday.day);
+          if (bNext.isBefore(now)) bNext = DateTime(now.year + 1, bBirthday.month, bBirthday.day);
+          return aNext.compareTo(bNext);
+        });
+        break;
+      case 'joinedAsc':
+        sorted.sort((a, b) {
+          if (a.joined == null && b.joined == null) return 0;
+          if (a.joined == null) return 1;
+          if (b.joined == null) return -1;
+          return a.joined!.compareTo(b.joined!);
+        });
+        break;
+      case 'joinedDesc':
+        sorted.sort((a, b) {
+          if (a.joined == null && b.joined == null) return 0;
+          if (a.joined == null) return 1;
+          if (b.joined == null) return -1;
+          return b.joined!.compareTo(a.joined!);
+        });
         break;
       case 'group':
       default:
@@ -135,7 +187,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
         });
         break;
     }
-    
+
     return sorted;
   }
 
@@ -153,7 +205,8 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
   @override
   Widget build(BuildContext context) {
     final tenant = ref.watch(currentTenantProvider);
-    final peopleAsync = ref.watch(peopleListProvider);
+    // Use realtime provider for live updates
+    final peopleAsync = ref.watch(realtimePlayersProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -185,7 +238,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                   icon: const Icon(Icons.select_all),
                   tooltip: 'Alle auswählen',
                   onPressed: () {
-                    final people = ref.read(peopleListProvider).valueOrNull ?? [];
+                    final people = ref.read(realtimePlayersProvider).valueOrNull ?? [];
                     final filtered = _filterPeople(people);
                     setState(() {
                       _selectedPlayerIds.clear();
@@ -241,42 +294,16 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                     });
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'group',
-                      child: Row(
-                        children: [
-                          if (_sortOption == 'group')
-                            const Icon(Icons.check,
-                                size: 18, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          const Text('Nach Gruppe'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'lastName',
-                      child: Row(
-                        children: [
-                          if (_sortOption == 'lastName')
-                            const Icon(Icons.check,
-                                size: 18, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          const Text('Nach Nachname'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'firstName',
-                      child: Row(
-                        children: [
-                          if (_sortOption == 'firstName')
-                            const Icon(Icons.check,
-                                size: 18, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          const Text('Nach Vorname'),
-                        ],
-                      ),
-                    ),
+                    _buildSortMenuItem('group', 'Nach Gruppe'),
+                    _buildSortMenuItem('lastName', 'Nach Nachname'),
+                    _buildSortMenuItem('firstName', 'Nach Vorname'),
+                    const PopupMenuDivider(),
+                    _buildSortMenuItem('birthdayAsc', 'Geburtstag (älteste)'),
+                    _buildSortMenuItem('birthdayDesc', 'Geburtstag (jüngste)'),
+                    _buildSortMenuItem('nextBirthday', 'Nächster Geburtstag'),
+                    const PopupMenuDivider(),
+                    _buildSortMenuItem('joinedAsc', 'Beitritt (älteste)'),
+                    _buildSortMenuItem('joinedDesc', 'Beitritt (neueste)'),
                   ],
                 ),
                 IconButton(
@@ -348,7 +375,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                 title: 'Fehler beim Laden',
                 subtitle: 'Die Personenliste konnte nicht geladen werden.',
                 actionLabel: 'Erneut versuchen',
-                onAction: () => ref.refresh(peopleListProvider),
+                onAction: () => ref.invalidate(realtimePlayersProvider),
               ),
               data: (people) {
                 final filteredPeople = _filterPeople(people);
@@ -384,9 +411,8 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                   
                   return RefreshIndicator(
                     onRefresh: () async {
-                      // FN-007: invalidate + await for proper RefreshIndicator behavior
-                      ref.invalidate(peopleListProvider);
-                      await ref.read(peopleListProvider.future);
+                      // FN-007: invalidate for manual refresh (realtime handles automatic updates)
+                      ref.invalidate(realtimePlayersProvider);
                     },
                     child: ListView.builder(
                       padding: const EdgeInsets.symmetric(
@@ -528,6 +554,22 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
     };
   }
 
+  PopupMenuItem<String> _buildSortMenuItem(String value, String label) {
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          if (_sortOption == value)
+            const Icon(Icons.check, size: 18, color: AppColors.primary)
+          else
+            const SizedBox(width: 18),
+          const SizedBox(width: 8),
+          Text(label),
+        ],
+      ),
+    );
+  }
+
   void _enterSelectionMode() {
     setState(() {
       _isSelectionMode = true;
@@ -553,7 +595,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
   }
 
   Future<void> _showHandoverSheet() async {
-    final people = ref.read(peopleListProvider).valueOrNull ?? [];
+    final people = ref.read(realtimePlayersProvider).valueOrNull ?? [];
     final selectedPlayers = people
         .where((p) => p.id != null && _selectedPlayerIds.contains(p.id))
         .toList();
@@ -567,7 +609,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
 
     if (result == true && mounted) {
       _exitSelectionMode();
-      ref.invalidate(peopleListProvider);
+      ref.invalidate(realtimePlayersProvider);
     }
   }
 
@@ -705,7 +747,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
 
     try {
       await repository.pausePlayer(person, until, reasonText);
-      ref.invalidate(peopleListProvider);
+      // Realtime handles the refresh automatically
 
       if (mounted) {
         messenger.showSnackBar(
@@ -732,7 +774,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
 
     try {
       await repository.unpausePlayer(person);
-      ref.invalidate(peopleListProvider);
+      // Realtime handles the refresh automatically
 
       if (mounted) {
         messenger.showSnackBar(
@@ -789,7 +831,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
         DateTime.now().toIso8601String(),
         null,
       );
-      ref.invalidate(peopleListProvider);
+      // Realtime handles the refresh automatically
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

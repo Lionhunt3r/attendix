@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "0.1.9",
+      "date": "25.2.2026",
+      "changes": [
+        "🔄 Realtime-Updates: Personen-Liste aktualisiert sich automatisch",
+        "📊 Erweiterte Sortierung: Nach Geburtstag, Beitritt, nächstem Geburtstag",
+        "⏰ Verspätungs-Tracking: Warnung bei häufigen Verspätungen mit Reset",
+        "🚨 Problemfall-Handling: Mit Person gesprochen Toggle und Auflösung",
+        "👤 Account-Management: Rollen ändern und Verknüpfung aufheben"
+      ]
+    },
+    {
       "version": "0.1.8",
       "date": "25.2.2026",
       "changes": [
