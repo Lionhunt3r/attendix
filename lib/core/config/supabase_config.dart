@@ -13,7 +13,16 @@ class SupabaseConfig {
   static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
   /// Initialize Supabase
+  /// SEC-021: Validates that essential credentials are present
   static Future<void> initialize() async {
+    // SEC-021: Validate essential credentials
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      throw Exception(
+        'Supabase configuration missing. '
+        'Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set in .env file.',
+      );
+    }
+
     await Supabase.initialize(
       url: supabaseUrl,
       anonKey: supabaseAnonKey,
