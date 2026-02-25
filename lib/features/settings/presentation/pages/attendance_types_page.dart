@@ -144,18 +144,22 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
         }
       }
 
-      if (mounted) {
-        ToastHelper.showSuccess(context, 'Reihenfolge gespeichert');
-      }
-
-      ref.invalidate(attendanceTypesProvider);
+      // BL-008: Only reset state AFTER successful save
+      // Exit reorder mode first, then invalidate provider
       setState(() {
         _isReordering = false;
         _localTypes = [];
       });
-    } catch (e) {
+
+      ref.invalidate(attendanceTypesProvider);
+
       if (mounted) {
-        ToastHelper.showError(context, 'Fehler beim Speichern: $e');
+        ToastHelper.showSuccess(context, 'Reihenfolge gespeichert');
+      }
+    } catch (e) {
+      // BL-008: Keep local changes on error - DO NOT reset _isReordering or _localTypes
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler beim Speichern. Bitte erneut versuchen.');
       }
     }
   }
