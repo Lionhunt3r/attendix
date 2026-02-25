@@ -109,9 +109,9 @@ class HolidayService {
         final startDate = DateTime.parse(item['startDate'] as String);
         final endDate = DateTime.parse(item['endDate'] as String);
         final names = item['name'] as List<dynamic>;
-        final name = names.isNotEmpty
-            ? (names.first['text'] as String? ?? 'Feiertag')
-            : 'Feiertag';
+        // BL-012: Use firstOrNull for clearer null-safety
+        final nameEntry = names.cast<Map<String, dynamic>?>().firstOrNull;
+        final name = nameEntry?['text'] as String? ?? 'Feiertag';
 
         return Holiday(
           id: item['id']?.toString() ?? '${startDate.toIso8601String()}_$name',
@@ -155,9 +155,9 @@ class HolidayService {
         final startDate = DateTime.parse(item['startDate'] as String);
         final endDate = DateTime.parse(item['endDate'] as String);
         final names = item['name'] as List<dynamic>;
-        final name = names.isNotEmpty
-            ? (names.first['text'] as String? ?? 'Schulferien')
-            : 'Schulferien';
+        // BL-012: Use firstOrNull for clearer null-safety
+        final nameEntry = names.cast<Map<String, dynamic>?>().firstOrNull;
+        final name = nameEntry?['text'] as String? ?? 'Schulferien';
 
         return Holiday(
           id: item['id']?.toString() ?? '${startDate.toIso8601String()}_$name',

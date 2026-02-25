@@ -152,11 +152,11 @@ class ExportService {
       final attInfo = <String>[];
 
       for (final att in limitedAttendances) {
-        final pa = personAttendances.firstWhere(
-          (p) => p.personId == player.id && p.attendanceId == att.id,
-          orElse: () => const PersonAttendance(),
-        );
-        attInfo.add(_getStatusCode(pa.status));
+        // BL-011: Use firstOrNull - null means "not recorded" which is correct
+        final pa = personAttendances
+            .where((p) => p.personId == player.id && p.attendanceId == att.id)
+            .firstOrNull;
+        attInfo.add(_getStatusCode(pa?.status));
       }
 
       data.add([
@@ -249,11 +249,11 @@ class ExportService {
       final attInfo = <String>[];
 
       for (final att in attendances) {
-        final pa = personAttendances.firstWhere(
-          (p) => p.personId == player.id && p.attendanceId == att.id,
-          orElse: () => const PersonAttendance(),
-        );
-        attInfo.add(_getStatusCode(pa.status));
+        // BL-011: Use firstOrNull - null means "not recorded" which is correct
+        final pa = personAttendances
+            .where((p) => p.personId == player.id && p.attendanceId == att.id)
+            .firstOrNull;
+        attInfo.add(_getStatusCode(pa?.status));
       }
 
       sheet.appendRow([
@@ -292,7 +292,9 @@ class ExportService {
   }
 
   /// Get status code for display
-  String _getStatusCode(AttendanceStatus status) {
+  /// BL-011: Accept nullable status - null means "not recorded"
+  String _getStatusCode(AttendanceStatus? status) {
+    if (status == null) return '-';
     switch (status) {
       case AttendanceStatus.present:
         return 'X';

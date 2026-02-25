@@ -551,10 +551,11 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
     try {
       final playerRepo = ref.read(playerRepositoryWithTenantProvider);
       final tenants = ref.read(userTenantsProvider).valueOrNull ?? [];
-      final targetTenant = tenants.firstWhere(
-        (t) => t.id == _targetTenantId,
-        orElse: () => Tenant(id: _targetTenantId, longName: '', shortName: ''),
-      );
+      // BL-009: Use firstOrNull and validate tenant exists
+      final targetTenant = tenants.where((t) => t.id == _targetTenantId).firstOrNull;
+      if (targetTenant == null) {
+        throw Exception('Ziel-Instanz nicht gefunden');
+      }
 
       final results = await playerRepo.handoverPlayers(
         players: widget.selectedPlayers,

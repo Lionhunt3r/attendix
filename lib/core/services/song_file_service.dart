@@ -25,7 +25,8 @@ class SongFileService {
     );
 
     if (result == null || result.files.isEmpty) return null;
-    return result.files.first;
+    // BL-013: Use firstOrNull for explicit null-safety
+    return result.files.firstOrNull;
   }
 
   /// Generate a safe filename

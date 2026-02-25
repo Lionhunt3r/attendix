@@ -23,9 +23,11 @@ abstract class BaseRepository {
 
   /// Handle Supabase errors consistently
   T handleError<T>(Object error, StackTrace stack, String operation) {
-    // Log error
+    // SEC-019: Only log detailed stack traces in debug mode
     debugPrint('[$runtimeType] Error in $operation: $error');
-    debugPrint('$stack');
+    if (kDebugMode) {
+      debugPrint('$stack');
+    }
 
     // Rethrow with more context
     if (error is PostgrestException) {

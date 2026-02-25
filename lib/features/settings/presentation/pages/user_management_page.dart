@@ -203,8 +203,10 @@ class UserManagementPage extends ConsumerWidget {
         }
       }
     } catch (e) {
+      // SEC-020: Don't expose internal error details to user
+      debugPrint('Error adding user: $e');
       if (context.mounted) {
-        ToastHelper.showError(context, 'Fehler: $e');
+        ToastHelper.showError(context, 'Fehler beim Hinzufügen des Benutzers');
       }
     }
   }
@@ -660,8 +662,10 @@ class _UserTile extends ConsumerWidget {
         ToastHelper.showSuccess(context, 'Rolle geändert zu ${_getRoleLabel(newRole)}');
       }
     } catch (e) {
+      // SEC-020: Don't expose internal error details to user
+      debugPrint('Error changing role: $e');
       if (context.mounted) {
-        ToastHelper.showError(context, 'Fehler: $e');
+        ToastHelper.showError(context, 'Fehler beim Ändern der Rolle');
       }
     }
   }
