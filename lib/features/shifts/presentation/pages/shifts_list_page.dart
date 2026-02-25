@@ -61,9 +61,12 @@ class _ShiftsListPageState extends ConsumerState<ShiftsListPage> {
                 return ListView.builder(
                   itemCount: shifts.length,
                   itemBuilder: (context, index) {
+                    final shift = shifts[index];
                     return _ShiftPlanTile(
-                      shift: shifts[index],
-                      onTap: () => _openShiftDetail(shifts[index]),
+                      // FN-005: Add key for proper widget identity
+                      key: ValueKey(shift.id),
+                      shift: shift,
+                      onTap: () => _openShiftDetail(shift),
                     );
                   },
                 );
@@ -181,9 +184,10 @@ class _ShiftsListPageState extends ConsumerState<ShiftsListPage> {
         ),
       );
 
-      if (result != null && result['name']!.trim().isNotEmpty) {
-        await _createShift(
-            result['name']!.trim(), result['description']?.trim() ?? '');
+      // RT-014: Safe access to dialog result
+      final name = result?['name']?.trim() ?? '';
+      if (name.isNotEmpty) {
+        await _createShift(name, result?['description']?.trim() ?? '');
       }
     } finally {
       // FN-001: Dispose controllers
@@ -224,6 +228,7 @@ class _ShiftPlanTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _ShiftPlanTile({
+    super.key,
     required this.shift,
     required this.onTap,
   });

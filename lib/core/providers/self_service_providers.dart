@@ -161,18 +161,22 @@ class AttendanceStats {
   });
 }
 
-/// Provider for current player (user's linked player record across all tenants)
-/// Returns the first player linked to the current user
+/// Provider for current player (user's linked player record for the current tenant)
+/// SEC-008: Added tenantId filter to prevent cross-tenant identity confusion
 final currentSelfServicePlayerProvider = FutureProvider<Person?>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final userId = supabase.auth.currentUser?.id;
+  final tenantId = ref.watch(currentTenantIdProvider);
 
   if (userId == null) return null;
+  if (tenantId == null) return null;
 
+  // SEC-008: Filter by both appId AND tenantId
   final response = await supabase
       .from('player')
       .select('*')
       .eq('appId', userId)
+      .eq('tenantId', tenantId)
       .limit(1)
       .maybeSingle();
 

@@ -294,12 +294,14 @@ class _CopyToTenantSheetState extends ConsumerState<CopyToTenantSheet> {
       final newSongId = insertResponse['id'] as int;
 
       // Copy files if any
-      if (widget.song.files?.isNotEmpty == true) {
+      // RT-008: Extract to local variable for null-safety
+      final files = widget.song.files;
+      if (files != null && files.isNotEmpty) {
         final songFileService = ref.read(songFileServiceProvider);
-        final fileCount = widget.song.files!.length;
+        final fileCount = files.length;
 
         for (var i = 0; i < fileCount; i++) {
-          final file = widget.song.files![i];
+          final file = files[i];
           setState(() => _progressMessage =
               'Kopiere Datei ${i + 1} von $fileCount...');
 

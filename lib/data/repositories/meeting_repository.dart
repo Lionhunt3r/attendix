@@ -49,8 +49,21 @@ class MeetingRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Create a new meeting
+  /// BL-005: Checks for duplicate meetings on the same date
   Future<Meeting> createMeeting(Meeting meeting) async {
     try {
+      // BL-005: Check for existing meeting on the same date
+      final existing = await supabase
+          .from('meetings')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .eq('date', meeting.date)
+          .maybeSingle();
+
+      if (existing != null) {
+        throw Exception('Eine Sitzung an diesem Datum existiert bereits');
+      }
+
       final data = {
         'tenantId': currentTenantId,
         'date': meeting.date,

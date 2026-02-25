@@ -59,9 +59,11 @@ class _SmartPrintDialogState extends ConsumerState<SmartPrintDialog> {
   }
 
   void _updateCopies(int index, int newCopies) {
-    if (_copyInfos == null) return;
+    // RT-007: Add bounds check
+    final infos = _copyInfos;
+    if (infos == null || index < 0 || index >= infos.length) return;
     setState(() {
-      _copyInfos![index] = _copyInfos![index].copyWith(
+      _copyInfos![index] = infos[index].copyWith(
         copies: newCopies.clamp(0, 99),
       );
     });

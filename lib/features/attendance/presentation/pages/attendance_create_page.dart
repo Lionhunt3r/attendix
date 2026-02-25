@@ -695,6 +695,18 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
       return;
     }
 
+    // BL-007: Validate that end time is after start time
+    if (_startTime != null && _endTime != null) {
+      final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
+      final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
+      if (endMinutes <= startMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ende muss nach Beginn liegen')),
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -754,16 +766,15 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     // Prepare checklist from type
     List<Map<String, dynamic>>? checklist;
     if (type.checklist != null && type.checklist!.isNotEmpty) {
-      final eventDateTime = type.startTime != null
-          ? DateTime(
-              normalizedDate.year,
-              normalizedDate.month,
-              normalizedDate.day,
-              int.parse(type.startTime!.split(':')[0]),
-              int.parse(type.startTime!.split(':')[1]),
-            )
-          : DateTime(normalizedDate.year, normalizedDate.month,
-              normalizedDate.day, 19, 0);
+      // RT-003: Safe time parsing - use existing _parseTime method
+      final parsedTime = type.startTime != null ? _parseTime(type.startTime!) : null;
+      final eventDateTime = DateTime(
+        normalizedDate.year,
+        normalizedDate.month,
+        normalizedDate.day,
+        parsedTime?.hour ?? 19,
+        parsedTime?.minute ?? 0,
+      );
 
       checklist = type.checklist!.map((item) {
         DateTime? dueDate;

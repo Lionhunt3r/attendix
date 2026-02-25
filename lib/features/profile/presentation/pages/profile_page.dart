@@ -130,7 +130,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           .eq('tenantId', tenant!.id!);
 
       // Update player if linked
-      if (_profileData?['playerId'] != null) {
+      // RT-006: Extract to local variable for null-safety
+      final playerId = _profileData?['playerId'];
+      if (playerId != null) {
         await supabase
             .from('players')
             .update({
@@ -138,7 +140,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               'lastName': _lastNameController.text.trim(),
               'phone': _phoneController.text.trim(),
             })
-            .eq('id', _profileData!['playerId']);
+            .eq('id', playerId);
       }
 
       if (mounted) {
