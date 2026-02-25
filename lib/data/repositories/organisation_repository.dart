@@ -158,8 +158,47 @@ class OrganisationRepository extends BaseRepository {
   }
 
   /// Get all tenants of an organisation
+  /// SEC-005: Added authorization check - user must be member of at least one tenant in the organisation
   Future<List<Tenant>> getInstancesOfOrganisation(int organisationId) async {
     try {
+      // First verify user has access to at least one tenant in this organisation
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        throw RepositoryException(
+          message: 'User not authenticated',
+          operation: 'getInstancesOfOrganisation',
+        );
+      }
+
+      // Get all tenants in this organisation
+      final orgTenantsResponse = await supabase
+          .from('tenant_group_tenants')
+          .select('tenant_id')
+          .eq('tenant_group', organisationId);
+
+      final orgTenantIds = (orgTenantsResponse as List)
+          .map((e) => e['tenant_id'] as int)
+          .toList();
+
+      if (orgTenantIds.isEmpty) return [];
+
+      // Check if user is member of any tenant in this organisation
+      final userAccessResponse = await supabase
+          .from('tenantUsers')
+          .select('tenantId')
+          .eq('userId', userId)
+          .inFilter('tenantId', orgTenantIds)
+          .limit(1)
+          .maybeSingle();
+
+      if (userAccessResponse == null) {
+        throw RepositoryException(
+          message: 'Access denied: User is not member of this organisation',
+          operation: 'getInstancesOfOrganisation',
+        );
+      }
+
+      // User has access, now load all tenants
       final response = await supabase
           .from('tenant_group_tenants')
           .select('tenant:tenant_id(*)')
@@ -176,10 +215,35 @@ class OrganisationRepository extends BaseRepository {
   }
 
   /// Get all persons from all tenants of an organisation
+  /// SEC-006: Added authorization check - user must be member of at least one of the requested tenants
   Future<List<Person>> getAllPersonsFromOrganisation(List<Tenant> tenants) async {
     try {
       final tenantIds = tenants.map((t) => t.id).whereType<int>().toList();
       if (tenantIds.isEmpty) return [];
+
+      // Verify user has access to at least one of the requested tenants
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        throw RepositoryException(
+          message: 'User not authenticated',
+          operation: 'getAllPersonsFromOrganisation',
+        );
+      }
+
+      final userAccessResponse = await supabase
+          .from('tenantUsers')
+          .select('tenantId')
+          .eq('userId', userId)
+          .inFilter('tenantId', tenantIds)
+          .limit(1)
+          .maybeSingle();
+
+      if (userAccessResponse == null) {
+        throw RepositoryException(
+          message: 'Access denied: User is not member of any requested tenant',
+          operation: 'getAllPersonsFromOrganisation',
+        );
+      }
 
       final response = await supabase
           .from('player')
@@ -263,27 +327,53 @@ class OrganisationRepository extends BaseRepository {
   }
 
   /// Get all linked tenants (from all organisations the tenant belongs to)
+  /// SEC-007: Fixed to only load tenant_groups that user has access to
   Future<List<Tenant>> getLinkedTenants(int tenantId) async {
     try {
-      // Get all tenant_group_tenants
+      // First verify user has access to this tenant
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        throw RepositoryException(
+          message: 'User not authenticated',
+          operation: 'getLinkedTenants',
+        );
+      }
+
+      final userAccessResponse = await supabase
+          .from('tenantUsers')
+          .select('tenantId')
+          .eq('userId', userId)
+          .eq('tenantId', tenantId)
+          .maybeSingle();
+
+      if (userAccessResponse == null) {
+        throw RepositoryException(
+          message: 'Access denied: User is not member of this tenant',
+          operation: 'getLinkedTenants',
+        );
+      }
+
+      // Get all groups this tenant belongs to
+      final myGroupsResponse = await supabase
+          .from('tenant_group_tenants')
+          .select('tenant_group')
+          .eq('tenant_id', tenantId);
+
+      final myGroupIds = (myGroupsResponse as List)
+          .map((e) => e['tenant_group'] as int)
+          .toList();
+
+      if (myGroupIds.isEmpty) return [];
+
+      // Get all tenants in those groups (server-side filtered)
       final response = await supabase
           .from('tenant_group_tenants')
-          .select('tenant_id, tenant_group, tenant:tenant_id(*)');
+          .select('tenant_id, tenant:tenant_id(*)')
+          .inFilter('tenant_group', myGroupIds)
+          .neq('tenant_id', tenantId); // Exclude current tenant
 
-      final allLinks = response as List;
-
-      // Find all groups that the current tenant belongs to
-      final myGroups = allLinks
-          .where((link) => link['tenant_id'] == tenantId)
-          .map((link) => link['tenant_group'] as int)
-          .toSet();
-
-      // Find all tenants in those groups (excluding current tenant)
-      return allLinks
-          .where((link) =>
-              myGroups.contains(link['tenant_group']) &&
-              link['tenant_id'] != tenantId &&
-              link['tenant'] != null)
+      return (response as List)
+          .where((link) => link['tenant'] != null)
           .map((link) => Tenant.fromJson(link['tenant'] as Map<String, dynamic>))
           .toList();
     } catch (e, stack) {

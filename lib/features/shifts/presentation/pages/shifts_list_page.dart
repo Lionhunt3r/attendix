@@ -184,9 +184,10 @@ class _ShiftsListPageState extends ConsumerState<ShiftsListPage> {
         ),
       );
 
-      if (result != null && result['name']!.trim().isNotEmpty) {
-        await _createShift(
-            result['name']!.trim(), result['description']?.trim() ?? '');
+      // RT-014: Safe access to dialog result
+      final name = result?['name']?.trim() ?? '';
+      if (name.isNotEmpty) {
+        await _createShift(name, result?['description']?.trim() ?? '');
       }
     } finally {
       // FN-001: Dispose controllers

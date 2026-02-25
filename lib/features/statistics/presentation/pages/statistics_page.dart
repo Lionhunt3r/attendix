@@ -678,7 +678,8 @@ class _AgeDistributionChart extends ConsumerWidget {
       return const _EmptyChartPlaceholder(message: 'Keine Geburtsdaten vorhanden');
     }
 
-    final maxCount = data.map((e) => e.count).reduce((a, b) => a > b ? a : b);
+    // BL-006: Use fold instead of reduce for safety
+    final maxCount = data.map((e) => e.count).fold(0, (a, b) => a > b ? a : b);
 
     return Card(
       child: Padding(
@@ -768,7 +769,8 @@ class _AvgAgePerInstrumentChart extends ConsumerWidget {
       return const _EmptyChartPlaceholder(message: 'Keine Geburtsdaten vorhanden');
     }
 
-    final maxAge = data.map((e) => e.percentage).reduce((a, b) => a > b ? a : b);
+    // BL-006: Use fold instead of reduce for safety
+    final maxAge = data.map((e) => e.percentage).fold(0.0, (a, b) => a > b ? a : b);
     final chartHeight = (data.length * 28.0).clamp(150.0, 400.0);
 
     return Card(
@@ -859,7 +861,8 @@ class _DivaIndexChart extends ConsumerWidget {
       return const _EmptyChartPlaceholder(message: 'Keine unentschuldigten Abwesenheiten');
     }
 
-    final maxAbsences = data.map((e) => e.percentage).reduce((a, b) => a > b ? a : b);
+    // BL-006: Use fold instead of reduce for safety
+    final maxAbsences = data.map((e) => e.percentage).fold(0.0, (a, b) => a > b ? a : b);
     final chartHeight = (data.length * 28.0).clamp(150.0, 420.0);
 
     return Card(

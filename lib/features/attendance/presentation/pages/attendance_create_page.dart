@@ -695,6 +695,18 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
       return;
     }
 
+    // BL-007: Validate that end time is after start time
+    if (_startTime != null && _endTime != null) {
+      final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
+      final endMinutes = _endTime!.hour * 60 + _endTime!.minute;
+      if (endMinutes <= startMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ende muss nach Beginn liegen')),
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
