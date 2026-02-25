@@ -277,8 +277,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     const SizedBox(height: AppDimensions.paddingL),
 
                     // Register link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text('Noch kein Konto?'),
                         TextButton(
