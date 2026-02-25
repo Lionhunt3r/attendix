@@ -1831,6 +1831,8 @@ class _AttendanceGrid extends StatelessWidget {
     final grouped = _groupByInstrument(persons);
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppDimensions.paddingS),
       itemCount: grouped.length,
       itemBuilder: (context, index) {
