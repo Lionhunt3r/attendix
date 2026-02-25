@@ -184,8 +184,9 @@ class AttendanceListPage extends ConsumerWidget {
 
           return RefreshIndicator(
             onRefresh: () async {
-              // ignore: unused_result
-              ref.refresh(attendanceListProvider);
+              // FN-008: invalidate + await for proper RefreshIndicator behavior
+              ref.invalidate(attendanceListProvider);
+              await ref.read(attendanceListProvider.future);
             },
             child: ListView(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
