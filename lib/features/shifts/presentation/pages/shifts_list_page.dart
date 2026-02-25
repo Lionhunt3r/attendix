@@ -128,50 +128,67 @@ class _ShiftsListPageState extends ConsumerState<ShiftsListPage> {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
 
-    final result = await showDialog<Map<String, String>?>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Neuer Schichtplan'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                hintText: 'z.B. 3-Schicht-System',
+    try {
+      final result = await showDialog<Map<String, String>?>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Neuer Schichtplan'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  hintText: 'z.B. 3-Schicht-System',
+                ),
+                autofocus: true,
               ),
-              autofocus: true,
+              const SizedBox(height: AppDimensions.paddingM),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Beschreibung (optional)',
+                  hintText: 'z.B. Früh, Spät, Nacht',
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
             ),
-            const SizedBox(height: AppDimensions.paddingM),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Beschreibung (optional)',
-                hintText: 'z.B. Früh, Spät, Nacht',
-              ),
-              maxLines: 2,
+            ElevatedButton(
+              onPressed: () {
+                // FN-002: Validate before submit
+                final name = nameController.text.trim();
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Name ist erforderlich')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, {
+                  'name': name,
+                  'description': descriptionController.text,
+                });
+              },
+              child: const Text('Erstellen'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Abbrechen'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, {
-              'name': nameController.text,
-              'description': descriptionController.text,
-            }),
-            child: const Text('Erstellen'),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (result != null && result['name']!.trim().isNotEmpty) {
-      await _createShift(result['name']!.trim(), result['description']?.trim() ?? '');
+      if (result != null && result['name']!.trim().isNotEmpty) {
+        await _createShift(
+            result['name']!.trim(), result['description']?.trim() ?? '');
+      }
+    } finally {
+      // FN-001: Dispose controllers
+      nameController.dispose();
+      descriptionController.dispose();
     }
   }
 

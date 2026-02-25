@@ -576,110 +576,119 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
     final reasonController = TextEditingController();
     DateTime? pauseUntil;
 
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: AppDimensions.paddingL,
-            right: AppDimensions.paddingL,
-            top: AppDimensions.paddingL,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.pause_circle, color: AppColors.warning, size: 28),
-                  const SizedBox(width: AppDimensions.paddingS),
-                  Expanded(
-                    child: Text(
-                      '${person.firstName} pausieren',
-                      style: Theme.of(context).textTheme.titleLarge,
+    try {
+      final result = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: AppDimensions.paddingL,
+              right: AppDimensions.paddingL,
+              top: AppDimensions.paddingL,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.pause_circle,
+                        color: AppColors.warning, size: 28),
+                    const SizedBox(width: AppDimensions.paddingS),
+                    Expanded(
+                      child: Text(
+                        '${person.firstName} pausieren',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppDimensions.paddingL),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: 'Grund *',
+                    hintText: 'Warum wird pausiert?',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                  autofocus: true,
+                ),
+                const SizedBox(height: AppDimensions.paddingM),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading:
+                      const Icon(Icons.calendar_today, color: AppColors.primary),
+                  title: const Text('Pausiert bis (optional)'),
+                  subtitle: Text(
+                    pauseUntil != null
+                        ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
+                        : 'Kein Enddatum',
+                    style: TextStyle(
+                      color:
+                          pauseUntil != null ? AppColors.primary : AppColors.medium,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimensions.paddingL),
-              TextField(
-                controller: reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Grund *',
-                  hintText: 'Warum wird pausiert?',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-                autofocus: true,
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.calendar_today, color: AppColors.primary),
-                title: const Text('Pausiert bis (optional)'),
-                subtitle: Text(
-                  pauseUntil != null
-                      ? DateFormat('dd.MM.yyyy').format(pauseUntil!)
-                      : 'Kein Enddatum',
-                  style: TextStyle(
-                    color: pauseUntil != null ? AppColors.primary : AppColors.medium,
-                  ),
-                ),
-                trailing: pauseUntil != null
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, color: AppColors.medium),
-                        onPressed: () => setDialogState(() => pauseUntil = null),
-                      )
-                    : null,
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now().add(const Duration(days: 30)),
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
-                  );
-                  if (date != null) {
-                    setDialogState(() => pauseUntil = date);
-                  }
-                },
-              ),
-              const SizedBox(height: AppDimensions.paddingL),
-              FilledButton.icon(
-                onPressed: () {
-                  if (reasonController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Bitte Grund angeben')),
+                  trailing: pauseUntil != null
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: AppColors.medium),
+                          onPressed: () => setDialogState(() => pauseUntil = null),
+                        )
+                      : null,
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 30)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
                     );
-                    return;
-                  }
-                  Navigator.pop(context, {
-                    'reason': reasonController.text,
-                    'until': pauseUntil?.toIso8601String(),
-                  });
-                },
-                icon: const Icon(Icons.pause),
-                label: const Text('Pausieren'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.warning,
-                  padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+                    if (date != null) {
+                      setDialogState(() => pauseUntil = date);
+                    }
+                  },
                 ),
-              ),
-              const SizedBox(height: AppDimensions.paddingL),
-            ],
+                const SizedBox(height: AppDimensions.paddingL),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (reasonController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Bitte Grund angeben')),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, {
+                      'reason': reasonController.text,
+                      'until': pauseUntil?.toIso8601String(),
+                    });
+                  },
+                  icon: const Icon(Icons.pause),
+                  label: const Text('Pausieren'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.warning,
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.paddingL),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    if (result != null && mounted) {
-      await _pausePerson(person, result['reason'], result['until']);
+      if (result != null && mounted) {
+        await _pausePerson(person, result['reason'], result['until']);
+      }
+    } finally {
+      // FN-001: Dispose controller
+      reasonController.dispose();
     }
   }
 

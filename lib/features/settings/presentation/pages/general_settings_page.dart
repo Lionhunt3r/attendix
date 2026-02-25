@@ -703,46 +703,52 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   Future<void> _showCreateOrganisationDialog() async {
     final nameController = TextEditingController();
 
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Neue Organisation'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'Name der Organisation',
-            hintText: 'z.B. Musikverein Musterstadt',
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Neue Organisation'),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'Name der Organisation',
+              hintText: 'z.B. Musikverein Musterstadt',
+            ),
+            autofocus: true,
           ),
-          autofocus: true,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Abbrechen'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Erstellen & Verknüpfen'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Abbrechen'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Erstellen & Verknüpfen'),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (result == true && mounted) {
-      final name = nameController.text.trim();
-      if (name.isEmpty) {
-        ToastHelper.showError(context, 'Name ist erforderlich');
-        return;
-      }
+      if (result == true && mounted) {
+        final name = nameController.text.trim();
+        if (name.isEmpty) {
+          ToastHelper.showError(context, 'Name ist erforderlich');
+          return;
+        }
 
-      final notifier = ref.read(organisationNotifierProvider.notifier);
-      final org = await notifier.create(name);
-      if (org != null && mounted) {
-        await notifier.linkCurrentTenant(org.id!);
-        if (mounted) {
-          ToastHelper.showSuccess(context, 'Organisation erstellt und verknüpft');
+        final notifier = ref.read(organisationNotifierProvider.notifier);
+        final org = await notifier.create(name);
+        if (org != null && mounted) {
+          await notifier.linkCurrentTenant(org.id!);
+          if (mounted) {
+            ToastHelper.showSuccess(
+                context, 'Organisation erstellt und verknüpft');
+          }
         }
       }
+    } finally {
+      // FN-001: Dispose controller
+      nameController.dispose();
     }
   }
 

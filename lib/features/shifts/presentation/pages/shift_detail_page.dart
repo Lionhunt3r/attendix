@@ -453,107 +453,114 @@ class _ShiftDetailPageState extends ConsumerState<ShiftDetailPage> {
         TextEditingController(text: segment.repeatCount.toString());
     bool isFree = segment.free;
 
-    return showDialog<ShiftDefinition>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Segment bearbeiten'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Free toggle
-                SwitchListTile(
-                  title: const Text('Frei'),
-                  subtitle: const Text('Mitarbeiter ist an diesem Tag frei'),
-                  value: isFree,
-                  onChanged: (value) {
-                    setDialogState(() => isFree = value);
-                  },
-                  contentPadding: EdgeInsets.zero,
-                ),
-                const Divider(),
-                // Start time
-                if (!isFree) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Startzeit'),
-                    subtitle: Text(startTimeController.text),
-                    trailing: const Icon(Icons.access_time),
-                    onTap: () async {
-                      final parts = startTimeController.text.split(':');
-                      final initialTime = TimeOfDay(
-                        hour: int.tryParse(parts[0]) ?? 8,
-                        minute: int.tryParse(parts[1]) ?? 0,
-                      );
-                      final time = await showTimePicker(
-                        context: context,
-                        initialTime: initialTime,
-                      );
-                      if (time != null) {
-                        setDialogState(() {
-                          startTimeController.text =
-                              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-                        });
-                      }
+    try {
+      return await showDialog<ShiftDefinition>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Segment bearbeiten'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Free toggle
+                  SwitchListTile(
+                    title: const Text('Frei'),
+                    subtitle: const Text('Mitarbeiter ist an diesem Tag frei'),
+                    value: isFree,
+                    onChanged: (value) {
+                      setDialogState(() => isFree = value);
                     },
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  // Duration
-                  TextField(
-                    controller: durationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Dauer (in Stunden)',
-                      hintText: 'z.B. 8.0',
+                  const Divider(),
+                  // Start time
+                  if (!isFree) ...[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Startzeit'),
+                      subtitle: Text(startTimeController.text),
+                      trailing: const Icon(Icons.access_time),
+                      onTap: () async {
+                        final parts = startTimeController.text.split(':');
+                        final initialTime = TimeOfDay(
+                          hour: int.tryParse(parts.isNotEmpty ? parts[0] : '8') ?? 8,
+                          minute: int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0,
+                        );
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: initialTime,
+                        );
+                        if (time != null) {
+                          setDialogState(() {
+                            startTimeController.text =
+                                '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                          });
+                        }
+                      },
                     ),
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    // Duration
+                    TextField(
+                      controller: durationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Dauer (in Stunden)',
+                        hintText: 'z.B. 8.0',
+                      ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: AppDimensions.paddingM),
+                  ],
+                  // Repeat count
+                  TextField(
+                    controller: repeatController,
+                    decoration: const InputDecoration(
+                      labelText: 'Wiederholungen',
+                      hintText: 'Anzahl aufeinanderfolgender Tage',
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
-                  const SizedBox(height: AppDimensions.paddingM),
                 ],
-                // Repeat count
-                TextField(
-                  controller: repeatController,
-                  decoration: const InputDecoration(
-                    labelText: 'Wiederholungen',
-                    hintText: 'Anzahl aufeinanderfolgender Tage',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-              ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  var duration = double.tryParse(durationController.text) ?? 8.0;
+                  var repeatCount = int.tryParse(repeatController.text) ?? 1;
+
+                  // Validate bounds
+                  if (duration < 0) duration = 0;
+                  if (duration > 24) duration = 24;
+                  if (repeatCount < 1) repeatCount = 1;
+                  if (repeatCount > 365) repeatCount = 365;
+
+                  Navigator.pop(
+                    context,
+                    segment.copyWith(
+                      startTime: startTimeController.text,
+                      duration: duration,
+                      free: isFree,
+                      repeatCount: repeatCount,
+                    ),
+                  );
+                },
+                child: const Text('Speichern'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Abbrechen'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                var duration = double.tryParse(durationController.text) ?? 8.0;
-                var repeatCount = int.tryParse(repeatController.text) ?? 1;
-
-                // Validate bounds
-                if (duration < 0) duration = 0;
-                if (duration > 24) duration = 24;
-                if (repeatCount < 1) repeatCount = 1;
-                if (repeatCount > 365) repeatCount = 365;
-
-                Navigator.pop(
-                  context,
-                  segment.copyWith(
-                    startTime: startTimeController.text,
-                    duration: duration,
-                    free: isFree,
-                    repeatCount: repeatCount,
-                  ),
-                );
-              },
-              child: const Text('Speichern'),
-            ),
-          ],
         ),
-      ),
-    );
+      );
+    } finally {
+      // FN-001: Dispose controllers
+      startTimeController.dispose();
+      durationController.dispose();
+      repeatController.dispose();
+    }
   }
 
   Future<void> _saveChanges() async {
