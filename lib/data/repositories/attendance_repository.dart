@@ -454,32 +454,9 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
 
   // Helper to parse attendance with optional person attendances
   Attendance _parseAttendance(Map<String, dynamic> data, bool withPersons) {
-    if (withPersons && data['persons'] != null) {
-      // Parse nested person attendances
-      final persons = (data['persons'] as List).map((pa) {
-        final personData = pa['person'] as Map<String, dynamic>?;
-        return PersonAttendance(
-          id: pa['id']?.toString(),
-          attendanceId: pa['attendance_id'],
-          personId: pa['person_id'],
-          status: _parseStatus(pa['status']),
-          notes: pa['notes'],
-          firstName: personData?['firstName'],
-          lastName: personData?['lastName'],
-          img: personData?['img'],
-          instrument: personData?['instrument']?['id'],
-          groupName: personData?['instrument']?['name'],
-          joined: personData?['joined'],
-        );
-      }).toList();
-
-      // Create attendance with parsed persons
-      final attendance = Attendance.fromJson(data);
-      // Note: We'd need to add a persons field to the Attendance model
-      // For now, we return the base attendance
-      return attendance;
-    }
-
+    // RT-020: Removed unused persons parsing - the Attendance model
+    // doesn't have a persons field yet. When needed, add the field to
+    // the Attendance model and uncomment the parsing logic.
     return Attendance.fromJson(data);
   }
 
