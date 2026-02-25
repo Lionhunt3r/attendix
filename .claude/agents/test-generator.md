@@ -9,9 +9,123 @@ model: sonnet
 
 Generiere Tests für Flutter-Code im Attendix-Projekt.
 
+## Test-Infrastruktur
+
+Das Projekt hat eine etablierte Test-Infrastruktur:
+
+```
+test/
+├── mocks/                    # Mock-Klassen
+│   ├── supabase_mocks.dart   # SupabaseClient Mocks
+│   └── repository_mocks.dart # Repository Mocks (mocktail)
+├── factories/                # Test-Daten Factories
+│   └── test_factories.dart   # Person, Tenant, Attendance, etc.
+├── helpers/                  # Test-Utilities
+│   └── test_helpers.dart     # Container Setup, Matchers
+├── core/providers/           # Provider Tests
+├── data/repositories/        # Repository Security Tests
+└── features/                 # Feature/Widget Tests
+```
+
 ## Test-Kategorien
 
-### 1. Widget Tests
+### 1. Repository Security Tests (KRITISCH)
+
+**Pfad:** `test/data/repositories/<repository>_test.dart`
+
+**Ansatz:** Source-Code-Analyse für robuste Security-Tests:
+
+```dart
+import 'dart:io';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late String repoSource;
+
+  setUpAll(() {
+    final file = File('lib/data/repositories/<repository>_repository.dart');
+    repoSource = file.readAsStringSync();
+  });
+
+  group('Multi-Tenant Security - <Repository>', () {
+    test('all UPDATE operations include tenantId filter', () {
+      final updateQueries = RegExp(
+        r"supabase[^;]*\.from\('<table>'\)[^;]*\.update\([^;]+",
+        multiLine: true,
+      ).allMatches(repoSource);
+
+      expect(updateQueries, isNotEmpty);
+
+      for (final match in updateQueries) {
+        final query = match.group(0)!;
+        expect(
+          query,
+          contains(".eq('tenantId', currentTenantId)"),
+          reason: 'UPDATE query missing tenantId filter',
+        );
+      }
+    });
+
+    test('all DELETE operations include tenantId filter', () {
+      final deleteQueries = RegExp(
+        r"supabase[^;]*\.from\('<table>'\)[^;]*\.delete\(\)[^;]+",
+        multiLine: true,
+      ).allMatches(repoSource);
+
+      for (final match in deleteQueries) {
+        expect(match.group(0), contains(".eq('tenantId', currentTenantId)"));
+      }
+    });
+
+    test('INSERT sets tenantId in data', () {
+      expect(repoSource, contains("data['tenantId'] = currentTenantId"));
+    });
+  });
+}
+```
+
+### 2. Provider Tests
+
+**Pfad:** `test/core/providers/<provider>_providers_test.dart`
+
+**Nutze Test-Infrastruktur:**
+
+```dart
+import 'dart:io';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late String providerSource;
+
+  setUpAll(() {
+    final file = File('lib/core/providers/<name>_providers.dart');
+    providerSource = file.readAsStringSync();
+  });
+
+  group('<Name> Providers', () {
+    group('Tenant Guard Pattern', () {
+      test('returns empty when no tenant', () {
+        expect(providerSource, contains('if (!repo.hasTenantId) return [];'));
+      });
+    });
+
+    group('Cache Invalidation', () {
+      test('create invalidates list provider', () {
+        expect(providerSource, contains('ref.invalidate(<list>Provider)'));
+      });
+    });
+
+    group('Repository Integration', () {
+      test('sets tenantId from currentTenantIdProvider', () {
+        expect(providerSource, contains('ref.watch(currentTenantIdProvider)'));
+        expect(providerSource, contains('repo.setTenantId('));
+      });
+    });
+  });
+}
+```
+
+### 3. Widget Tests
 
 **Pfad:** `test/features/<feature>/presentation/pages/<page>_test.dart`
 
@@ -19,14 +133,16 @@ Generiere Tests für Flutter-Code im Attendix-Projekt.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mocktail/mocktail.dart';
 
-import 'package:attendix/features/<feature>/presentation/pages/<page>_page.dart';
-
-// Mock Provider
-class MockRepository extends Mock implements Repository {}
+import '../../factories/test_factories.dart';
+import '../../helpers/test_helpers.dart';
+import '../../mocks/repository_mocks.dart';
 
 void main() {
+  setUpAll(() {
+    registerFallbackValues();
+  });
+
   group('<Page>Page', () {
     testWidgets('shows loading state initially', (tester) async {
       await tester.pumpWidget(
@@ -44,129 +160,73 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('shows empty state when no data', (tester) async {
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            dataProvider.overrideWith((ref) async => []),
-          ],
-          child: const MaterialApp(home: TestPage()),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-      expect(find.text('Keine Daten'), findsOneWidget);
-    });
-
     testWidgets('shows data when loaded', (tester) async {
+      final testData = TestFactories.createPersonList(3);
+
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            dataProvider.overrideWith((ref) async => [
-              TestModel(id: 1, name: 'Test'),
-            ]),
+            dataProvider.overrideWith((ref) async => testData),
           ],
           child: const MaterialApp(home: TestPage()),
         ),
       );
 
       await tester.pumpAndSettle();
-      expect(find.text('Test'), findsOneWidget);
+      expect(find.text('Person 1'), findsOneWidget);
     });
   });
 }
 ```
 
-### 2. Provider Tests
-
-**Pfad:** `test/core/providers/<provider>_test.dart`
+## Test-Factories nutzen
 
 ```dart
-import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mocktail/mocktail.dart';
+import 'package:attendix/test/factories/test_factories.dart';
 
-import 'package:attendix/core/providers/<provider>_providers.dart';
+// Einzelne Person
+final person = TestFactories.createPerson(
+  id: 1,
+  firstName: 'Alice',
+  tenantId: 42,
+);
 
-void main() {
-  group('<Name>Provider', () {
-    late ProviderContainer container;
-    late MockRepository mockRepo;
+// Liste
+final persons = TestFactories.createPersonList(10, tenantId: 42);
 
-    setUp(() {
-      mockRepo = MockRepository();
-      container = ProviderContainer(
-        overrides: [
-          repositoryProvider.overrideWithValue(mockRepo),
-        ],
-      );
-    });
+// Spezielle Varianten
+final conductor = TestFactories.createConductor(mainGroupId: 1);
+final archived = TestFactories.createArchivedPerson();
+final paused = TestFactories.createPausedPerson(pausedUntil: '2024-12-31');
+final pending = TestFactories.createPendingPerson();
 
-    tearDown(() {
-      container.dispose();
-    });
+// Andere Models
+final tenant = TestFactories.createTenant(id: 42, shortName: 'Test');
+final attendance = TestFactories.createAttendance(date: '2024-01-15', tenantId: 42);
+final group = TestFactories.createGroup(name: 'Violine 1', tenantId: 42);
 
-    test('returns empty list when no tenant', () async {
-      when(() => mockRepo.hasTenantId).thenReturn(false);
-
-      final result = await container.read(dataProvider.future);
-
-      expect(result, isEmpty);
-    });
-
-    test('returns data when tenant is set', () async {
-      when(() => mockRepo.hasTenantId).thenReturn(true);
-      when(() => mockRepo.getAll()).thenAnswer((_) async => [
-        TestModel(id: 1, name: 'Test'),
-      ]);
-
-      final result = await container.read(dataProvider.future);
-
-      expect(result, hasLength(1));
-      expect(result.first.name, 'Test');
-    });
-  });
-}
+// JSON für Mocks
+final personJson = person.toTestJson();
+final personListJson = TestFactories.personsToJson(persons);
 ```
 
-### 3. Repository Tests
-
-**Pfad:** `test/data/repositories/<repository>_test.dart`
+## Repository Mocks nutzen
 
 ```dart
-import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:attendix/test/mocks/repository_mocks.dart';
 
-import 'package:attendix/data/repositories/<repository>_repository.dart';
+setUpAll(() {
+  registerFallbackValues(); // WICHTIG für mocktail
+});
 
-void main() {
-  group('<Name>Repository', () {
-    late MockSupabaseClient mockClient;
-    late Repository repository;
+test('example', () async {
+  final mockRepo = MockPlayerRepository();
+  setupMockPlayerRepository(mockRepo, tenantId: 42);
+  mockGetPlayers(mockRepo, testPlayers);
 
-    setUp(() {
-      mockClient = MockSupabaseClient();
-      // Setup repository with mock client
-    });
-
-    test('getAll filters by tenantId', () async {
-      // Verify tenantId is included in query
-    });
-
-    test('create includes tenantId', () async {
-      // Verify tenantId is set on insert
-    });
-
-    test('update includes tenantId filter', () async {
-      // Verify tenantId is included in update filter
-    });
-
-    test('delete includes tenantId filter', () async {
-      // Verify tenantId is included in delete filter
-    });
-  });
-}
+  // Test...
+  verify(() => mockRepo.getPlayers()).called(1);
+});
 ```
 
 ## Test-Konventionen
@@ -176,51 +236,37 @@ void main() {
 - Test-Gruppen: Beschreiben die Klasse/Funktion
 - Test-Cases: Beschreiben das erwartete Verhalten
 
-### Setup
+### Security Test Pattern
 ```dart
-setUp(() {
-  // Mocks initialisieren
-});
-
-tearDown(() {
-  // Cleanup
-});
+// Immer verifizieren:
+// 1. SELECT hat tenantId Filter
+// 2. UPDATE hat id UND tenantId Filter
+// 3. DELETE hat id UND tenantId Filter
+// 4. INSERT setzt tenantId im Daten-Objekt
 ```
 
-### Assertions
-```dart
-// Prefer specific matchers
-expect(result, hasLength(3));
-expect(result.first.name, 'Expected');
-expect(result, isA<List<Model>>());
-
-// For async
-await expectLater(future, throwsA(isA<Exception>()));
-```
-
-## Test ausführen
+## Tests ausführen
 
 ```bash
 # Alle Tests
 flutter test
 
 # Spezifische Datei
-flutter test test/features/attendance/presentation/pages/attendance_page_test.dart
+flutter test test/data/repositories/player_repository_test.dart
+
+# Security Tests
+flutter test --name "Multi-Tenant Security"
 
 # Mit Coverage
 flutter test --coverage
 
-# Watch-Mode
+# Watch-Mode (nicht auf CI)
 flutter test --watch
 ```
 
-## Dependencies für Tests
+## CI-Integration
 
-`pubspec.yaml`:
-```yaml
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  mocktail: ^1.0.0
-  fake_async: ^1.3.0
-```
+Tests laufen automatisch via `.github/workflows/ci.yml`:
+- Push auf `master` oder `develop`
+- Pull Requests auf `master`
+- Vor Deployment auf Cloudflare Pages

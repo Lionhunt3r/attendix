@@ -83,9 +83,73 @@ dart analyze lib/
 # Tests ausführen
 flutter test
 
+# Tests mit Coverage
+flutter test --coverage
+
+# Security-Tests ausführen
+flutter test --name "Multi-Tenant Security"
+
 # PWA starten
 flutter run -d chrome
 ```
+
+## Testing
+
+### Test-Struktur
+
+```
+test/
+├── mocks/           # Supabase & Repository Mocks
+├── factories/       # Test-Daten Factories
+├── helpers/         # Container Setup, Matchers
+├── core/providers/  # Provider Tests
+├── data/repositories/  # Repository Security Tests
+└── features/        # Feature Tests
+```
+
+### Security Tests
+
+Repository-Tests validieren Multi-Tenant Security via Source-Code-Analyse:
+
+```dart
+// Alle UPDATE-Operationen müssen tenantId filtern
+test('all UPDATE operations include tenantId filter', () {
+  final updateQueries = RegExp(...)
+      .allMatches(playerRepoSource);
+
+  for (final match in updateQueries) {
+    expect(query, contains(".eq('tenantId', currentTenantId)"));
+  }
+});
+```
+
+### Test-Factories
+
+```dart
+// Person erstellen
+final person = TestFactories.createPerson(id: 1, tenantId: 42);
+
+// Liste erstellen
+final persons = TestFactories.createPersonList(10, tenantId: 42);
+
+// Spezielle Varianten
+final archived = TestFactories.createArchivedPerson();
+final paused = TestFactories.createPausedPerson();
+```
+
+### Neue Tests schreiben
+
+**Repository-Tests:**
+- Source-Code-Analyse für Security
+- Verifiziere `tenantId` Filter auf allen Operationen
+- Prüfe `id` UND `tenantId` bei Mutations
+
+**Provider-Tests:**
+- Teste Tenant-Guard Pattern (`if (!repo.hasTenantId) return ...`)
+- Verifiziere Cache-Invalidierung
+- Teste Error-Handling
+
+Mehr Details: `test/README.md`
 
 ## Vor dem Commit/Push
 

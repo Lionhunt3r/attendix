@@ -4,15 +4,21 @@
 
 **Ionic Projekt:** `/Users/I576226/repositories/attendance` (~12.600 Zeilen TypeScript)
 **Flutter Projekt:** `/Users/I576226/repositories/attendix` (~16.800 Zeilen Dart)
-**Migrationsfortschritt:** ~97%
+**Migrationsfortschritt:** ~79% (detaillierte Analyse)
 
 | Metrik | Wert |
 |--------|------|
 | Ionic Pages | 35 |
-| Flutter Pages | 38 |
-| Flutter Repositories | 9 |
+| Flutter Pages | 43 |
+| Flutter Repositories | 15 |
+| Service Parity | 62% |
+| Feature/UI Parity | 87% |
+| UX Patterns | 74% |
+| Code Quality | 94% |
 
-*Zuletzt aktualisiert: 2026-02-24*
+*Zuletzt aktualisiert: 2026-02-25*
+
+**Detaillierter Gap-Report:** [parity-gap-report-20260225.md](parity-gap-report-20260225.md)
 
 ---
 
@@ -71,19 +77,32 @@
 
 ## Ausstehende Features
 
-### Hohe Priorität 🔴
+### Kritische Priorität 🔴
 
-*Keine - alle hohen Prioritäten sind abgeschlossen!*
+| Feature | Komplexität | Beschreibung |
+|---------|-------------|--------------|
+| Realtime-Updates | Mittel | Live-Updates in Attendance Detail |
+| Checklisten-Feature | Hoch | To-Do Items mit Deadline in Attendance |
+| Werke-History | Mittel | Werke zu Anwesenheit zuordnen |
+| Meine Stammdaten | Mittel | Profil/Passbild ändern in Settings |
+| Song File-Ops | Hoch | Upload/Download/Delete für Noten |
 
-### Mittlere Priorität 🟡
+### Hohe Priorität 🟡
 
-*Keine offenen mittleren Prioritäten!*
+| Feature | Komplexität | Beschreibung |
+|---------|-------------|--------------|
+| Gruppen-PDFs drucken | Hoch | Smart Print mit Kopien pro Instrument |
+| Registerprobenplan | Mittel | Registerproben-Pläne erstellen |
+| Aktuelle Werke Modal | Niedrig | Aktuelle Stücke anzeigen |
+| Passwort ändern | Niedrig | In Settings |
+| Cross-Tenant Shifts | Hoch | Schichten bei Handover |
 
 ### Niedrige Priorität 🟢
 
 | Feature | Komplexität | Beschreibung |
 |---------|-------------|--------------|
 | AI Service | Niedrig | GPT-basierte Gruppen-Synonyme |
+| Telegram-Integration | Mittel | Push-Benachrichtigungen |
 
 ---
 
