@@ -229,14 +229,16 @@ class _MeetingListItem extends StatelessWidget {
         if (hasAttendees)
           Text(
             '${meeting.attendeeIds!.length} Teilnehmer',
-            style: TextStyle(color: AppColors.medium, fontSize: 12),
+            // FN-011: Use const for better performance
+            style: const TextStyle(color: AppColors.medium, fontSize: 12),
           ),
         if (hasNotes)
           Text(
             meeting.notes!,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: AppColors.medium),
+            // FN-011: Use const for better performance
+            style: const TextStyle(color: AppColors.medium),
           ),
       ],
     );

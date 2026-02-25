@@ -127,6 +127,8 @@ class AttendanceListPage extends ConsumerWidget {
             if (tenant != null)
               Text(
                 tenant.shortName,
+                // FN-014: Add overflow handling for long tenant names
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppColors.medium,
                 ),
