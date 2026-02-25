@@ -85,7 +85,11 @@ class InstrumentsListPage extends ConsumerWidget {
           final regularInstruments = instruments.where((i) => !i.isSection).toList();
 
           return RefreshIndicator(
-            onRefresh: () async => ref.refresh(instrumentsListProvider),
+            // FN-004: invalidate + await for proper RefreshIndicator behavior
+            onRefresh: () async {
+              ref.invalidate(instrumentsListProvider);
+              await ref.read(instrumentsListProvider.future);
+            },
             child: ListView(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               children: [

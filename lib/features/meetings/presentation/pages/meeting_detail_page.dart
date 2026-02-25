@@ -142,16 +142,14 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   }
 
   Widget _buildContent(String date, List<Person> availableAttendees) {
+    // RT-005: Use safe pattern instead of invalid default object
     final selectedNames = _selectedAttendeeIds
-        .map((id) => availableAttendees.firstWhere(
-              (p) => p.id == id,
-              orElse: () => Person(
-                firstName: 'Unbekannt',
-                lastName: '',
-                tenantId: 0,
-              ),
-            ))
-        .map((p) => '${p.firstName} ${p.lastName}'.trim())
+        .map((id) {
+          final person = availableAttendees.where((p) => p.id == id).firstOrNull;
+          return person != null
+              ? '${person.firstName} ${person.lastName}'.trim()
+              : 'Unbekannt';
+        })
         .join(', ');
 
     if (_isEditMode) {

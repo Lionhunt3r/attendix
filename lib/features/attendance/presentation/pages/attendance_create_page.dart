@@ -754,16 +754,15 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     // Prepare checklist from type
     List<Map<String, dynamic>>? checklist;
     if (type.checklist != null && type.checklist!.isNotEmpty) {
-      final eventDateTime = type.startTime != null
-          ? DateTime(
-              normalizedDate.year,
-              normalizedDate.month,
-              normalizedDate.day,
-              int.parse(type.startTime!.split(':')[0]),
-              int.parse(type.startTime!.split(':')[1]),
-            )
-          : DateTime(normalizedDate.year, normalizedDate.month,
-              normalizedDate.day, 19, 0);
+      // RT-003: Safe time parsing - use existing _parseTime method
+      final parsedTime = type.startTime != null ? _parseTime(type.startTime!) : null;
+      final eventDateTime = DateTime(
+        normalizedDate.year,
+        normalizedDate.month,
+        normalizedDate.day,
+        parsedTime?.hour ?? 19,
+        parsedTime?.minute ?? 0,
+      );
 
       checklist = type.checklist!.map((item) {
         DateTime? dueDate;

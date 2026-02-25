@@ -61,9 +61,12 @@ class _ShiftsListPageState extends ConsumerState<ShiftsListPage> {
                 return ListView.builder(
                   itemCount: shifts.length,
                   itemBuilder: (context, index) {
+                    final shift = shifts[index];
                     return _ShiftPlanTile(
-                      shift: shifts[index],
-                      onTap: () => _openShiftDetail(shifts[index]),
+                      // FN-005: Add key for proper widget identity
+                      key: ValueKey(shift.id),
+                      shift: shift,
+                      onTap: () => _openShiftDetail(shift),
                     );
                   },
                 );
@@ -224,6 +227,7 @@ class _ShiftPlanTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _ShiftPlanTile({
+    super.key,
     required this.shift,
     required this.onTap,
   });

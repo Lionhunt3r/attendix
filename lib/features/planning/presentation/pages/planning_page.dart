@@ -567,15 +567,23 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   Future<void> _savePlan() async {
     if (_selectedAttendanceId == null) return;
 
+    // BL-004: Add tenantId filter for security
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant?.id == null) return;
+
     try {
       final supabase = ref.read(supabaseClientProvider);
-      await supabase.from('attendance').update({
-        'plan': {
-          'time': _formatTime(_startTime),
-          'end': _endTime != null ? _formatTime(_endTime!) : null,
-          'fields': _fields.map((f) => f.toJson()).toList(),
-        },
-      }).eq('id', _selectedAttendanceId!);
+      await supabase
+          .from('attendance')
+          .update({
+            'plan': {
+              'time': _formatTime(_startTime),
+              'end': _endTime != null ? _formatTime(_endTime!) : null,
+              'fields': _fields.map((f) => f.toJson()).toList(),
+            },
+          })
+          .eq('id', _selectedAttendanceId!)
+          .eq('tenantId', tenant!.id!);
     } catch (e) {
       // Silent fail - auto-save
     }

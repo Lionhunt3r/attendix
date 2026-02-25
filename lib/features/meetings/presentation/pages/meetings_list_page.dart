@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/providers/meeting_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -17,6 +18,8 @@ class MeetingsListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final meetingsAsync = ref.watch(meetingsProvider);
+    // BL-003: Add role check for FAB visibility
+    final role = ref.watch(effectiveRoleProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -82,11 +85,14 @@ class MeetingsListPage extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateMeetingDialog(context, ref),
-        icon: const Icon(Icons.add),
-        label: const Text('Neue Sitzung'),
-      ),
+      // BL-003: Only show FAB for users who can edit
+      floatingActionButton: role.canEdit
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateMeetingDialog(context, ref),
+              icon: const Icon(Icons.add),
+              label: const Text('Neue Sitzung'),
+            )
+          : null,
     );
   }
 
