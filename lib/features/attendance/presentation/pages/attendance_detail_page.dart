@@ -17,13 +17,18 @@ import '../../../../data/models/person/person.dart';
 import '../../../../core/providers/tenant_providers.dart';
 
 /// Provider for attendance detail
+/// FN-004: Added tenantId filter for multi-tenant security
 final attendanceDetailProvider = FutureProvider.autoDispose.family<Attendance?, int>((ref, attendanceId) async {
   final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+
+  if (tenant?.id == null) return null;
 
   final response = await supabase
       .from('attendance')
       .select('*')
       .eq('id', attendanceId)
+      .eq('tenantId', tenant!.id!)
       .maybeSingle();
 
   if (response == null) return null;
@@ -32,15 +37,21 @@ final attendanceDetailProvider = FutureProvider.autoDispose.family<Attendance?, 
 });
 
 /// Provider for attendance type of a specific attendance
+/// FN-005: Added tenant_id filter for multi-tenant security
 final attendanceTypeForAttendanceProvider = FutureProvider.autoDispose.family<AttendanceType?, int>((ref, attendanceId) async {
   final attendance = await ref.watch(attendanceDetailProvider(attendanceId).future);
   if (attendance?.typeId == null) return null;
 
   final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+
+  if (tenant?.id == null) return null;
+
   final response = await supabase
       .from('attendance_types')
       .select('*')
       .eq('id', attendance!.typeId!)
+      .eq('tenant_id', tenant!.id!)
       .maybeSingle();
 
   if (response == null) return null;

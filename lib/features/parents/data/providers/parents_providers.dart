@@ -287,7 +287,10 @@ final parentAttendanceGroupsProvider =
   }
 
   // Convert to ParentAttendanceGroup
-  return grouped.entries.map((entry) {
+  // BL-008: Use firstOrNull for safety even though grouped entries should never be empty
+  return grouped.entries
+      .where((entry) => entry.value.isNotEmpty)
+      .map((entry) {
     final childAtts = entry.value;
     final first = childAtts.first;
     return ParentAttendanceGroup(

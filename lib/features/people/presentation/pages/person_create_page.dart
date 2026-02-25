@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/player_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
-import '../../../../data/repositories/player_repository.dart';
 import '../../../instruments/presentation/pages/instruments_list_page.dart';
 import 'people_list_page.dart';
 
@@ -369,7 +369,8 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
     setState(() => _isLoading = true);
 
     try {
-      final repo = ref.read(playerRepositoryProvider);
+      // FN-002: Use WithTenant provider for proper tenantId handling
+      final repo = ref.read(playerRepositoryWithTenantProvider);
 
       final person = Person(
         firstName: _firstNameController.text.trim(),

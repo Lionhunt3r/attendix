@@ -47,6 +47,28 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
     String notes = '',
   }) async {
     try {
+      // SEC-009: Validate that personAttendance belongs to current tenant
+      final validation = await supabase
+          .from('person_attendances')
+          .select('id, attendance:attendance_id(tenantId)')
+          .eq('id', personAttendanceId)
+          .maybeSingle();
+
+      if (validation == null) {
+        throw RepositoryException(
+          message: 'PersonAttendance not found',
+          operation: 'signIn',
+        );
+      }
+
+      final attendanceTenantId = validation['attendance']?['tenantId'];
+      if (attendanceTenantId != currentTenantId) {
+        throw RepositoryException(
+          message: 'Access denied: PersonAttendance belongs to different tenant',
+          operation: 'signIn',
+        );
+      }
+
       AttendanceStatus newStatus;
 
       switch (type) {
@@ -80,6 +102,27 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
     bool isLateComing = false,
   }) async {
     try {
+      // SEC-010: Validate all personAttendances belong to current tenant
+      final validation = await supabase
+          .from('person_attendances')
+          .select('id, attendance:attendance_id(tenantId)')
+          .inFilter('id', personAttendanceIds);
+
+      final validIds = <String>[];
+      for (final record in validation as List) {
+        final attendanceTenantId = record['attendance']?['tenantId'];
+        if (attendanceTenantId == currentTenantId) {
+          validIds.add(record['id'].toString());
+        }
+      }
+
+      if (validIds.isEmpty) {
+        throw RepositoryException(
+          message: 'No valid person attendances found for current tenant',
+          operation: 'signOut',
+        );
+      }
+
       final status =
           isLateComing ? AttendanceStatus.lateExcused : AttendanceStatus.excused;
 
@@ -88,7 +131,7 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
         'notes': reason,
         'changed_at': DateTime.now().toIso8601String(),
         'changed_by': supabase.auth.currentUser?.id,
-      }).inFilter('id', personAttendanceIds);
+      }).inFilter('id', validIds);
     } catch (e, stack) {
       handleError(e, stack, 'signOut');
       rethrow;
@@ -101,6 +144,28 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
     String note,
   ) async {
     try {
+      // SEC-011: Validate that personAttendance belongs to current tenant
+      final validation = await supabase
+          .from('person_attendances')
+          .select('id, attendance:attendance_id(tenantId)')
+          .eq('id', personAttendanceId)
+          .maybeSingle();
+
+      if (validation == null) {
+        throw RepositoryException(
+          message: 'PersonAttendance not found',
+          operation: 'updateAttendanceNote',
+        );
+      }
+
+      final attendanceTenantId = validation['attendance']?['tenantId'];
+      if (attendanceTenantId != currentTenantId) {
+        throw RepositoryException(
+          message: 'Access denied: PersonAttendance belongs to different tenant',
+          operation: 'updateAttendanceNote',
+        );
+      }
+
       await supabase.from('person_attendances').update({
         'notes': note,
         'changed_at': DateTime.now().toIso8601String(),
