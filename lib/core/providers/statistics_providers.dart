@@ -545,7 +545,10 @@ final avgAgePerInstrumentProvider = Provider<List<GroupChartData>>((ref) {
     }
   }
 
-  final result = groupAges.entries.map((e) {
+  // BL-002: Filter empty groups and safely calculate average
+  final result = groupAges.entries
+      .where((e) => e.value.isNotEmpty)
+      .map((e) {
     final avgAge = e.value.reduce((a, b) => a + b) / e.value.length;
     return GroupChartData(
       name: '${e.key} (${e.value.length})',

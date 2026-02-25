@@ -363,7 +363,10 @@ final childStatsProvider = Provider.family<ChildStats, int>((ref, childId) {
       .length;
 
   return ChildStats(
-    percentage: (attended / childAttendances.length * 100).round(),
+    // BL-002: Safe division - avoid division by zero
+    percentage: childAttendances.isEmpty
+        ? 0
+        : (attended / childAttendances.length * 100).round(),
     lateCount: late,
     totalCount: childAttendances.length,
     presentCount: attended,

@@ -33,7 +33,17 @@ class _CopyToTenantSheetState extends ConsumerState<CopyToTenantSheet> {
   @override
   void initState() {
     super.initState();
-    _targetTenantId = widget.availableTenants.first.id!;
+    // BL-001: Safe access to first tenant
+    final firstTenant = widget.availableTenants.firstOrNull;
+    if (firstTenant?.id == null) {
+      // Should not happen as parent validates, but defensive
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
+      _targetTenantId = 0;
+      return;
+    }
+    _targetTenantId = firstTenant!.id!;
   }
 
   @override

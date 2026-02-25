@@ -313,8 +313,14 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
       return;
     }
 
+    // BL-001: Safe access to first child attendance
+    final first = group.childAttendances.firstOrNull;
+    if (first == null) {
+      ToastHelper.showError(context, 'Keine Kinder-Anwesenheit gefunden');
+      return;
+    }
+
     // Convert to CrossTenantPersonAttendance for plan viewer
-    final first = group.childAttendances.first;
     final crossTenant = CrossTenantPersonAttendance(
       id: first.id,
       date: group.date,
