@@ -32,8 +32,47 @@ class OrganisationRepository extends BaseRepository {
   }
 
   /// Link a tenant to an organisation
+  /// SEC-004: Added authorization check - user must be admin of the tenant
   Future<void> linkTenantToOrganisation(int tenantId, int organisationId) async {
     try {
+      // Validate user has admin permission for this tenant
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        throw RepositoryException(
+          message: 'User not authenticated',
+          operation: 'linkTenantToOrganisation',
+        );
+      }
+
+      // Check if user is admin (role=1) or responsible (role=5) for this tenant
+      final userAccess = await supabase
+          .from('tenantUsers')
+          .select('role')
+          .eq('userId', userId)
+          .eq('tenantId', tenantId)
+          .or('role.eq.1,role.eq.5')
+          .maybeSingle();
+
+      if (userAccess == null) {
+        throw RepositoryException(
+          message: 'Access denied: User is not admin of this tenant',
+          operation: 'linkTenantToOrganisation',
+        );
+      }
+
+      // Check for duplicate link
+      final existing = await supabase
+          .from('tenant_group_tenants')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .eq('tenant_group', organisationId)
+          .maybeSingle();
+
+      if (existing != null) {
+        // Already linked - silently return
+        return;
+      }
+
       await supabase.from('tenant_group_tenants').insert({
         'tenant_id': tenantId,
         'tenant_group': organisationId,
@@ -46,8 +85,34 @@ class OrganisationRepository extends BaseRepository {
 
   /// Unlink a tenant from an organisation
   /// If no tenants remain in the organisation, the organisation is deleted
+  /// SEC-004: Added authorization check - user must be admin of the tenant
   Future<void> unlinkTenantFromOrganisation(int tenantId, int organisationId) async {
     try {
+      // Validate user has admin permission for this tenant
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        throw RepositoryException(
+          message: 'User not authenticated',
+          operation: 'unlinkTenantFromOrganisation',
+        );
+      }
+
+      // Check if user is admin (role=1) or responsible (role=5) for this tenant
+      final userAccess = await supabase
+          .from('tenantUsers')
+          .select('role')
+          .eq('userId', userId)
+          .eq('tenantId', tenantId)
+          .or('role.eq.1,role.eq.5')
+          .maybeSingle();
+
+      if (userAccess == null) {
+        throw RepositoryException(
+          message: 'Access denied: User is not admin of this tenant',
+          operation: 'unlinkTenantFromOrganisation',
+        );
+      }
+
       // Remove the link
       await supabase
           .from('tenant_group_tenants')

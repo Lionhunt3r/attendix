@@ -57,6 +57,7 @@ class CrossTenantService {
   }
 
   /// Get person attendances for a specific tenant
+  /// SEC-002: Added tenantId filter - parameter was unused before!
   Future<List<Map<String, dynamic>>> getPersonAttendancesForTenant(
     int personId,
     int tenantId,
@@ -67,7 +68,7 @@ class CrossTenantService {
           .from('person_attendances')
           .select('''
             *,
-            attendance:attendance_id (
+            attendance:attendance_id!inner (
               id,
               date,
               type,
@@ -75,10 +76,12 @@ class CrossTenantService {
               type_id,
               start_time,
               end_time,
-              deadline
+              deadline,
+              tenantId
             )
           ''')
           .eq('person_id', personId)
+          .eq('attendance.tenantId', tenantId)
           .gt('attendance.date', startDate);
 
       return (response as List).cast<Map<String, dynamic>>();

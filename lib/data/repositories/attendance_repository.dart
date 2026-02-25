@@ -186,9 +186,57 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Create person attendance records (batch)
+  /// SEC-001: Added tenant validation for attendance_id and person_id
   Future<void> createPersonAttendances(List<PersonAttendance> records) async {
     try {
-      final data = records.map((r) {
+      if (records.isEmpty) return;
+
+      // Extract unique IDs for validation
+      final attendanceIds = records
+          .map((r) => r.attendanceId)
+          .whereType<int>()
+          .toSet()
+          .toList();
+      final personIds = records
+          .map((r) => r.personId)
+          .whereType<int>()
+          .toSet()
+          .toList();
+
+      if (attendanceIds.isEmpty || personIds.isEmpty) return;
+
+      // Validate all attendance IDs belong to current tenant
+      final validAttendances = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .inFilter('id', attendanceIds);
+
+      final validAttendanceIds = (validAttendances as List)
+          .map((a) => a['id'] as int)
+          .toSet();
+
+      // Validate all person IDs belong to current tenant
+      final validPersons = await supabase
+          .from('player')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .inFilter('id', personIds);
+
+      final validPersonIds = (validPersons as List)
+          .map((p) => p['id'] as int)
+          .toSet();
+
+      // Filter records to only include valid combinations
+      final validRecords = records.where((r) =>
+          r.attendanceId != null &&
+          r.personId != null &&
+          validAttendanceIds.contains(r.attendanceId) &&
+          validPersonIds.contains(r.personId)).toList();
+
+      if (validRecords.isEmpty) return;
+
+      final data = validRecords.map((r) {
         final json = r.toJson();
         // Only include necessary fields
         return {
@@ -199,9 +247,7 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
         };
       }).toList();
 
-      await supabase
-          .from('person_attendances')
-          .insert(data);
+      await supabase.from('person_attendances').insert(data);
     } catch (e, stack) {
       handleError(e, stack, 'createPersonAttendances');
       rethrow;

@@ -90,10 +90,13 @@ final allPersonAttendancesForStatsProvider =
   if (attendanceIds.isEmpty) return [];
 
   try {
+    // SEC-003: Defense-in-Depth - add tenant filter via inner join
     final response = await supabase
         .from('person_attendances')
-        .select('*, person:person_id(id, firstName, lastName, birthday, instrument, left, paused)')
-        .inFilter('attendance_id', attendanceIds);
+        .select(
+            '*, person:person_id(id, firstName, lastName, birthday, instrument, left, paused), attendance:attendance_id!inner(tenantId)')
+        .inFilter('attendance_id', attendanceIds)
+        .eq('attendance.tenantId', tenantId);
 
     return (response as List).map((e) {
       final personData = e['person'] as Map<String, dynamic>?;
