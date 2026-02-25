@@ -14,6 +14,7 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/services/export_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
@@ -2637,10 +2638,8 @@ class _GeneralInfoAccordion extends StatelessWidget {
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: attendanceType!.color != null
-                      ? Color(int.parse('0xFF${attendanceType!.color!.replaceAll('#', '')}'))
-                          .withValues(alpha: 0.2)
-                      : AppColors.primary.withValues(alpha: 0.1),
+                  color: ColorUtils.parseNamedColor(attendanceType!.color)
+                      .withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
