@@ -49,8 +49,9 @@ class AttendanceTypeEditPage extends ConsumerStatefulWidget {
 class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _startTimeController = TextEditingController();
-  final _endTimeController = TextEditingController();
+
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
 
   AttendanceStatus _defaultStatus = AttendanceStatus.present;
   Set<AttendanceStatus> _availableStatuses = {
@@ -84,8 +85,8 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
       setState(() {
         _originalType = type;
         _nameController.text = type.name;
-        _startTimeController.text = type.startTime ?? '19:00';
-        _endTimeController.text = type.endTime ?? '20:30';
+        _startTime = _parseTime(type.startTime ?? '19:00');
+        _endTime = _parseTime(type.endTime ?? '20:30');
 
         // Load available statuses with fallback
         _availableStatuses = type.availableStatuses?.isNotEmpty == true
@@ -119,8 +120,6 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   @override
   void dispose() {
     _nameController.dispose();
-    _startTimeController.dispose();
-    _endTimeController.dispose();
     super.dispose();
   }
 
@@ -217,22 +216,20 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
               child: Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _startTimeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Beginn',
-                        hintText: '19:00',
-                      ),
+                    child: ListTile(
+                      leading: const Icon(Icons.access_time, color: AppColors.primary),
+                      title: Text(_formatTime(_startTime ?? const TimeOfDay(hour: 19, minute: 0))),
+                      subtitle: const Text('Beginn'),
+                      onTap: () => _pickTime(isStart: true),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const Icon(Icons.arrow_forward, color: AppColors.medium),
                   Expanded(
-                    child: TextFormField(
-                      controller: _endTimeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Ende',
-                        hintText: '20:30',
-                      ),
+                    child: ListTile(
+                      leading: const Icon(Icons.access_time_filled, color: AppColors.primary),
+                      title: Text(_formatTime(_endTime ?? const TimeOfDay(hour: 20, minute: 30))),
+                      subtitle: const Text('Ende'),
+                      onTap: () => _pickTime(isStart: false),
                     ),
                   ),
                 ],
@@ -410,6 +407,38 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
     }
   }
 
+  Future<void> _pickTime({required bool isStart}) async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: isStart
+          ? (_startTime ?? const TimeOfDay(hour: 19, minute: 0))
+          : (_endTime ?? const TimeOfDay(hour: 20, minute: 30)),
+    );
+    if (time != null) {
+      setState(() {
+        if (isStart) {
+          _startTime = time;
+        } else {
+          _endTime = time;
+        }
+        _hasChanges = true;
+      });
+    }
+  }
+
+  TimeOfDay? _parseTime(String time) {
+    final parts = time.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _formatTime(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _onBackPressed() async {
     if (_hasChanges) {
       final result = await DialogHelper.showConfirmation(
@@ -441,8 +470,8 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
     try {
       await supabase.from('attendance_types').update({
         'name': _nameController.text.trim(),
-        'start_time': _startTimeController.text.trim(),
-        'end_time': _endTimeController.text.trim(),
+        'start_time': _formatTime(_startTime ?? const TimeOfDay(hour: 19, minute: 0)),
+        'end_time': _formatTime(_endTime ?? const TimeOfDay(hour: 20, minute: 30)),
         'default_status': _defaultStatus.value,
         'available_statuses': _availableStatuses.map((s) => s.value).toList(),
         'manage_songs': _manageSongs,
