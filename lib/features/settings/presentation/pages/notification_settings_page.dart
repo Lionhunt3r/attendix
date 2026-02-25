@@ -65,6 +65,7 @@ class NotificationConfig {
   NotificationConfig copyWith({
     bool? enabled,
     String? telegramChatId,
+    bool clearTelegramChatId = false,
     bool? birthdays,
     bool? signins,
     bool? signouts,
@@ -76,7 +77,7 @@ class NotificationConfig {
   }) {
     return NotificationConfig(
       enabled: enabled ?? this.enabled,
-      telegramChatId: telegramChatId ?? this.telegramChatId,
+      telegramChatId: clearTelegramChatId ? null : (telegramChatId ?? this.telegramChatId),
       birthdays: birthdays ?? this.birthdays,
       signins: signins ?? this.signins,
       signouts: signouts ?? this.signouts,
@@ -454,18 +455,8 @@ class _NotificationSettingsPageState extends ConsumerState<NotificationSettingsP
     if (currentConfig == null) return;
 
     setState(() {
-      _config = NotificationConfig(
-        enabled: currentConfig.enabled,
-        telegramChatId: null,
-        birthdays: currentConfig.birthdays,
-        signins: currentConfig.signins,
-        signouts: currentConfig.signouts,
-        registrations: currentConfig.registrations,
-        criticals: currentConfig.criticals,
-        reminders: currentConfig.reminders,
-        updates: currentConfig.updates,
-        checklist: currentConfig.checklist,
-      );
+      // FN-003: Use copyWith instead of manual reconstruction
+      _config = currentConfig.copyWith(clearTelegramChatId: true);
       _hasChanges = true;
     });
   }
