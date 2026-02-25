@@ -384,7 +384,9 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                   
                   return RefreshIndicator(
                     onRefresh: () async {
-                      ref.refresh(peopleListProvider);
+                      // FN-007: invalidate + await for proper RefreshIndicator behavior
+                      ref.invalidate(peopleListProvider);
+                      await ref.read(peopleListProvider.future);
                     },
                     child: ListView.builder(
                       padding: const EdgeInsets.symmetric(
@@ -465,7 +467,9 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
 
                 return RefreshIndicator(
                   onRefresh: () async {
-                    ref.refresh(peopleListProvider);
+                    // FN-007: invalidate + await for proper RefreshIndicator behavior
+                    ref.invalidate(peopleListProvider);
+                    await ref.read(peopleListProvider.future);
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(

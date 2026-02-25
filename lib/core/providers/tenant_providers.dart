@@ -102,14 +102,16 @@ class CurrentTenantNotifier extends StateNotifier<Tenant?> {
     state = tenant;
 
     final prefs = await SharedPreferences.getInstance();
-    if (tenant?.id != null) {
+    // RT-010: Extract tenant ID once for safety
+    final tenantId = tenant?.id;
+    if (tenantId != null) {
       // Save to SharedPreferences immediately (fast)
-      await prefs.setInt(_tenantIdKey, tenant!.id!);
+      await prefs.setInt(_tenantIdKey, tenantId);
 
       // Update user_metadata asynchronously (fire and forget for cross-device sync)
       ref
           .read(userPreferencesNotifierProvider.notifier)
-          .updateCurrentTenantId(tenant.id!);
+          .updateCurrentTenantId(tenantId);
     } else {
       await prefs.remove(_tenantIdKey);
     }

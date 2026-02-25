@@ -211,12 +211,14 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
         // Guard against setState after dispose
         if (!mounted || _isDisposed) return;
 
-        if (next.value != null) {
+        // RT-009: Use local variable for thread safety
+        final value = next.value;
+        if (value != null) {
           // Only update if we don't have local changes, or this is the first load
           final isFirstLoad = _localStatuses.isEmpty;
           if (isFirstLoad || !_hasChanges) {
             setState(() {
-              for (final pa in next.value!) {
+              for (final pa in value) {
                 if (pa.personId != null) {
                   _localStatuses[pa.personId!] = pa.status;
                   _personAttendanceIds[pa.personId!] = pa.id;

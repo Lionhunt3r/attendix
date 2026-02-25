@@ -40,14 +40,27 @@ final personProvider =
 });
 
 /// Provider for person attendance statistics
+/// FN-010: Added tenantId filter for Multi-Tenant Security
 final personAttendanceStatsProvider =
     FutureProvider.family<Map<String, dynamic>, int>((ref, personId) async {
   final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+
+  // Guard against null tenant - Multi-Tenant Security
+  if (tenant?.id == null) {
+    return {
+      'total': 0,
+      'attended': 0,
+      'percentage': 0,
+      'lateCount': 0,
+    };
+  }
 
   final response = await supabase
       .from('person_attendances')
       .select('attended, date, status')
-      .eq('person_id', personId);
+      .eq('person_id', personId)
+      .eq('tenantId', tenant!.id!);
 
   final attendances = response as List;
   final now = DateTime.now();

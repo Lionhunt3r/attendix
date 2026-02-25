@@ -44,7 +44,9 @@ class ShiftPreviewSheet extends StatelessWidget {
     final today = DateTime.now();
     final startDate = startInstance?.dateTime ?? today;
     final dateFormat = DateFormat('E, d. MMM', 'de_DE');
-    final hasCustomStart = startInstance != null;
+    // RT-011: Extract name once for null-safe access
+    final startInstanceName = startInstance?.name;
+    final hasCustomStart = startInstanceName != null;
 
     return Column(
       children: [
@@ -70,7 +72,7 @@ class ShiftPreviewSheet extends StatelessWidget {
                   children: [
                     Text(
                       hasCustomStart
-                          ? 'Vorschau: ${startInstance!.name}'
+                          ? 'Vorschau: $startInstanceName'
                           : 'Beispiel-Rechnung',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
@@ -111,7 +113,7 @@ class ShiftPreviewSheet extends StatelessWidget {
                   Expanded(
                     child: Text(
                       hasCustomStart
-                          ? 'Startdatum: ${dateFormat.format(startDate)} (${startInstance!.name})\n'
+                          ? 'Startdatum: ${dateFormat.format(startDate)} ($startInstanceName)\n'
                               'Zyklus: ${plan.cycleLengthDays} Tage'
                           : 'Startdatum: Heute (${dateFormat.format(today)})\n'
                               'Zyklus: ${plan.cycleLengthDays} Tage',
@@ -167,7 +169,7 @@ class ShiftPreviewSheet extends StatelessWidget {
                       segment: segment,
                       isToday: isTodayDate,
                       isStartDate: isStartDate && hasCustomStart,
-                      startInstanceName: hasCustomStart ? startInstance!.name : null,
+                      startInstanceName: startInstanceName,
                     );
                   },
                 ),
