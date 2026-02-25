@@ -70,9 +70,16 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
 
       if (!mounted) return;
 
-      // Set tenant and navigate immediately
-      await ref.read(currentTenantProvider.notifier).setTenant(savedTenant);
+      // Set tenant locally WITHOUT triggering auth sync
+      await ref.read(currentTenantProvider.notifier).setTenantLocal(savedTenant);
+
+      // Navigate FIRST
       context.go(role.defaultRoute);
+
+      // Auth sync AFTER navigation
+      ref
+          .read(userPreferencesNotifierProvider.notifier)
+          .updateCurrentTenantId(savedTenant.id!);
     } catch (e) {
       debugPrint('Auto-navigation failed: $e');
       if (mounted) {
@@ -109,10 +116,18 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
     // Check mounted before state change
     if (!mounted) return;
 
-    // Set tenant and navigate immediately after - no async gap between
-    // state change and navigation to avoid rebuild interference
-    await ref.read(currentTenantProvider.notifier).setTenant(tenant);
+    // Set tenant locally WITHOUT triggering auth sync
+    // This avoids auth events that would rebuild widgets and interrupt navigation
+    await ref.read(currentTenantProvider.notifier).setTenantLocal(tenant);
+
+    // Navigate FIRST - before auth sync can cause rebuilds
     context.go(role.defaultRoute);
+
+    // Auth sync AFTER navigation (fire and forget)
+    // This syncs to Supabase user_metadata for cross-device sync
+    ref
+        .read(userPreferencesNotifierProvider.notifier)
+        .updateCurrentTenantId(tenant.id!);
   }
 
   @override

@@ -97,23 +97,32 @@ class CurrentTenantNotifier extends StateNotifier<Tenant?> {
     }
   }
 
-  /// Set the current tenant and persist to both storages
-  Future<void> setTenant(Tenant? tenant) async {
+  /// Set the current tenant locally without triggering auth sync.
+  /// Use this for navigation scenarios where auth events would interrupt navigation.
+  /// After navigation completes, call updateCurrentTenantId separately.
+  Future<void> setTenantLocal(Tenant? tenant) async {
     state = tenant;
 
     final prefs = await SharedPreferences.getInstance();
-    // RT-010: Extract tenant ID once for safety
     final tenantId = tenant?.id;
     if (tenantId != null) {
-      // Save to SharedPreferences immediately (fast)
       await prefs.setInt(_tenantIdKey, tenantId);
+    } else {
+      await prefs.remove(_tenantIdKey);
+    }
+    // NOTE: Does NOT call updateCurrentTenantId to avoid auth events
+  }
 
-      // Update user_metadata asynchronously (fire and forget for cross-device sync)
+  /// Set the current tenant and persist to both storages
+  Future<void> setTenant(Tenant? tenant) async {
+    await setTenantLocal(tenant);
+
+    // Update user_metadata asynchronously (fire and forget for cross-device sync)
+    final tenantId = tenant?.id;
+    if (tenantId != null) {
       ref
           .read(userPreferencesNotifierProvider.notifier)
           .updateCurrentTenantId(tenantId);
-    } else {
-      await prefs.remove(_tenantIdKey);
     }
   }
 
