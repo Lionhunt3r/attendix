@@ -65,13 +65,14 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
         return;
       }
 
-      // Set tenant and navigate
-      await ref.read(currentTenantProvider.notifier).setTenant(savedTenant);
+      // Get role FIRST, before any state changes (same pattern as _selectTenant)
       final role = await _getTenantUserRole(savedTenant.id!);
 
-      if (mounted) {
-        context.go(role.defaultRoute);
-      }
+      if (!mounted) return;
+
+      // Set tenant and navigate immediately
+      await ref.read(currentTenantProvider.notifier).setTenant(savedTenant);
+      context.go(role.defaultRoute);
     } catch (e) {
       debugPrint('Auto-navigation failed: $e');
       if (mounted) {
@@ -100,16 +101,18 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
 
   /// Navigate to the appropriate page based on role
   Future<void> _selectTenant(Tenant tenant) async {
-    // Set the tenant first
-    await ref.read(currentTenantProvider.notifier).setTenant(tenant);
-
-    // Get the user's role for this tenant
+    // Get the user's role FIRST, before any state changes
+    // This prevents a race condition where setTenant() triggers provider
+    // invalidation and widget rebuild while navigation is pending
     final role = await _getTenantUserRole(tenant.id!);
 
-    // Navigate to the appropriate default route for this role
-    if (mounted) {
-      context.go(role.defaultRoute);
-    }
+    // Check mounted before state change
+    if (!mounted) return;
+
+    // Set tenant and navigate immediately after - no async gap between
+    // state change and navigation to avoid rebuild interference
+    await ref.read(currentTenantProvider.notifier).setTenant(tenant);
+    context.go(role.defaultRoute);
   }
 
   @override
