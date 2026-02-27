@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../../../core/constants/app_constants.dart';
@@ -51,16 +52,31 @@ class AttendancePersonTile extends StatelessWidget {
       ),
       endActionPane: ActionPane(
         motion: const ScrollMotion(),
-        extentRatio: 0.5,
+        extentRatio: status != AttendanceStatus.neutral && status != AttendanceStatus.lateExcused
+            ? 0.65 // 4 actions
+            : status != AttendanceStatus.neutral
+                ? 0.5  // 3 actions (no neutral)
+                : status != AttendanceStatus.lateExcused
+                    ? 0.5  // 3 actions (no lateExcused)
+                    : 0.4, // 2 actions (both excluded)
         children: [
           // Neutral status swipe action (if not already neutral)
           if (status != AttendanceStatus.neutral)
             SlidableAction(
-              onPressed: (_) => onStatusChanged(AttendanceStatus.neutral),
+              onPressed: (_) => _onStatusChangedWithHaptic(AttendanceStatus.neutral),
               backgroundColor: AppColors.medium,
               foregroundColor: Colors.white,
               icon: Icons.remove_circle_outline,
               label: 'Neutral',
+            ),
+          // LateExcused status swipe action (if not already lateExcused)
+          if (status != AttendanceStatus.lateExcused)
+            SlidableAction(
+              onPressed: (_) => _onStatusChangedWithHaptic(AttendanceStatus.lateExcused),
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
+              icon: Icons.watch_later,
+              label: 'Versp.(E)',
             ),
           SlidableAction(
             onPressed: (_) => _showNoteDialog(context),
@@ -195,6 +211,16 @@ class AttendancePersonTile extends StatelessWidget {
     );
   }
 
+  /// Trigger haptic feedback and change status
+  void _onStatusChangedWithHaptic(AttendanceStatus newStatus) {
+    try {
+      HapticFeedback.lightImpact();
+    } catch (_) {
+      // PWA-kompatibel: ignoriere Fehler auf nicht-nativen Plattformen
+    }
+    onStatusChanged(newStatus);
+  }
+
   void _showStatusPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -218,7 +244,7 @@ class AttendancePersonTile extends StatelessWidget {
               title: Text(s.label),
               selected: s == status,
               onTap: () {
-                onStatusChanged(s);
+                _onStatusChangedWithHaptic(s);
                 Navigator.pop(context);
               },
             )),

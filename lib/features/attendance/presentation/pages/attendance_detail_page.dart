@@ -20,6 +20,7 @@ import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../data/models/person/person.dart';
 import '../widgets/attendance_detail/attendance_detail_widgets.dart';
+import '../widgets/attendance_status_overview_sheet.dart';
 import '../widgets/songs_selection_sheet.dart';
 
 /// Attendance detail/taking page
@@ -1203,101 +1204,17 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   void _showStatsDialog() {
     final persons = ref.read(allPersonsForAttendanceProvider).valueOrNull ?? [];
     final total = persons.length;
-    final present = _localStatuses.values.where((s) => s == AttendanceStatus.present).length;
-    final excused = _localStatuses.values.where((s) => s.isExcused).length;
-    final absent = _localStatuses.values.where((s) => s == AttendanceStatus.absent).length;
-    final late = _localStatuses.values.where((s) => s == AttendanceStatus.late || s == AttendanceStatus.lateExcused).length;
-    final unknown = total - present - excused - absent - late;
-    final percentage = total > 0 ? (present / total * 100) : 0.0;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Statistik'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildStatRow('Gesamt', total, AppColors.primary),
-            const Divider(),
-            _buildStatRow('Anwesend', present, AppColors.success,
-                percentage: total > 0 ? present / total * 100 : 0),
-            _buildStatRow('Entschuldigt', excused, AppColors.info,
-                percentage: total > 0 ? excused / total * 100 : 0),
-            _buildStatRow('Abwesend', absent, AppColors.danger,
-                percentage: total > 0 ? absent / total * 100 : 0),
-            _buildStatRow('Verspätet', late, AppColors.warning,
-                percentage: total > 0 ? late / total * 100 : 0),
-            _buildStatRow('Offen', unknown, AppColors.medium,
-                percentage: total > 0 ? unknown / total * 100 : 0),
-            const Divider(),
-            Container(
-              padding: const EdgeInsets.all(AppDimensions.paddingM),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.people, color: AppColors.success),
-                  const SizedBox(width: AppDimensions.paddingS),
-                  Text(
-                    'Anwesenheitsrate: ${percentage.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.success,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Schließen'),
-          ),
-        ],
-      ),
-    );
-  }
+    // Build status counts map for the new sheet
+    final statusCounts = <AttendanceStatus, int>{};
+    for (final status in AttendanceStatus.values) {
+      statusCounts[status] = _localStatuses.values.where((s) => s == status).length;
+    }
 
-  Widget _buildStatRow(String label, int value, Color color, {double? percentage}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingXS),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: AppDimensions.paddingS),
-          Expanded(child: Text(label)),
-          Text(
-            '$value',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          if (percentage != null) ...[
-            const SizedBox(width: AppDimensions.paddingS),
-            SizedBox(
-              width: 50,
-              child: Text(
-                '(${percentage.toStringAsFixed(0)}%)',
-                style: TextStyle(color: AppColors.medium, fontSize: 12),
-              ),
-            ),
-          ],
-        ],
-      ),
+    showStatusOverviewSheet(
+      context,
+      statusCounts: statusCounts,
+      total: total,
     );
   }
 

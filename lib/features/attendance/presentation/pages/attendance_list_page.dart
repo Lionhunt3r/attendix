@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/dialog_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../shared/widgets/loading/loading.dart';
 import '../../../../shared/widgets/common/empty_state.dart';
 import '../../../../shared/widgets/display/percentage_badge.dart';
 import '../../../../shared/widgets/animations/animated_list_item.dart';
+import '../widgets/attendance_legend_sheet.dart';
 
 
 /// Provider for attendance list
@@ -107,12 +112,106 @@ final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
   );
 });
 
+/// Provider for average attendance percentage of past attendances
+final averageAttendancePercentProvider = Provider<double?>((ref) {
+  final categorized = ref.watch(categorizedAttendancesProvider);
+  final pastAttendances = categorized.past
+      .where((a) => a.percentage != null && a.percentage! > 0)
+      .toList();
+
+  if (pastAttendances.isEmpty) return null;
+
+  final sum = pastAttendances.fold<double>(
+    0,
+    (acc, a) => acc + (a.percentage ?? 0),
+  );
+  return sum / pastAttendances.length;
+});
+
 /// Attendance list page
-class AttendanceListPage extends ConsumerWidget {
+class AttendanceListPage extends ConsumerStatefulWidget {
   const AttendanceListPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AttendanceListPage> createState() => _AttendanceListPageState();
+}
+
+class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
+  RealtimeChannel? _channel;
+  bool _isDisposed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Setup will be done in didChangeDependencies to access ref
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _setupRealtimeChannel();
+  }
+
+  void _setupRealtimeChannel() {
+    // Avoid setting up multiple times
+    if (_channel != null) return;
+
+    final supabase = ref.read(supabaseClientProvider);
+    final tenant = ref.read(currentTenantProvider);
+
+    // Only setup if we have a tenant
+    if (tenant?.id == null) return;
+
+    _channel = supabase.channel('attendance-list-changes')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'attendance',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'tenantId',
+          value: tenant!.id,
+        ),
+        callback: (payload) {
+          if (_isDisposed) return;
+          // Refresh the attendance list on any change
+          ref.invalidate(attendanceListProvider);
+        },
+      )
+      .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _channel?.unsubscribe();
+    super.dispose();
+  }
+
+  Future<void> _confirmDelete(BuildContext context, Attendance attendance) async {
+    final dateFormatted = _formatDateForDialog(attendance.date);
+    final confirmed = await DialogHelper.showConfirmation(
+      context,
+      title: 'Anwesenheit löschen?',
+      message: 'Möchtest du "${attendance.displayTitle}" am $dateFormatted wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmText: 'Löschen',
+      isDestructive: true,
+    );
+    if (confirmed && context.mounted) {
+      await ref.read(attendanceNotifierProvider.notifier).deleteAttendance(attendance.id!);
+      ref.invalidate(attendanceListProvider);
+    }
+  }
+
+  String _formatDateForDialog(String dateString) {
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return dateString;
+    return '${date.day}.${date.month}.${date.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final tenant = ref.watch(currentTenantProvider);
     final attendanceAsync = ref.watch(attendanceListProvider);
     // Use effectiveRoleProvider to support debug role override
@@ -136,6 +235,11 @@ class AttendanceListPage extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Legende',
+            onPressed: () => showAttendanceLegendSheet(context),
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_today),
             tooltip: 'Kalender',
@@ -183,6 +287,7 @@ class AttendanceListPage extends ConsumerWidget {
 
           // Use memoized categorized attendances (no more date parsing in build)
           final categorized = ref.watch(categorizedAttendancesProvider);
+          final averagePercent = ref.watch(averageAttendancePercentProvider);
 
           return RefreshIndicator(
             onRefresh: () async {
@@ -207,6 +312,9 @@ class AttendanceListPage extends ConsumerWidget {
                           key: ValueKey(categorized.current!.id),
                           attendance: categorized.current!,
                           onTap: () => context.push('/attendance/${categorized.current!.id}'),
+                          onDelete: role.canAddAttendance
+                              ? () => _confirmDelete(context, categorized.current!)
+                              : null,
                           isHighlighted: highlightedTypeIds.contains(categorized.current!.typeId),
                         ),
                       ),
@@ -227,6 +335,9 @@ class AttendanceListPage extends ConsumerWidget {
                           key: ValueKey(entry.value.id),
                           attendance: entry.value,
                           onTap: () => context.push('/attendance/${entry.value.id}'),
+                          onDelete: role.canAddAttendance
+                              ? () => _confirmDelete(context, entry.value)
+                              : null,
                           isHighlighted: highlightedTypeIds.contains(entry.value.typeId),
                         ),
                       ),
@@ -240,6 +351,34 @@ class AttendanceListPage extends ConsumerWidget {
                     count: categorized.past.length,
                     initiallyExpanded: false,
                     isPrimary: false,
+                    trailing: averagePercent != null
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.analytics,
+                                  size: 14,
+                                  color: AppColors.success,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Ø ${averagePercent.toStringAsFixed(0)}%',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : null,
                     children: categorized.past.asMap().entries.map((entry) =>
                       AnimatedListItem(
                         index: entry.key,
@@ -247,6 +386,9 @@ class AttendanceListPage extends ConsumerWidget {
                           key: ValueKey(entry.value.id),
                           attendance: entry.value,
                           onTap: () => context.push('/attendance/${entry.value.id}'),
+                          onDelete: role.canAddAttendance
+                              ? () => _confirmDelete(context, entry.value)
+                              : null,
                           isHighlighted: highlightedTypeIds.contains(entry.value.typeId),
                         ),
                       ),
@@ -277,6 +419,7 @@ class _CollapsibleSection extends StatefulWidget {
     required this.children,
     this.initiallyExpanded = true,
     this.isPrimary = true,
+    this.trailing,
   });
 
   final String title;
@@ -284,6 +427,7 @@ class _CollapsibleSection extends StatefulWidget {
   final List<Widget> children;
   final bool initiallyExpanded;
   final bool isPrimary;
+  final Widget? trailing;
 
   @override
   State<_CollapsibleSection> createState() => _CollapsibleSectionState();
@@ -343,6 +487,10 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                     ),
                   ),
                 ),
+                if (widget.trailing != null) ...[
+                  const Spacer(),
+                  widget.trailing!,
+                ],
               ],
             ),
           ),
@@ -359,16 +507,18 @@ class _AttendanceListItem extends StatelessWidget {
     super.key,
     required this.attendance,
     required this.onTap,
+    this.onDelete,
     this.isHighlighted = false,
   });
 
   final Attendance attendance;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
   final bool isHighlighted;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final card = Card(
       margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
       child: ListTile(
         onTap: onTap,
@@ -450,6 +600,27 @@ class _AttendanceListItem extends StatelessWidget {
           showBackground: true,
         ),
       ),
+    );
+
+    // Wrap in Slidable only if delete is available
+    if (onDelete == null) return card;
+
+    return Slidable(
+      key: ValueKey(attendance.id),
+      endActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        extentRatio: 0.25,
+        children: [
+          SlidableAction(
+            onPressed: (_) => onDelete!(),
+            backgroundColor: AppColors.danger,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Löschen',
+          ),
+        ],
+      ),
+      child: card,
     );
   }
 
