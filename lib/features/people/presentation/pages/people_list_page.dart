@@ -740,10 +740,15 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
     // Cache ScaffoldMessenger before async gap to avoid disposed context issues
     final messenger = ScaffoldMessenger.of(context);
 
-    // Format reason with date if provided
-    final reasonText = until != null
-        ? '$reason (bis ${DateFormat('dd.MM.yyyy').format(DateTime.parse(until))})'
-        : reason;
+    // Format reason with date if provided - RT-005: Safe date parsing
+    String reasonText = reason;
+    if (until != null) {
+      final parsedDate = DateTime.tryParse(until);
+      final dateStr = parsedDate != null
+          ? DateFormat('dd.MM.yyyy').format(parsedDate)
+          : until;
+      reasonText = '$reason (bis $dateStr)';
+    }
 
     try {
       await repository.pausePlayer(person, until, reasonText);
