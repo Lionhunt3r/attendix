@@ -27,12 +27,20 @@ class TenantRegistrationPage extends ConsumerStatefulWidget {
 class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage> {
   final _formKey = GlobalKey<FormState>();
   final _formData = RegistrationFormData();
+  // FN-007: Controller as state variable to prevent memory leak
+  final _birthdayController = TextEditingController();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
   bool get _isLoggedIn => ref.read(supabaseClientProvider).auth.currentUser != null;
+
+  @override
+  void dispose() {
+    _birthdayController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -356,6 +364,10 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
 
   Widget _buildBirthdayField() {
     final dateFormat = DateFormat('dd.MM.yyyy');
+    // FN-007: Use state-managed controller and update text on date change
+    if (_formData.birthDate != null && _birthdayController.text.isEmpty) {
+      _birthdayController.text = dateFormat.format(_formData.birthDate!);
+    }
     return TextFormField(
       decoration: InputDecoration(
         labelText: 'Geburtsdatum',
@@ -366,11 +378,7 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
             : null,
       ),
       readOnly: true,
-      controller: TextEditingController(
-        text: _formData.birthDate != null
-            ? dateFormat.format(_formData.birthDate!)
-            : '',
-      ),
+      controller: _birthdayController,
       onTap: () async {
         final date = await showDatePicker(
           context: context,
@@ -379,7 +387,10 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
           lastDate: DateTime.now(),
         );
         if (date != null) {
-          setState(() => _formData.birthDate = date);
+          setState(() {
+            _formData.birthDate = date;
+            _birthdayController.text = dateFormat.format(date);
+          });
         }
       },
     );
