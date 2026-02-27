@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/song_providers.dart';
@@ -11,7 +12,6 @@ import '../../../../data/models/song/song.dart';
 import '../../../../data/models/song/song_filter.dart';
 import '../widgets/song_filter_sheet.dart';
 import '../widgets/song_categories_sheet.dart';
-import '../widgets/current_songs_sheet.dart';
 import '../widgets/group_files_sheet.dart';
 
 /// Songs list page with filter and sort support
@@ -40,6 +40,26 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
     super.dispose();
   }
 
+  void _handleMenuAction(String value, WidgetRef ref, BuildContext context, bool isConductor) {
+    final notifier = ref.read(songViewOptionsProvider.notifier);
+    switch (value) {
+      case 'filter':
+        showSongFilterSheet(context);
+      case 'choir':
+        notifier.setShowChoirBadge(!ref.read(songViewOptionsProvider).showChoirBadge);
+      case 'solo':
+        notifier.setShowSoloBadge(!ref.read(songViewOptionsProvider).showSoloBadge);
+      case 'missing':
+        notifier.setShowMissingInstruments(!ref.read(songViewOptionsProvider).showMissingInstruments);
+      case 'link':
+        notifier.setShowLink(!ref.read(songViewOptionsProvider).showLink);
+      case 'lastSung':
+        notifier.setShowLastSung(!ref.read(songViewOptionsProvider).showLastSung);
+      case 'categories':
+        if (isConductor) showSongCategoriesSheet(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final songsAsync = ref.watch(songsProvider);
@@ -50,6 +70,7 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
     final categoriesAsync = ref.watch(songCategoriesProvider);
     final currentRole = ref.watch(currentRoleProvider);
     final groupsWithFiles = ref.watch(groupsWithFilesProvider);
+    final currentSongsAsync = ref.watch(currentSongsProvider);
 
     final isConductor = currentRole.isConductor;
 
@@ -61,12 +82,6 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
           onPressed: () => context.go('/settings'),
         ),
         actions: [
-          // Current songs (calendar) button
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () => showCurrentSongsSheet(context),
-            tooltip: 'Aktuelle Werke',
-          ),
           // Group files directory (only show if there are files)
           if (groupsWithFiles.isNotEmpty)
             IconButton(
@@ -74,34 +89,76 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
               onPressed: () => showGroupFilesSheet(context),
               tooltip: 'Gruppenverzeichnis',
             ),
-          // Category management (admin only)
-          if (isConductor)
-            IconButton(
-              icon: const Icon(Icons.category),
-              onPressed: () => showSongCategoriesSheet(context),
-              tooltip: 'Kategorien verwalten',
-            ),
-          // View options popup
+          // Overflow menu for all other options
           PopupMenuButton<String>(
-            icon: const Icon(Icons.visibility),
-            tooltip: 'Ansicht',
-            onSelected: (value) {
-              final notifier = ref.read(songViewOptionsProvider.notifier);
-              switch (value) {
-                case 'choir':
-                  notifier.setShowChoirBadge(!viewOptions.showChoirBadge);
-                case 'solo':
-                  notifier.setShowSoloBadge(!viewOptions.showSoloBadge);
-                case 'missing':
-                  notifier
-                      .setShowMissingInstruments(!viewOptions.showMissingInstruments);
-                case 'link':
-                  notifier.setShowLink(!viewOptions.showLink);
-                case 'lastSung':
-                  notifier.setShowLastSung(!viewOptions.showLastSung);
-              }
-            },
+            icon: Stack(
+              children: [
+                const Icon(Icons.more_vert),
+                if (filter.hasActiveFilters)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            tooltip: 'Menü',
+            onSelected: (value) => _handleMenuAction(value, ref, context, isConductor),
             itemBuilder: (context) => [
+              // Filter & Sort
+              PopupMenuItem(
+                value: 'filter',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.filter_list,
+                      color: filter.hasActiveFilters ? AppColors.primary : null,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Filter & Sortierung'),
+                    if (filter.hasActiveFilters) ...[
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${filter.activeFilterCount}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              // View options header
+              const PopupMenuItem(
+                enabled: false,
+                height: 32,
+                child: Text(
+                  'Ansicht',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.medium,
+                  ),
+                ),
+              ),
               CheckedPopupMenuItem(
                 value: 'choir',
                 checked: viewOptions.showChoirBadge,
@@ -127,40 +184,20 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                 checked: viewOptions.showLastSung,
                 child: const Text('Zuletzt gespielt'),
               ),
-            ],
-          ),
-          // Filter button with indicator
-          Stack(
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.filter_list,
-                  color:
-                      filter.hasActiveFilters ? AppColors.primary : null,
-                ),
-                onPressed: () => showSongFilterSheet(context),
-                tooltip: 'Filter & Sortierung',
-              ),
-              if (filter.hasActiveFilters)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '${filter.activeFilterCount}',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              // Admin section
+              if (isConductor) ...[
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'categories',
+                  child: Row(
+                    children: [
+                      Icon(Icons.category, size: 20),
+                      SizedBox(width: 12),
+                      Text('Kategorien verwalten'),
+                    ],
                   ),
                 ),
+              ],
             ],
           ),
         ],
@@ -347,23 +384,49 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                   );
                 }
 
+                // Get current songs data
+                final currentSongs = currentSongsAsync.valueOrNull ?? [];
+
                 return RefreshIndicator(
                   onRefresh: () async {
                     ref.invalidate(songsProvider);
+                    ref.invalidate(currentSongsProvider);
                   },
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.paddingM,
-                    ),
-                    itemCount: filteredSongs.length,
-                    itemBuilder: (context, index) {
-                      final song = filteredSongs[index];
-                      return _SongListItem(
-                        song: song,
-                        viewOptions: viewOptions,
-                        onTap: () => context.push('/settings/songs/${song.id}'),
-                      );
-                    },
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppDimensions.paddingM),
+                    children: [
+                      // Current songs section (only if there are upcoming events)
+                      if (currentSongs.isNotEmpty)
+                        _CollapsibleSection(
+                          title: 'Aktuelle Werke (14 Tage)',
+                          count: currentSongs.fold<int>(
+                            0, (sum, group) => sum + group.history.length),
+                          initiallyExpanded: true,
+                          isPrimary: true,
+                          children: currentSongs.map((group) =>
+                            _CurrentSongsGroup(
+                              date: group.date,
+                              songs: group.history,
+                              onSongTap: (songId) => context.push('/settings/songs/$songId'),
+                            ),
+                          ).toList(),
+                        ),
+
+                      // All songs section
+                      _CollapsibleSection(
+                        title: 'Alle Lieder',
+                        count: filteredSongs.length,
+                        initiallyExpanded: true,
+                        isPrimary: currentSongs.isEmpty,
+                        children: filteredSongs.map((song) =>
+                          _SongListItem(
+                            song: song,
+                            viewOptions: viewOptions,
+                            onTap: () => context.push('/settings/songs/${song.id}'),
+                          ),
+                        ).toList(),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -543,6 +606,202 @@ class _SongListItem extends StatelessWidget {
                 color: AppColors.medium,
               ),
       ),
+    );
+  }
+}
+
+/// Collapsible section widget (like Ionic accordion)
+class _CollapsibleSection extends StatefulWidget {
+  const _CollapsibleSection({
+    required this.title,
+    required this.count,
+    required this.children,
+    this.initiallyExpanded = true,
+    this.isPrimary = true,
+  });
+
+  final String title;
+  final int count;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+  final bool isPrimary;
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.isPrimary ? AppColors.primary : AppColors.medium;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: AppDimensions.paddingS,
+              horizontal: AppDimensions.paddingXS,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isExpanded ? Icons.expand_more : Icons.chevron_right,
+                  color: color,
+                  size: 20,
+                ),
+                const SizedBox(width: AppDimensions.paddingXS),
+                Text(
+                  widget.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.paddingS),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${widget.count}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_isExpanded) ...widget.children,
+        if (_isExpanded) const SizedBox(height: AppDimensions.paddingM),
+      ],
+    );
+  }
+}
+
+/// Current songs group widget (grouped by date)
+class _CurrentSongsGroup extends StatelessWidget {
+  final String date;
+  final List<SongHistory> songs;
+  final void Function(int songId) onSongTap;
+
+  const _CurrentSongsGroup({
+    required this.date,
+    required this.songs,
+    required this.onSongTap,
+  });
+
+  String _formatDate(String dateStr) {
+    try {
+      final parsed = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final tomorrow = today.add(const Duration(days: 1));
+      final dateOnly = DateTime(parsed.year, parsed.month, parsed.day);
+
+      if (dateOnly == today) {
+        return 'Heute';
+      } else if (dateOnly == tomorrow) {
+        return 'Morgen';
+      } else {
+        return DateFormat('EEEE, d. MMMM', 'de_DE').format(parsed);
+      }
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            vertical: AppDimensions.paddingXS,
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.event, size: 14, color: AppColors.primary),
+              const SizedBox(width: AppDimensions.paddingXS),
+              Text(
+                _formatDate(date),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...songs.map((history) {
+          final song = history.song;
+          if (song == null) return const SizedBox.shrink();
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: AppDimensions.paddingXS),
+            child: ListTile(
+              dense: true,
+              onTap: song.id != null ? () => onSongTap(song.id!) : null,
+              leading: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+                ),
+                child: Center(
+                  child: song.fullNumber.isNotEmpty
+                      ? Text(
+                          song.fullNumber,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                            color: AppColors.primary,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.music_note,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
+                ),
+              ),
+              title: Text(
+                song.name,
+                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              ),
+              subtitle: song.conductor != null
+                  ? Text(
+                      song.conductor!,
+                      style: const TextStyle(fontSize: 12),
+                    )
+                  : null,
+              trailing: const Icon(
+                Icons.chevron_right,
+                color: AppColors.medium,
+                size: 20,
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 }

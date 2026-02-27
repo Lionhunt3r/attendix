@@ -159,7 +159,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
   Future<List<SongHistory>> getSongHistory({int? songId, int? limit}) async {
     try {
       var baseQuery = supabase
-          .from('song_history')
+          .from('history')
           .select('*, song:songs(*)')
           .eq('tenant_id', currentTenantId);
 
@@ -193,7 +193,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
   }) async {
     try {
       final response = await supabase
-          .from('song_history')
+          .from('history')
           .insert({
             'tenant_id': currentTenantId,
             'song_id': songId,
@@ -277,7 +277,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
       final in14Days = now.add(const Duration(days: 14));
 
       final response = await supabase
-          .from('song_history')
+          .from('history')
           .select('*, song:songs(*)')
           .eq('tenant_id', currentTenantId)
           .gte('date', now.toIso8601String().substring(0, 10))

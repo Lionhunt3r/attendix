@@ -65,7 +65,7 @@ final songHistoryProvider = FutureProvider<List<HistoryEntry>>((ref) async {
   if (tenant == null) return [];
 
   final response = await supabase
-      .from('song_history')
+      .from('history')
       .select('*, song:songs(name, number)')
       .eq('tenant_id', tenant.id!)
       .order('date', ascending: false)
@@ -431,7 +431,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       final supabase = ref.read(supabaseClientProvider);
       final tenant = ref.read(currentTenantProvider);
 
-      await supabase.from('song_history').insert({
+      await supabase.from('history').insert({
         'tenant_id': tenant?.id,
         'song_id': songId,
         'person_id': conductorId,
@@ -475,7 +475,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       }
 
       await supabase
-          .from('song_history')
+          .from('history')
           .delete()
           .eq('id', entry.id!)
           .eq('tenant_id', tenant!.id!);

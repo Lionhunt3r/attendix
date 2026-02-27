@@ -957,7 +957,7 @@ class _AttendanceCreatePageState extends ConsumerState<AttendanceCreatePage> {
     }).toList();
 
     if (entries.isNotEmpty) {
-      await supabase.from('song_history').insert(entries);
+      await supabase.from('history').insert(entries);
     }
 
     // Invalidate song history providers
