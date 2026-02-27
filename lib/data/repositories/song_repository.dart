@@ -161,7 +161,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
       var baseQuery = supabase
           .from('history')
           .select('*, song:songs(*)')
-          .eq('tenant_id', currentTenantId);
+          .eq('tenantId', currentTenantId);
 
       if (songId != null) {
         baseQuery = baseQuery.eq('song_id', songId);
@@ -211,7 +211,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
       final response = await supabase
           .from('history')
           .insert({
-            'tenant_id': currentTenantId,
+            'tenantId': currentTenantId,
             'song_id': songId,
             'date': date,
             'conductorName': conductorName,
@@ -295,7 +295,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
       final response = await supabase
           .from('history')
           .select('*, song:songs(*)')
-          .eq('tenant_id', currentTenantId)
+          .eq('tenantId', currentTenantId)
           .gte('date', now.toIso8601String().substring(0, 10))
           .lte('date', in14Days.toIso8601String().substring(0, 10))
           .order('date');
