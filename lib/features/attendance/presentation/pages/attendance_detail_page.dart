@@ -12,6 +12,8 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_detail_providers.dart';
 import '../../../../core/providers/attendance_providers.dart';
+import '../../../../core/providers/conductor_providers.dart';
+import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/export_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -19,6 +21,7 @@ import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../data/models/person/person.dart';
+import '../../../../data/models/song/song.dart';
 import '../widgets/attendance_detail/attendance_detail_widgets.dart';
 import '../widgets/attendance_status_overview_sheet.dart';
 import '../widgets/songs_selection_sheet.dart';
@@ -57,6 +60,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   // Local songs/history entries
   List<SongHistoryEntry> _songEntries = [];
+  bool _isSavingSongs = false;
 
   @override
   void initState() {
@@ -109,27 +113,57 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     }
   }
 
-  /// Load song entries from attendance data
-  void _loadSongEntries() {
+  /// Load song entries from attendance data with resolved names
+  Future<void> _loadSongEntries() async {
     final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
     if (attendance == null) return;
 
-    // Convert from attendance.songs and attendance.conductors to SongHistoryEntry list
     final songIds = attendance.songs ?? [];
     final conductorIds = attendance.conductors ?? [];
 
-    // Create placeholder entries - they'll be populated when songs load
+    if (songIds.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _songEntries = [];
+        });
+      }
+      return;
+    }
+
+    // Load songs and conductors from providers to resolve names
+    final songs = await ref.read(songsProvider.future);
+    final conductors = await ref.read(activeConductorsProvider.future);
+
+    // Create entries with resolved names
     final entries = <SongHistoryEntry>[];
     for (var i = 0; i < songIds.length; i++) {
+      final songId = songIds[i];
+      final conductorId = i < conductorIds.length ? conductorIds[i] : null;
+
+      // Find song name
+      final song = songs.where((s) => s.id == songId).firstOrNull;
+      final songName = song?.displayName ?? 'Unbekanntes Werk';
+
+      // Find conductor name
+      String? conductorName;
+      if (conductorId != null) {
+        final conductor = conductors.where((c) => c.id == conductorId).firstOrNull;
+        conductorName = conductor?.fullName;
+      }
+
       entries.add(SongHistoryEntry(
-        songId: songIds[i],
-        songName: 'Laden...',
-        conductorId: i < conductorIds.length ? conductorIds[i] : null,
+        songId: songId,
+        songName: songName,
+        conductorId: conductorId,
+        conductorName: conductorName,
       ));
     }
-    setState(() {
-      _songEntries = entries;
-    });
+
+    if (mounted) {
+      setState(() {
+        _songEntries = entries;
+      });
+    }
   }
 
   @override
@@ -994,16 +1028,23 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   }
 
   Future<void> _saveSongEntries() async {
+    // Prevent concurrent saves
+    if (_isSavingSongs) return;
+    _isSavingSongs = true;
+
     try {
       final supabase = ref.read(supabaseClientProvider);
       final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
+      final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
+      if (tenant?.id == null || attendance == null) return;
+
       final songIds = _songEntries.map((e) => e.songId).toList();
       final conductorIds = _songEntries
           .map((e) => e.conductorId)
           .where((id) => id != null)
           .toList();
 
+      // 1. Update attendance table with songs/conductors arrays
       await supabase
           .from('attendance')
           .update({
@@ -1013,11 +1054,49 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
           .eq('id', widget.attendanceId)
           .eq('tenantId', tenant!.id!);
 
+      // 2. Sync history table: delete old entries and create new ones
+      await _syncHistoryEntries(attendance.date);
+
+      // 3. Invalidate providers
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
+      ref.invalidate(currentSongsProvider);
+      ref.invalidate(songHistoryProvider(null));
     } catch (e) {
       if (mounted) {
         ToastHelper.showError(context, 'Fehler beim Speichern: $e');
       }
+    } finally {
+      _isSavingSongs = false;
+    }
+  }
+
+  /// Sync history table entries for this attendance
+  Future<void> _syncHistoryEntries(String date) async {
+    final supabase = ref.read(supabaseClientProvider);
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant?.id == null) return;
+
+    // Delete existing history entries for this attendance
+    await supabase
+        .from('history')
+        .delete()
+        .eq('attendance_id', widget.attendanceId)
+        .eq('tenantId', tenant!.id!);
+
+    // Create new history entries if there are songs
+    if (_songEntries.isNotEmpty) {
+      final entries = _songEntries.map((entry) {
+        return {
+          'song_id': entry.songId,
+          'attendance_id': widget.attendanceId,
+          'date': date,
+          'tenantId': tenant.id,
+          'conductorName': entry.conductorName,
+          'otherConductor': entry.otherConductor,
+        };
+      }).toList();
+
+      await supabase.from('history').insert(entries);
     }
   }
 
