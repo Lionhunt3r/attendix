@@ -46,11 +46,15 @@ jobs:
         run: cp .env.example .env
 
       - name: Run tests
-        run: flutter test --coverage
+        run: flutter test
+        # Note: Coverage disabled due to Flutter 3.29.0 segmentation fault bug
+        # when running `flutter test --coverage` on Ubuntu runners.
+        # Re-enable when Flutter fixes this issue.
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          file: coverage/lcov.info
-          fail_ci_if_error: false
-        continue-on-error: true
+      # Coverage temporarily disabled - see above
+      # - name: Upload coverage
+      #   uses: codecov/codecov-action@v4
+      #   with:
+      #     file: coverage/lcov.info
+      #     fail_ci_if_error: false
+      #   continue-on-error: true
