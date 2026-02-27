@@ -40,3 +40,23 @@ const _$SongSortOptionEnumMap = {
   SongSortOption.lastSungAsc: 'lastSungAsc',
   SongSortOption.lastSungDesc: 'lastSungDesc',
 };
+
+_$SongViewOptionsImpl _$$SongViewOptionsImplFromJson(
+  Map<String, dynamic> json,
+) => _$SongViewOptionsImpl(
+  showChoirBadge: json['showChoirBadge'] as bool? ?? true,
+  showSoloBadge: json['showSoloBadge'] as bool? ?? true,
+  showMissingInstruments: json['showMissingInstruments'] as bool? ?? true,
+  showLink: json['showLink'] as bool? ?? true,
+  showLastSung: json['showLastSung'] as bool? ?? true,
+);
+
+Map<String, dynamic> _$$SongViewOptionsImplToJson(
+  _$SongViewOptionsImpl instance,
+) => <String, dynamic>{
+  'showChoirBadge': instance.showChoirBadge,
+  'showSoloBadge': instance.showSoloBadge,
+  'showMissingInstruments': instance.showMissingInstruments,
+  'showLink': instance.showLink,
+  'showLastSung': instance.showLastSung,
+};

@@ -317,3 +317,276 @@ abstract class _SongFilter extends SongFilter {
   _$$SongFilterImplCopyWith<_$SongFilterImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
+
+SongViewOptions _$SongViewOptionsFromJson(Map<String, dynamic> json) {
+  return _SongViewOptions.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SongViewOptions {
+  bool get showChoirBadge => throw _privateConstructorUsedError;
+  bool get showSoloBadge => throw _privateConstructorUsedError;
+  bool get showMissingInstruments => throw _privateConstructorUsedError;
+  bool get showLink => throw _privateConstructorUsedError;
+  bool get showLastSung => throw _privateConstructorUsedError;
+
+  /// Serializes this SongViewOptions to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of SongViewOptions
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SongViewOptionsCopyWith<SongViewOptions> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SongViewOptionsCopyWith<$Res> {
+  factory $SongViewOptionsCopyWith(
+    SongViewOptions value,
+    $Res Function(SongViewOptions) then,
+  ) = _$SongViewOptionsCopyWithImpl<$Res, SongViewOptions>;
+  @useResult
+  $Res call({
+    bool showChoirBadge,
+    bool showSoloBadge,
+    bool showMissingInstruments,
+    bool showLink,
+    bool showLastSung,
+  });
+}
+
+/// @nodoc
+class _$SongViewOptionsCopyWithImpl<$Res, $Val extends SongViewOptions>
+    implements $SongViewOptionsCopyWith<$Res> {
+  _$SongViewOptionsCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of SongViewOptions
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? showChoirBadge = null,
+    Object? showSoloBadge = null,
+    Object? showMissingInstruments = null,
+    Object? showLink = null,
+    Object? showLastSung = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            showChoirBadge:
+                null == showChoirBadge
+                    ? _value.showChoirBadge
+                    : showChoirBadge // ignore: cast_nullable_to_non_nullable
+                        as bool,
+            showSoloBadge:
+                null == showSoloBadge
+                    ? _value.showSoloBadge
+                    : showSoloBadge // ignore: cast_nullable_to_non_nullable
+                        as bool,
+            showMissingInstruments:
+                null == showMissingInstruments
+                    ? _value.showMissingInstruments
+                    : showMissingInstruments // ignore: cast_nullable_to_non_nullable
+                        as bool,
+            showLink:
+                null == showLink
+                    ? _value.showLink
+                    : showLink // ignore: cast_nullable_to_non_nullable
+                        as bool,
+            showLastSung:
+                null == showLastSung
+                    ? _value.showLastSung
+                    : showLastSung // ignore: cast_nullable_to_non_nullable
+                        as bool,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$SongViewOptionsImplCopyWith<$Res>
+    implements $SongViewOptionsCopyWith<$Res> {
+  factory _$$SongViewOptionsImplCopyWith(
+    _$SongViewOptionsImpl value,
+    $Res Function(_$SongViewOptionsImpl) then,
+  ) = __$$SongViewOptionsImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    bool showChoirBadge,
+    bool showSoloBadge,
+    bool showMissingInstruments,
+    bool showLink,
+    bool showLastSung,
+  });
+}
+
+/// @nodoc
+class __$$SongViewOptionsImplCopyWithImpl<$Res>
+    extends _$SongViewOptionsCopyWithImpl<$Res, _$SongViewOptionsImpl>
+    implements _$$SongViewOptionsImplCopyWith<$Res> {
+  __$$SongViewOptionsImplCopyWithImpl(
+    _$SongViewOptionsImpl _value,
+    $Res Function(_$SongViewOptionsImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of SongViewOptions
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? showChoirBadge = null,
+    Object? showSoloBadge = null,
+    Object? showMissingInstruments = null,
+    Object? showLink = null,
+    Object? showLastSung = null,
+  }) {
+    return _then(
+      _$SongViewOptionsImpl(
+        showChoirBadge:
+            null == showChoirBadge
+                ? _value.showChoirBadge
+                : showChoirBadge // ignore: cast_nullable_to_non_nullable
+                    as bool,
+        showSoloBadge:
+            null == showSoloBadge
+                ? _value.showSoloBadge
+                : showSoloBadge // ignore: cast_nullable_to_non_nullable
+                    as bool,
+        showMissingInstruments:
+            null == showMissingInstruments
+                ? _value.showMissingInstruments
+                : showMissingInstruments // ignore: cast_nullable_to_non_nullable
+                    as bool,
+        showLink:
+            null == showLink
+                ? _value.showLink
+                : showLink // ignore: cast_nullable_to_non_nullable
+                    as bool,
+        showLastSung:
+            null == showLastSung
+                ? _value.showLastSung
+                : showLastSung // ignore: cast_nullable_to_non_nullable
+                    as bool,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SongViewOptionsImpl implements _SongViewOptions {
+  const _$SongViewOptionsImpl({
+    this.showChoirBadge = true,
+    this.showSoloBadge = true,
+    this.showMissingInstruments = true,
+    this.showLink = true,
+    this.showLastSung = true,
+  });
+
+  factory _$SongViewOptionsImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SongViewOptionsImplFromJson(json);
+
+  @override
+  @JsonKey()
+  final bool showChoirBadge;
+  @override
+  @JsonKey()
+  final bool showSoloBadge;
+  @override
+  @JsonKey()
+  final bool showMissingInstruments;
+  @override
+  @JsonKey()
+  final bool showLink;
+  @override
+  @JsonKey()
+  final bool showLastSung;
+
+  @override
+  String toString() {
+    return 'SongViewOptions(showChoirBadge: $showChoirBadge, showSoloBadge: $showSoloBadge, showMissingInstruments: $showMissingInstruments, showLink: $showLink, showLastSung: $showLastSung)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SongViewOptionsImpl &&
+            (identical(other.showChoirBadge, showChoirBadge) ||
+                other.showChoirBadge == showChoirBadge) &&
+            (identical(other.showSoloBadge, showSoloBadge) ||
+                other.showSoloBadge == showSoloBadge) &&
+            (identical(other.showMissingInstruments, showMissingInstruments) ||
+                other.showMissingInstruments == showMissingInstruments) &&
+            (identical(other.showLink, showLink) ||
+                other.showLink == showLink) &&
+            (identical(other.showLastSung, showLastSung) ||
+                other.showLastSung == showLastSung));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    showChoirBadge,
+    showSoloBadge,
+    showMissingInstruments,
+    showLink,
+    showLastSung,
+  );
+
+  /// Create a copy of SongViewOptions
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SongViewOptionsImplCopyWith<_$SongViewOptionsImpl> get copyWith =>
+      __$$SongViewOptionsImplCopyWithImpl<_$SongViewOptionsImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SongViewOptionsImplToJson(this);
+  }
+}
+
+abstract class _SongViewOptions implements SongViewOptions {
+  const factory _SongViewOptions({
+    final bool showChoirBadge,
+    final bool showSoloBadge,
+    final bool showMissingInstruments,
+    final bool showLink,
+    final bool showLastSung,
+  }) = _$SongViewOptionsImpl;
+
+  factory _SongViewOptions.fromJson(Map<String, dynamic> json) =
+      _$SongViewOptionsImpl.fromJson;
+
+  @override
+  bool get showChoirBadge;
+  @override
+  bool get showSoloBadge;
+  @override
+  bool get showMissingInstruments;
+  @override
+  bool get showLink;
+  @override
+  bool get showLastSung;
+
+  /// Create a copy of SongViewOptions
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SongViewOptionsImplCopyWith<_$SongViewOptionsImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}

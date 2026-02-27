@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "0.1.10",
+      "date": "27.2.2026",
+      "changes": [
+        "🏷️ Kategorien verwalten: Erstellen, umbenennen, löschen und sortieren",
+        "🔄 Realtime-Updates: Lieder-Liste aktualisiert sich automatisch",
+        "👁️ Ansichts-Optionen: Badges in der Liste ein-/ausblenden",
+        "📅 Aktuelle Werke: Kommende 14 Tage auf einen Blick",
+        "📁 Gruppenverzeichnis: Noten schnell nach Instrument finden"
+      ]
+    },
+    {
       "version": "0.1.9",
       "date": "25.2.2026",
       "changes": [

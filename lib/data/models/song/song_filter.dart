@@ -68,3 +68,18 @@ class SongFilter with _$SongFilter {
     return count;
   }
 }
+
+/// View options for songs list badges/info display
+@freezed
+class SongViewOptions with _$SongViewOptions {
+  const factory SongViewOptions({
+    @Default(true) bool showChoirBadge,
+    @Default(true) bool showSoloBadge,
+    @Default(true) bool showMissingInstruments,
+    @Default(true) bool showLink,
+    @Default(true) bool showLastSung,
+  }) = _SongViewOptions;
+
+  factory SongViewOptions.fromJson(Map<String, dynamic> json) =>
+      _$SongViewOptionsFromJson(json);
+}

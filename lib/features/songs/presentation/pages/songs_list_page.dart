@@ -5,10 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/song_filter_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/song/song.dart';
 import '../../../../data/models/song/song_filter.dart';
 import '../widgets/song_filter_sheet.dart';
+import '../widgets/song_categories_sheet.dart';
+import '../widgets/current_songs_sheet.dart';
+import '../widgets/group_files_sheet.dart';
 
 /// Songs list page with filter and sort support
 class SongsListPage extends ConsumerStatefulWidget {
@@ -41,8 +45,13 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
     final songsAsync = ref.watch(songsProvider);
     final filteredSongs = ref.watch(filteredSongsProvider);
     final filter = ref.watch(songFilterProvider);
+    final viewOptions = ref.watch(songViewOptionsProvider);
     final searchQuery = ref.watch(songSearchQueryProvider);
     final categoriesAsync = ref.watch(songCategoriesProvider);
+    final currentRole = ref.watch(currentRoleProvider);
+    final groupsWithFiles = ref.watch(groupsWithFilesProvider);
+
+    final isConductor = currentRole.isConductor;
 
     return Scaffold(
       appBar: AppBar(
@@ -52,6 +61,74 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
           onPressed: () => context.go('/settings'),
         ),
         actions: [
+          // Current songs (calendar) button
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: () => showCurrentSongsSheet(context),
+            tooltip: 'Aktuelle Werke',
+          ),
+          // Group files directory (only show if there are files)
+          if (groupsWithFiles.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.folder_open),
+              onPressed: () => showGroupFilesSheet(context),
+              tooltip: 'Gruppenverzeichnis',
+            ),
+          // Category management (admin only)
+          if (isConductor)
+            IconButton(
+              icon: const Icon(Icons.category),
+              onPressed: () => showSongCategoriesSheet(context),
+              tooltip: 'Kategorien verwalten',
+            ),
+          // View options popup
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.visibility),
+            tooltip: 'Ansicht',
+            onSelected: (value) {
+              final notifier = ref.read(songViewOptionsProvider.notifier);
+              switch (value) {
+                case 'choir':
+                  notifier.setShowChoirBadge(!viewOptions.showChoirBadge);
+                case 'solo':
+                  notifier.setShowSoloBadge(!viewOptions.showSoloBadge);
+                case 'missing':
+                  notifier
+                      .setShowMissingInstruments(!viewOptions.showMissingInstruments);
+                case 'link':
+                  notifier.setShowLink(!viewOptions.showLink);
+                case 'lastSung':
+                  notifier.setShowLastSung(!viewOptions.showLastSung);
+              }
+            },
+            itemBuilder: (context) => [
+              CheckedPopupMenuItem(
+                value: 'choir',
+                checked: viewOptions.showChoirBadge,
+                child: const Text('Chor-Badge'),
+              ),
+              CheckedPopupMenuItem(
+                value: 'solo',
+                checked: viewOptions.showSoloBadge,
+                child: const Text('Solo-Badge'),
+              ),
+              CheckedPopupMenuItem(
+                value: 'missing',
+                checked: viewOptions.showMissingInstruments,
+                child: const Text('Fehlende Instrumente'),
+              ),
+              CheckedPopupMenuItem(
+                value: 'link',
+                checked: viewOptions.showLink,
+                child: const Text('Link-Icon'),
+              ),
+              CheckedPopupMenuItem(
+                value: 'lastSung',
+                checked: viewOptions.showLastSung,
+                child: const Text('Zuletzt gespielt'),
+              ),
+            ],
+          ),
           // Filter button with indicator
           Stack(
             children: [
@@ -283,6 +360,7 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                       final song = filteredSongs[index];
                       return _SongListItem(
                         song: song,
+                        viewOptions: viewOptions,
                         onTap: () => context.push('/settings/songs/${song.id}'),
                       );
                     },
@@ -359,14 +437,21 @@ class _ActiveFilterChips extends ConsumerWidget {
 class _SongListItem extends StatelessWidget {
   const _SongListItem({
     required this.song,
+    required this.viewOptions,
     required this.onTap,
   });
 
   final Song song;
+  final SongViewOptions viewOptions;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final showChoir = viewOptions.showChoirBadge && song.withChoir;
+    final showSolo = viewOptions.showSoloBadge && song.withSolo;
+    final showLink = viewOptions.showLink && song.link != null && song.link!.isNotEmpty;
+    final showLastSung = viewOptions.showLastSung && song.lastSung != null;
+
     return Card(
       margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
       child: ListTile(
@@ -393,9 +478,20 @@ class _SongListItem extends StatelessWidget {
                   ),
           ),
         ),
-        title: Text(
-          song.name,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                song.name,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+            if (showLink)
+              const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Icon(Icons.link, size: 16, color: AppColors.medium),
+              ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -405,28 +501,29 @@ class _SongListItem extends StatelessWidget {
                 song.conductor!,
                 style: const TextStyle(fontSize: 13),
               ),
-            Row(
-              children: [
-                if (song.withChoir)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: Chip(
-                      label: Text('Chor'),
+            if (showChoir || showSolo)
+              Row(
+                children: [
+                  if (showChoir)
+                    const Padding(
+                      padding: EdgeInsets.only(right: 8),
+                      child: Chip(
+                        label: Text('Chor'),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                  if (showSolo)
+                    const Chip(
+                      label: Text('Solo'),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                     ),
-                  ),
-                if (song.withSolo)
-                  const Chip(
-                    label: Text('Solo'),
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                  ),
-              ],
-            ),
+                ],
+              ),
           ],
         ),
-        trailing: song.lastSung != null
+        trailing: showLastSung
             ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,

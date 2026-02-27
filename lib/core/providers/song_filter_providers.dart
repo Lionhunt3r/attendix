@@ -196,3 +196,79 @@ int _compareDates(String? a, String? b) {
   if (b == null) return -1;
   return a.compareTo(b);
 }
+
+/// Key pattern for persisting view options per tenant
+String _getSongViewOptionsPrefsKey(int tenantId) => 'songViewOpts_$tenantId';
+
+/// Song view options state with persistence
+final songViewOptionsProvider =
+    StateNotifierProvider<SongViewOptionsNotifier, SongViewOptions>((ref) {
+  final tenantId = ref.watch(currentTenantIdProvider);
+  return SongViewOptionsNotifier(tenantId);
+});
+
+/// Notifier for song view options with SharedPreferences persistence
+class SongViewOptionsNotifier extends StateNotifier<SongViewOptions> {
+  SongViewOptionsNotifier(this.tenantId) : super(const SongViewOptions()) {
+    if (tenantId != null) {
+      _loadFromPrefs();
+    }
+  }
+
+  final int? tenantId;
+
+  Future<void> _loadFromPrefs() async {
+    if (tenantId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(_getSongViewOptionsPrefsKey(tenantId!));
+      if (json != null) {
+        state = SongViewOptions.fromJson(
+            jsonDecode(json) as Map<String, dynamic>);
+      }
+    } catch (_) {
+      // If loading fails, use default options
+    }
+  }
+
+  Future<void> _saveToPrefs() async {
+    if (tenantId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+          _getSongViewOptionsPrefsKey(tenantId!), jsonEncode(state.toJson()));
+    } catch (_) {
+      // Ignore save errors
+    }
+  }
+
+  void setShowChoirBadge(bool value) {
+    state = state.copyWith(showChoirBadge: value);
+    _saveToPrefs();
+  }
+
+  void setShowSoloBadge(bool value) {
+    state = state.copyWith(showSoloBadge: value);
+    _saveToPrefs();
+  }
+
+  void setShowMissingInstruments(bool value) {
+    state = state.copyWith(showMissingInstruments: value);
+    _saveToPrefs();
+  }
+
+  void setShowLink(bool value) {
+    state = state.copyWith(showLink: value);
+    _saveToPrefs();
+  }
+
+  void setShowLastSung(bool value) {
+    state = state.copyWith(showLastSung: value);
+    _saveToPrefs();
+  }
+
+  void reset() {
+    state = const SongViewOptions();
+    _saveToPrefs();
+  }
+}

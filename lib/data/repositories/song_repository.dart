@@ -210,4 +210,94 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
       rethrow;
     }
   }
+
+  // ==========================================================================
+  // Song Categories CRUD
+  // ==========================================================================
+
+  /// Create a new song category
+  Future<SongCategory> addSongCategory({
+    required String name,
+    required int index,
+  }) async {
+    try {
+      final response = await supabase
+          .from('song_categories')
+          .insert({
+            'tenant_id': currentTenantId,
+            'name': name,
+            'index': index,
+          })
+          .select()
+          .single();
+
+      return SongCategory.fromJson(response);
+    } catch (e, stack) {
+      handleError(e, stack, 'addSongCategory');
+      rethrow;
+    }
+  }
+
+  /// Update a song category
+  Future<void> updateSongCategory(String id, Map<String, dynamic> updates) async {
+    try {
+      await supabase
+          .from('song_categories')
+          .update(updates)
+          .eq('id', id)
+          .eq('tenant_id', currentTenantId);
+    } catch (e, stack) {
+      handleError(e, stack, 'updateSongCategory');
+      rethrow;
+    }
+  }
+
+  /// Delete a song category
+  Future<void> deleteSongCategory(String id) async {
+    try {
+      await supabase
+          .from('song_categories')
+          .delete()
+          .eq('id', id)
+          .eq('tenant_id', currentTenantId);
+    } catch (e, stack) {
+      handleError(e, stack, 'deleteSongCategory');
+      rethrow;
+    }
+  }
+
+  // ==========================================================================
+  // Current Songs (next 14 days)
+  // ==========================================================================
+
+  /// Get songs for upcoming events (next 14 days)
+  Future<List<({String date, List<SongHistory> history})>> getCurrentSongs() async {
+    try {
+      final now = DateTime.now();
+      final in14Days = now.add(const Duration(days: 14));
+
+      final response = await supabase
+          .from('song_history')
+          .select('*, song:songs(*)')
+          .eq('tenant_id', currentTenantId)
+          .gte('date', now.toIso8601String().substring(0, 10))
+          .lte('date', in14Days.toIso8601String().substring(0, 10))
+          .order('date');
+
+      // Group by date
+      final Map<String, List<SongHistory>> grouped = {};
+      for (final item in response as List) {
+        final history = SongHistory.fromJson(item as Map<String, dynamic>);
+        final date = history.date ?? '';
+        grouped.putIfAbsent(date, () => []).add(history);
+      }
+
+      return grouped.entries
+          .map((e) => (date: e.key, history: e.value))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getCurrentSongs');
+      rethrow;
+    }
+  }
 }

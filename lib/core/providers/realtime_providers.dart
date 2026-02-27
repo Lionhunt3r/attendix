@@ -6,8 +6,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/models/person/person.dart';
+import '../../data/models/song/song.dart';
 import '../../data/repositories/attendance_repository.dart';
 import 'player_providers.dart';
+import 'song_providers.dart';
 import 'tenant_providers.dart';
 import 'group_providers.dart';
 
@@ -124,6 +126,64 @@ final realtimeAttendancesProvider = StreamProvider.autoDispose<List<Attendance>>
         callback: (payload) async {
           try {
             final freshData = await attendanceRepo.getAttendances();
+            if (!controller.isClosed) {
+              controller.add(freshData);
+            }
+          } catch (e) {
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          }
+        },
+      )
+      .subscribe();
+
+  ref.onDispose(() {
+    channel.unsubscribe();
+    controller.close();
+  });
+
+  await for (final data in controller.stream) {
+    yield data;
+  }
+});
+
+/// Provider for realtime song changes subscription
+///
+/// Subscribes to the songs table and invalidates the list
+/// when changes occur
+final realtimeSongsProvider = StreamProvider.autoDispose<List<Song>>((ref) async* {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenantId = ref.watch(currentTenantIdProvider);
+  final songRepo = ref.watch(songRepositoryWithTenantProvider);
+
+  if (tenantId == null) {
+    yield [];
+    return;
+  }
+
+  // Initial data
+  final initialData = await songRepo.getSongs();
+  yield initialData;
+
+  // Create a stream controller
+  final controller = StreamController<List<Song>>();
+
+  // Setup realtime channel
+  final channel = supabase
+      .channel('song_changes_$tenantId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'songs',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'tenantId',
+          value: tenantId,
+        ),
+        callback: (payload) async {
+          try {
+            final freshData = await songRepo.getSongs();
             if (!controller.isClosed) {
               controller.add(freshData);
             }
