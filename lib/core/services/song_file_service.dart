@@ -90,13 +90,21 @@ class SongFileService {
     // Get public URL
     final url = _supabase.storage.from(_bucketName).getPublicUrl(storagePath);
 
-    // Get current song to update files array
+    // RT-009: Use maybeSingle() to handle deleted songs gracefully
     final songResponse = await _supabase
         .from('songs')
         .select('files')
         .eq('id', songId)
         .eq('tenantId', _tenantId)
-        .single();
+        .maybeSingle();
+
+    if (songResponse == null) {
+      // Cleanup: remove uploaded file
+      try {
+        await _supabase.storage.from(_bucketName).remove([storagePath]);
+      } catch (_) {}
+      throw Exception('Song wurde nicht gefunden oder bereits gelöscht');
+    }
 
     // Build new files array
     final existingFiles = (songResponse['files'] as List?) ?? [];
@@ -137,13 +145,18 @@ class SongFileService {
       // File might not exist in storage, continue anyway
     }
 
-    // Get current song files
+    // RT-009: Use maybeSingle() - song may have been deleted
     final songResponse = await _supabase
         .from('songs')
         .select('files')
         .eq('id', songId)
         .eq('tenantId', _tenantId)
-        .single();
+        .maybeSingle();
+
+    // Song doesn't exist - file is effectively deleted
+    if (songResponse == null) {
+      return;
+    }
 
     final existingFiles = (songResponse['files'] as List?) ?? [];
 
@@ -164,13 +177,18 @@ class SongFileService {
       throw Exception('Kein Tenant ausgewählt');
     }
 
-    // Get current song files
+    // RT-009: Use maybeSingle() - song may have been deleted
     final songResponse = await _supabase
         .from('songs')
         .select('files')
         .eq('id', songId)
         .eq('tenantId', _tenantId)
-        .single();
+        .maybeSingle();
+
+    // Song doesn't exist - nothing to do
+    if (songResponse == null) {
+      return;
+    }
 
     final existingFiles = (songResponse['files'] as List?) ?? [];
 
@@ -204,13 +222,17 @@ class SongFileService {
       throw Exception('Kein Tenant ausgewählt');
     }
 
-    // Get current song files
+    // RT-009: Use maybeSingle() - song may have been deleted
     final songResponse = await _supabase
         .from('songs')
         .select('files')
         .eq('id', songId)
         .eq('tenantId', _tenantId)
-        .single();
+        .maybeSingle();
+
+    if (songResponse == null) {
+      throw Exception('Song wurde nicht gefunden oder bereits gelöscht');
+    }
 
     final existingFiles = List<Map<String, dynamic>>.from(
       (songResponse['files'] as List?) ?? [],
@@ -298,13 +320,21 @@ class SongFileService {
     // Get public URL
     final url = _supabase.storage.from(_bucketName).getPublicUrl(storagePath);
 
-    // Get current song to update files array
+    // RT-009: Use maybeSingle() - song may have been deleted
     final songResponse = await _supabase
         .from('songs')
         .select('files')
         .eq('id', songId)
         .eq('tenantId', tenantId)
-        .single();
+        .maybeSingle();
+
+    if (songResponse == null) {
+      // Cleanup: remove uploaded file
+      try {
+        await _supabase.storage.from(_bucketName).remove([storagePath]);
+      } catch (_) {}
+      throw Exception('Song wurde nicht gefunden oder bereits gelöscht');
+    }
 
     // Build new files array
     final existingFiles = (songResponse['files'] as List?) ?? [];

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/supabase_config.dart';
+import '../constants/enums.dart';
+import '../providers/tenant_providers.dart';
 import 'page_transitions.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
@@ -60,6 +62,38 @@ class AuthChangeNotifier extends ChangeNotifier {
   final Ref _ref;
 }
 
+/// SEC-006: Protected routes with their required role checks
+typedef RoleCheck = bool Function(Role role);
+
+const Map<String, RoleCheck> _protectedRoutes = {
+  // Admin-only routes
+  '/settings/users': _isAdmin,
+  '/settings/viewers': _isAdmin,
+  '/settings/parents': _isAdmin,
+
+  // Admin or Responsible
+  '/settings/general': _isAdminOrResponsible,
+  '/settings/types': _isAdminOrResponsible,
+  '/settings/instruments': _isAdminOrResponsible,
+  '/settings/meetings': _isAdminOrResponsible,
+  '/settings/shifts': _isAdminOrResponsible,
+  '/settings/pending': _isAdminOrResponsible,
+  '/settings/left': _isAdminOrResponsible,
+
+  // Conductor routes (Admin, Responsible, Viewer)
+  '/settings/teachers': _isConductor,
+  '/people': _canSeePeopleTab,
+
+  // Attendance management
+  '/attendance': _canSeeAttendanceTab,
+};
+
+bool _isAdmin(Role role) => role.isAdmin;
+bool _isAdminOrResponsible(Role role) => role.isAdmin || role.isResponsible;
+bool _isConductor(Role role) => role.isConductor;
+bool _canSeePeopleTab(Role role) => role.canSeePeopleTab;
+bool _canSeeAttendanceTab(Role role) => role.canSeeAttendanceTab;
+
 /// Provider for the auth change notifier
 final authChangeNotifierProvider = Provider<AuthChangeNotifier>((ref) {
   return AuthChangeNotifier(ref);
@@ -97,6 +131,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       // If logged in and on auth route, redirect to tenant selection
       if (isLoggedIn && isAuthRoute) {
         return '/tenants';
+      }
+
+      // SEC-006: Role-based access control for protected routes
+      if (isLoggedIn && !isAuthRoute && !isTenantRegistration) {
+        final role = ref.read(currentRoleProvider);
+        final location = state.matchedLocation;
+
+        // Check if route (or parent route) is protected
+        for (final entry in _protectedRoutes.entries) {
+          if (location == entry.key || location.startsWith('${entry.key}/')) {
+            final hasAccess = entry.value(role);
+            if (!hasAccess) {
+              // Redirect to appropriate default route based on role
+              if (role.canSeePeopleTab) {
+                return '/people';
+              } else if (role.canSeeAttendanceTab) {
+                return '/attendance';
+              } else {
+                return '/overview';
+              }
+            }
+            break;
+          }
+        }
       }
 
       return null;

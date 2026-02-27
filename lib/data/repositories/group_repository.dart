@@ -92,6 +92,7 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
     bool maingroup = false,
   }) async {
     try {
+      // RT-008: Use maybeSingle() to avoid StateError on empty result
       final response = await supabase
           .from('instruments')
           .insert({
@@ -102,8 +103,14 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
             'maingroup': maingroup,
           })
           .select()
-          .single();
+          .maybeSingle();
 
+      if (response == null) {
+        throw RepositoryException(
+          message: 'Gruppe konnte nicht erstellt werden',
+          operation: 'createGroup',
+        );
+      }
       return Group.fromJson(response);
     } catch (e, stack) {
       handleError(e, stack, 'createGroup');
@@ -121,14 +128,21 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
       updates.remove('categoryData');
       updates.remove('count');
 
+      // RT-008: Use maybeSingle() to avoid StateError
       final response = await supabase
           .from('instruments')
           .update(updates)
           .eq('id', id)
           .eq('tenantId', currentTenantId)
           .select()
-          .single();
+          .maybeSingle();
 
+      if (response == null) {
+        throw RepositoryException(
+          message: 'Gruppe mit ID $id nicht gefunden',
+          operation: 'updateGroup',
+        );
+      }
       return Group.fromJson(response);
     } catch (e, stack) {
       // Handle unique constraint violation (only one maingroup)
@@ -144,9 +158,37 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Get count of players assigned to a group
+  Future<int> getPlayerCountInGroup(int groupId) async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .eq('instrument', groupId)
+          .isFilter('left', null); // Only active players
+
+      return (response as List).length;
+    } catch (e, stack) {
+      handleError(e, stack, 'getPlayerCountInGroup');
+      rethrow;
+    }
+  }
+
   /// Delete a group
+  /// BL-008: Throws if players are still assigned to the group
   Future<void> deleteGroup(int id) async {
     try {
+      // BL-008: Check for assigned players before deletion
+      final playerCount = await getPlayerCountInGroup(id);
+      if (playerCount > 0) {
+        throw RepositoryException(
+          message: 'Gruppe kann nicht gelöscht werden: $playerCount Spieler sind noch zugewiesen',
+          operation: 'deleteGroup',
+          code: 'FK_VIOLATION',
+        );
+      }
+
       await supabase
           .from('instruments')
           .delete()
@@ -184,6 +226,7 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
     int? index,
   }) async {
     try {
+      // RT-008: Use maybeSingle() to avoid StateError
       final response = await supabase
           .from('group_categories')
           .insert({
@@ -192,8 +235,14 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
             'tenant_id': currentTenantId,
           })
           .select()
-          .single();
+          .maybeSingle();
 
+      if (response == null) {
+        throw RepositoryException(
+          message: 'Kategorie konnte nicht erstellt werden',
+          operation: 'createGroupCategory',
+        );
+      }
       return GroupCategory.fromJson(response);
     } catch (e, stack) {
       handleError(e, stack, 'createGroupCategory');
@@ -208,14 +257,21 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
       updates.remove('created_at');
       updates.remove('tenant_id');
 
+      // RT-008: Use maybeSingle() to avoid StateError
       final response = await supabase
           .from('group_categories')
           .update(updates)
           .eq('id', id)
           .eq('tenant_id', currentTenantId)
           .select()
-          .single();
+          .maybeSingle();
 
+      if (response == null) {
+        throw RepositoryException(
+          message: 'Gruppenkategorie mit ID $id nicht gefunden',
+          operation: 'updateGroupCategory',
+        );
+      }
       return GroupCategory.fromJson(response);
     } catch (e, stack) {
       handleError(e, stack, 'updateGroupCategory');

@@ -85,12 +85,28 @@ class MeetingRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Update an existing meeting
+  /// BL-004: Checks for duplicate meetings when date changes
   Future<Meeting> updateMeeting(int id, {
     String? date,
     String? notes,
     List<int>? attendeeIds,
   }) async {
     try {
+      // BL-004: Check for duplicate if date is being changed
+      if (date != null) {
+        final existing = await supabase
+            .from('meetings')
+            .select('id')
+            .eq('tenantId', currentTenantId)
+            .eq('date', date)
+            .neq('id', id) // Exclude current meeting
+            .maybeSingle();
+
+        if (existing != null) {
+          throw Exception('Eine Sitzung an diesem Datum existiert bereits');
+        }
+      }
+
       final updates = <String, dynamic>{};
       if (date != null) updates['date'] = date;
       if (notes != null) updates['notes'] = notes;

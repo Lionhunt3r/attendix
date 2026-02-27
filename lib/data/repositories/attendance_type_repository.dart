@@ -112,9 +112,36 @@ class AttendanceTypeRepository extends BaseRepository with TenantAwareRepository
     }
   }
 
+  /// Check if attendance type is used by any attendances
+  Future<int> getAttendanceCountForType(String typeId) async {
+    try {
+      final response = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('type_id', typeId)
+          .eq('tenantId', currentTenantId);
+
+      return (response as List).length;
+    } catch (e, stack) {
+      handleError(e, stack, 'getAttendanceCountForType');
+      return -1;
+    }
+  }
+
   /// Delete an attendance type
+  /// BL-009: Checks for references before deletion
   Future<bool> deleteType(String id) async {
     try {
+      // BL-009: Check for attendances using this type
+      final usageCount = await getAttendanceCountForType(id);
+      if (usageCount > 0) {
+        throw RepositoryException(
+          message: 'Typ kann nicht gelöscht werden: Wird von $usageCount Anwesenheit(en) verwendet',
+          operation: 'deleteType',
+          code: 'FK_VIOLATION',
+        );
+      }
+
       await supabase
           .from('attendance_types')
           .delete()

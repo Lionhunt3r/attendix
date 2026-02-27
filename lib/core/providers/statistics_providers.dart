@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/supabase_config.dart';
 import '../../core/constants/enums.dart';
+import '../../core/utils/status_utils.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/models/person/person.dart';
 import '../../data/repositories/attendance_repository.dart';
@@ -104,7 +106,7 @@ final allPersonAttendancesForStatsProvider =
         id: e['id']?.toString(),
         attendanceId: e['attendance_id'],
         personId: e['person_id'],
-        status: _parseStatus(e['status']),
+        status: parseAttendanceStatus(e['status']),
         notes: e['notes'],
         firstName: personData?['firstName'],
         lastName: personData?['lastName'],
@@ -114,21 +116,15 @@ final allPersonAttendancesForStatsProvider =
     }).toList();
   } catch (e, stack) {
     debugPrint('Error loading person attendances for stats: $e');
-    debugPrint('$stack');
+    // SEC-008: Only log stack trace in debug mode
+    if (kDebugMode) {
+      debugPrint('$stack');
+    }
     return [];
   }
 });
 
-AttendanceStatus _parseStatus(dynamic status) {
-  if (status == null) return AttendanceStatus.neutral;
-  if (status is AttendanceStatus) return status;
-
-  final statusStr = status.toString().toLowerCase();
-  return AttendanceStatus.values.firstWhere(
-    (s) => s.name.toLowerCase() == statusStr,
-    orElse: () => AttendanceStatus.neutral,
-  );
-}
+// BL-010: Removed local _parseStatus - now using central parseAttendanceStatus from status_utils.dart
 
 /// Provider for active players
 final activePlayersForStatsProvider = FutureProvider<List<Person>>((ref) async {

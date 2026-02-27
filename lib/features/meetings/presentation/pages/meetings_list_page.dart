@@ -59,17 +59,28 @@ class MeetingsListPage extends ConsumerWidget {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: AppDimensions.paddingS),
-                  Text(
-                    'Erstelle die erste Sitzung',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
-                  ),
+                  // FN-012: Show role-appropriate empty state text
+                  if (role.canEdit)
+                    Text(
+                      'Erstelle die erste Sitzung',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
+                    )
+                  else
+                    Text(
+                      'Noch keine Sitzungen vorhanden',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
+                    ),
                 ],
               ),
             );
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(meetingsProvider),
+            // FN-006: await provider.future to show spinner until data loads
+            onRefresh: () async {
+              ref.invalidate(meetingsProvider);
+              await ref.read(meetingsProvider.future);
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               itemCount: meetings.length,
