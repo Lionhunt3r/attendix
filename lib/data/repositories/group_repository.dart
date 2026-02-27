@@ -158,9 +158,37 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Get count of players assigned to a group
+  Future<int> getPlayerCountInGroup(int groupId) async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .eq('instrument', groupId)
+          .isFilter('left', null); // Only active players
+
+      return (response as List).length;
+    } catch (e, stack) {
+      handleError(e, stack, 'getPlayerCountInGroup');
+      rethrow;
+    }
+  }
+
   /// Delete a group
+  /// BL-008: Throws if players are still assigned to the group
   Future<void> deleteGroup(int id) async {
     try {
+      // BL-008: Check for assigned players before deletion
+      final playerCount = await getPlayerCountInGroup(id);
+      if (playerCount > 0) {
+        throw RepositoryException(
+          message: 'Gruppe kann nicht gelöscht werden: $playerCount Spieler sind noch zugewiesen',
+          operation: 'deleteGroup',
+          code: 'FK_VIOLATION',
+        );
+      }
+
       await supabase
           .from('instruments')
           .delete()
