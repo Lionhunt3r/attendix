@@ -283,21 +283,19 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
   }
 
   // ==========================================================================
-  // Current Songs (next 14 days)
+  // Current Songs (all upcoming events)
   // ==========================================================================
 
-  /// Get songs for upcoming events (next 14 days)
+  /// Get songs for all upcoming events (from today onwards)
   Future<List<({String date, List<SongHistory> history})>> getCurrentSongs() async {
     try {
       final now = DateTime.now();
-      final in14Days = now.add(const Duration(days: 14));
 
       final response = await supabase
           .from('history')
           .select('*, song:songs(*)')
           .eq('tenant_id', currentTenantId)
           .gte('date', now.toIso8601String().substring(0, 10))
-          .lte('date', in14Days.toIso8601String().substring(0, 10))
           .order('date');
 
       // Group by date

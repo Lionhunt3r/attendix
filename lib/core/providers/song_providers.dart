@@ -211,7 +211,7 @@ final songCategoryNotifierProvider =
   return SongCategoryNotifier();
 });
 
-/// Provider for current songs (next 14 days from planned events)
+/// Provider for current songs (all upcoming events from today onwards)
 final currentSongsProvider = FutureProvider<
     List<({String date, List<SongHistory> history})>>((ref) async {
   final repo = ref.watch(songRepositoryWithTenantProvider);

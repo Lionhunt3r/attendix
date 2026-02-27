@@ -398,7 +398,7 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                       // Current songs section (only if there are upcoming events)
                       if (currentSongs.isNotEmpty)
                         _CollapsibleSection(
-                          title: 'Aktuelle Werke (14 Tage)',
+                          title: 'Aktuelle Werke',
                           count: currentSongs.fold<int>(
                             0, (sum, group) => sum + group.history.length),
                           initiallyExpanded: true,
