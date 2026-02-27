@@ -1045,12 +1045,16 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
     if (attendance == null) return;
 
-    final currentTime = attendance.startTime != null
-        ? TimeOfDay(
-            hour: int.tryParse(attendance.startTime!.split(':')[0]) ?? 17,
-            minute: int.tryParse(attendance.startTime!.split(':')[1]) ?? 0,
-          )
-        : const TimeOfDay(hour: 17, minute: 0);
+    // RT-011: Safe bounds check for split()
+    TimeOfDay currentTime;
+    if (attendance.startTime != null) {
+      final parts = attendance.startTime!.split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 17 : 17;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      currentTime = TimeOfDay(hour: hour, minute: minute);
+    } else {
+      currentTime = const TimeOfDay(hour: 17, minute: 0);
+    }
 
     final selectedTime = await showTimePicker(
       context: context,
@@ -1084,12 +1088,16 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
     if (attendance == null) return;
 
-    final currentTime = attendance.endTime != null
-        ? TimeOfDay(
-            hour: int.tryParse(attendance.endTime!.split(':')[0]) ?? 20,
-            minute: int.tryParse(attendance.endTime!.split(':')[1]) ?? 0,
-          )
-        : const TimeOfDay(hour: 20, minute: 0);
+    // RT-011: Safe bounds check for split()
+    TimeOfDay currentTime;
+    if (attendance.endTime != null) {
+      final parts = attendance.endTime!.split(':');
+      final hour = parts.isNotEmpty ? int.tryParse(parts[0]) ?? 20 : 20;
+      final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+      currentTime = TimeOfDay(hour: hour, minute: minute);
+    } else {
+      currentTime = const TimeOfDay(hour: 20, minute: 0);
+    }
 
     final selectedTime = await showTimePicker(
       context: context,

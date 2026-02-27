@@ -320,7 +320,11 @@ class _AdminsTab extends ConsumerWidget {
         }
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(tenantUsersProvider),
+          // FN-005: await provider.future to show spinner until data loads
+          onRefresh: () async {
+            ref.invalidate(tenantUsersProvider);
+            await ref.read(tenantUsersProvider.future);
+          },
           child: ListView.builder(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             itemCount: admins.length,
@@ -364,7 +368,11 @@ class _ViewersTab extends ConsumerWidget {
         }
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(tenantUsersProvider),
+          // FN-005: await provider.future to show spinner until data loads
+          onRefresh: () async {
+            ref.invalidate(tenantUsersProvider);
+            await ref.read(tenantUsersProvider.future);
+          },
           child: ListView.builder(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             itemCount: viewers.length,
@@ -408,7 +416,11 @@ class _ParentsTab extends ConsumerWidget {
         }
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(tenantUsersProvider),
+          // FN-005: await provider.future to show spinner until data loads
+          onRefresh: () async {
+            ref.invalidate(tenantUsersProvider);
+            await ref.read(tenantUsersProvider.future);
+          },
           child: ListView.builder(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             itemCount: parents.length,
@@ -455,7 +467,11 @@ class _AllUsersTab extends ConsumerWidget {
         ).toList();
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(tenantUsersProvider),
+          // FN-005: await provider.future to show spinner until data loads
+          onRefresh: () async {
+            ref.invalidate(tenantUsersProvider);
+            await ref.read(tenantUsersProvider.future);
+          },
           child: ListView(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
             children: [

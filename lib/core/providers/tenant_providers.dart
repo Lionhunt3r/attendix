@@ -93,7 +93,10 @@ class CurrentTenantNotifier extends StateNotifier<Tenant?> {
       }
     } catch (e, stack) {
       debugPrint('Failed to load saved tenant: $e');
-      debugPrint('$stack');
+      // SEC-008: Only log stack trace in debug mode
+      if (kDebugMode) {
+        debugPrint('$stack');
+      }
     }
   }
 
