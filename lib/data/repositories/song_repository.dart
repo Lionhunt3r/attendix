@@ -185,6 +185,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Add a song history entry
+  /// BL-014: Validates that songId belongs to current tenant before insert
   Future<SongHistory> addSongHistory({
     required int songId,
     required String date,
@@ -192,6 +193,21 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
     int? attendanceId,
   }) async {
     try {
+      // BL-014: Validate that songId belongs to current tenant
+      final songValidation = await supabase
+          .from('songs')
+          .select('id')
+          .eq('id', songId)
+          .eq('tenantId', currentTenantId)
+          .maybeSingle();
+
+      if (songValidation == null) {
+        throw RepositoryException(
+          message: 'Song nicht gefunden oder Zugriff verweigert',
+          operation: 'addSongHistory',
+        );
+      }
+
       final response = await supabase
           .from('song_history')
           .insert({
