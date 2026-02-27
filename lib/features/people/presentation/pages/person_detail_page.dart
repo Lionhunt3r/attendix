@@ -56,18 +56,21 @@ final personAttendanceStatsProvider =
     };
   }
 
+  // BL-001: person_attendances has no tenantId column
+  // Filter via inner join on attendance table which has tenantId
   final response = await supabase
       .from('person_attendances')
-      .select('attended, date, status')
+      .select('status, attendance:attendance_id!inner(id, date, tenantId)')
       .eq('person_id', personId)
-      .eq('tenantId', tenant!.id!);
+      .eq('attendance.tenantId', tenant!.id!);
 
   final attendances = response as List;
   final now = DateTime.now();
 
   // Filter to only past attendances
   final pastAttendances = attendances.where((a) {
-    final date = DateTime.tryParse(a['date'] ?? '');
+    final attendance = a['attendance'] as Map<String, dynamic>?;
+    final date = DateTime.tryParse(attendance?['date'] ?? '');
     return date != null && date.isBefore(now);
   }).toList();
 
@@ -105,12 +108,12 @@ final personHistoryProvider =
   final today = DateTime.now().toIso8601String().substring(0, 10);
 
   // Get attendance history - use attendance_id join like Ionic does
-  // FN-SEC: Added tenantId filter for Multi-Tenant Security
+  // BL-003/SEC: person_attendances has no tenantId - use inner join (!inner) to filter
   final attendanceResponse = await supabase
       .from('person_attendances')
-      .select('*, attendance:attendance_id(id, date, type, typeInfo, type_id)')
+      .select('*, attendance:attendance_id!inner(id, date, type, typeInfo, type_id, tenantId)')
       .eq('person_id', personId)
-      .eq('tenantId', tenant.id!);
+      .eq('attendance.tenantId', tenant.id!);
 
   // Get attendance types for title lookup
   List<Map<String, dynamic>> attendanceTypes = [];
