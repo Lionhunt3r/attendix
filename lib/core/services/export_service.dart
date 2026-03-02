@@ -337,6 +337,28 @@ class ExportService {
     required String? endTime,
     required List<Map<String, dynamic>> fields,
   }) async {
+    final pdf = _buildPlanPdfDocument(
+      tenantName: tenantName,
+      date: date,
+      startTime: startTime,
+      endTime: endTime,
+      fields: fields,
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: '${tenantName}_Probenprogramm_$date.pdf',
+    );
+  }
+
+  /// Build a plan PDF document (shared logic for export and bytes generation)
+  pw.Document _buildPlanPdfDocument({
+    required String tenantName,
+    required String date,
+    required String startTime,
+    required String? endTime,
+    required List<Map<String, dynamic>> fields,
+  }) {
     final pdf = pw.Document();
 
     // Calculate times for each field
@@ -409,10 +431,7 @@ class ExportService {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: '${tenantName}_Probenprogramm_$date.pdf',
-    );
+    return pdf;
   }
 
   /// Parse time string "HH:MM" to minutes since midnight
@@ -633,5 +652,24 @@ class ExportService {
       onLayout: (format) async => pdf.save(),
       name: '${tenantName}_Probenprogramm_2xA5_$date.pdf',
     );
+  }
+
+  /// Generate plan PDF as bytes (for sending via Telegram etc.)
+  Future<Uint8List> generatePlanPdfBytes({
+    required String tenantName,
+    required String date,
+    required String startTime,
+    required String? endTime,
+    required List<Map<String, dynamic>> fields,
+  }) async {
+    final pdf = _buildPlanPdfDocument(
+      tenantName: tenantName,
+      date: date,
+      startTime: startTime,
+      endTime: endTime,
+      fields: fields,
+    );
+
+    return pdf.save();
   }
 }

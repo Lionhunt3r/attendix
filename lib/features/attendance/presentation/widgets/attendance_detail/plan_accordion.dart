@@ -12,12 +12,14 @@ class PlanAccordion extends StatelessWidget {
     required this.onEdit,
     required this.onExportPdf,
     required this.onSharePlanChanged,
+    this.onSendViaTelegram,
   });
 
   final Attendance attendance;
   final VoidCallback onEdit;
   final VoidCallback onExportPdf;
   final void Function(bool) onSharePlanChanged;
+  final VoidCallback? onSendViaTelegram;
 
   @override
   Widget build(BuildContext context) {
@@ -136,8 +138,10 @@ class PlanAccordion extends StatelessWidget {
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(AppDimensions.paddingS),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            child: Wrap(
+              alignment: WrapAlignment.spaceEvenly,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 TextButton.icon(
                   onPressed: onEdit,
@@ -147,8 +151,14 @@ class PlanAccordion extends StatelessWidget {
                 TextButton.icon(
                   onPressed: onExportPdf,
                   icon: const Icon(Icons.picture_as_pdf, size: 18),
-                  label: const Text('PDF exportieren'),
+                  label: const Text('PDF'),
                 ),
+                if (onSendViaTelegram != null)
+                  TextButton.icon(
+                    onPressed: onSendViaTelegram,
+                    icon: const Icon(Icons.telegram, size: 18),
+                    label: const Text('Telegram'),
+                  ),
               ],
             ),
           ),
