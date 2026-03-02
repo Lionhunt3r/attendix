@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/attendance_detail_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/services/export_service.dart';
@@ -849,6 +850,10 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
           })
           .eq('id', _selectedAttendanceId!)
           .eq('tenantId', tenant!.id!);
+
+      // Invalidate providers so other pages see the updated plan
+      ref.invalidate(attendanceDetailProvider(_selectedAttendanceId!));
+      ref.invalidate(upcomingAttendancesProvider);
     } catch (e) {
       // Silent fail - auto-save
     }
