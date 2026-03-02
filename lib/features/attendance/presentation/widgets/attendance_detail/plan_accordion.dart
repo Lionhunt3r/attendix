@@ -12,6 +12,7 @@ class PlanAccordion extends StatelessWidget {
     required this.onEdit,
     required this.onExportPdf,
     required this.onSharePlanChanged,
+    this.onCreate,
     this.onSendViaTelegram,
   });
 
@@ -19,6 +20,7 @@ class PlanAccordion extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onExportPdf;
   final void Function(bool) onSharePlanChanged;
+  final VoidCallback? onCreate;
   final VoidCallback? onSendViaTelegram;
 
   @override
@@ -91,11 +93,27 @@ class PlanAccordion extends StatelessWidget {
           ),
           const Divider(height: 1),
           if (!hasPlan || fields.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(AppDimensions.paddingM),
-              child: Text(
-                'Kein Ablaufplan vorhanden',
-                style: TextStyle(color: AppColors.medium),
+            Padding(
+              padding: const EdgeInsets.all(AppDimensions.paddingL),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.schedule_outlined,
+                    size: 48,
+                    color: AppColors.medium.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+                  const Text(
+                    'Kein Ablaufplan vorhanden',
+                    style: TextStyle(color: AppColors.medium),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+                  FilledButton.icon(
+                    onPressed: onCreate ?? onEdit,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Ablaufplan erstellen'),
+                  ),
+                ],
               ),
             )
           else
