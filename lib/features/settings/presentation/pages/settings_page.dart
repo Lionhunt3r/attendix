@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/debug_providers.dart';
+import '../../../../core/providers/pwa_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/services/pwa_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/string_utils.dart';
 import '../../../../shared/widgets/sheets/feedback_sheet.dart';
@@ -28,6 +30,8 @@ class SettingsPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppDimensions.paddingM),
         children: [
+          // PWA Install Hint (only shown on mobile web)
+          const _PwaInstallHint(),
           // Tenant info section
           if (tenant != null) ...[
             _SettingsSection(
@@ -501,6 +505,117 @@ class _SettingsIcon extends StatelessWidget {
         icon,
         color: iconColor,
         size: 22,
+      ),
+    );
+  }
+}
+
+/// PWA install hint card for mobile web users
+class _PwaInstallHint extends ConsumerWidget {
+  const _PwaInstallHint();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showHint = ref.watch(showPwaInstallHintProvider);
+    final platform = ref.watch(pwaPlatformProvider);
+
+    return showHint.when(
+      data: (show) {
+        if (!show) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+          child: Card(
+            color: AppColors.info.withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.install_mobile, color: AppColors.info),
+                      const SizedBox(width: AppDimensions.paddingS),
+                      Expanded(
+                        child: Text(
+                          'App installieren',
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () {
+                          ref
+                              .read(pwaHintNotifierProvider.notifier)
+                              .dismissHint();
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppDimensions.paddingS),
+                  Text(
+                    'Für ein besseres Erlebnis kannst du diese App installieren:',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.medium,
+                        ),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+                  if (platform == PwaPlatform.ios) ...[
+                    _buildInstructionStep(context, '1', 'Tippe auf das Teilen-Symbol'),
+                    _buildInstructionStep(context, '2', '"Zum Home-Bildschirm"'),
+                    _buildInstructionStep(context, '3', '"Hinzufügen"'),
+                  ] else if (platform == PwaPlatform.android) ...[
+                    _buildInstructionStep(context, '1', 'Tippe auf das Menü (⋮)'),
+                    _buildInstructionStep(context, '2', '"App installieren" oder "Zum Startbildschirm"'),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildInstructionStep(BuildContext context, String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimensions.paddingXS),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: AppColors.info,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                number,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppDimensions.paddingS),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
       ),
     );
   }
