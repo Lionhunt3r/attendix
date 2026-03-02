@@ -115,7 +115,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       final tenant = ref.read(currentTenantProvider);
       final userId = supabase.auth.currentUser?.id;
 
-      if (userId == null || tenant?.id == null) {
+      final tenantId = tenant?.id;
+      if (userId == null || tenantId == null) {
         throw Exception('Nicht angemeldet');
       }
 
@@ -128,7 +129,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             'phone': _phoneController.text.trim(),
           })
           .eq('userId', userId)
-          .eq('tenantId', tenant!.id!);
+          .eq('tenantId', tenantId);
 
       // Update player if linked
       // RT-006: Extract to local variable for null-safety
@@ -143,7 +144,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               'phone': _phoneController.text.trim(),
             })
             .eq('id', playerId)
-            .eq('tenantId', tenant!.id!);
+            .eq('tenantId', tenantId);
       }
 
       if (mounted) {
