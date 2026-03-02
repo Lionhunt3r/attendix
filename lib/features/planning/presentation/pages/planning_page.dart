@@ -108,6 +108,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     FieldSelection(id: 'default', name: 'Wort', time: '10'),
   ];
   bool _hasChanges = false;
+  bool _initialLoadDone = false;
 
   @override
   void initState() {
@@ -193,13 +194,25 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                 );
               }
 
-              // Auto-select first if none selected
-              if (_selectedAttendanceId == null && attendances.isNotEmpty) {
+              // Load plan on first build
+              if (!_initialLoadDone) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  setState(() {
-                    _selectedAttendanceId = attendances.first.id;
+                  if (!mounted) return;
+                  _initialLoadDone = true;
+
+                  // If attendanceId was passed, find and load that attendance
+                  if (_selectedAttendanceId != null) {
+                    final att = attendances.where((a) => a.id == _selectedAttendanceId).firstOrNull;
+                    if (att != null) {
+                      _loadPlanFromAttendance(att);
+                    }
+                  } else if (attendances.isNotEmpty) {
+                    // Auto-select first if none selected
+                    setState(() {
+                      _selectedAttendanceId = attendances.first.id;
+                    });
                     _loadPlanFromAttendance(attendances.first);
-                  });
+                  }
                 });
               }
 
