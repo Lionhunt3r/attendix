@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -75,15 +76,19 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                   }
 
                   // Initialize target tenant if not set (using addPostFrameCallback to avoid setState during build)
+                  // RT-003: Use firstOrNull to safely handle empty list
                   if (_targetTenantId == null) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted && _targetTenantId == null) {
-                        setState(() {
-                          _targetTenantId = availableTenants.first.id;
-                        });
-                        _loadTargetGroups();
-                      }
-                    });
+                    final firstTenantId = availableTenants.firstOrNull?.id;
+                    if (firstTenantId != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && _targetTenantId == null) {
+                          setState(() {
+                            _targetTenantId = firstTenantId;
+                          });
+                          _loadTargetGroups();
+                        }
+                      });
+                    }
                   }
 
                   return ListView(
@@ -507,7 +512,10 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
         }
       });
     } catch (e) {
-      debugPrint('Error loading target groups: $e');
+      // SEC-003: Only log in debug mode to avoid data exposure
+      if (kDebugMode) {
+        debugPrint('Error loading target groups: $e');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
