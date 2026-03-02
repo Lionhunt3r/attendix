@@ -215,7 +215,7 @@ enum SupabaseTable {
   teachers('teachers'),
   meetings('meetings'),
   attendanceTypes('attendance_types'),
-  shiftPlans('shift_plans'),
+  shiftPlans('shifts'),
   shiftDefinitions('shift_definitions'),
   history('history'),
   organisations('organisations'),

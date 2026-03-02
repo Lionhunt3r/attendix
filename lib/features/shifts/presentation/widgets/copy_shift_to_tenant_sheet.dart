@@ -306,7 +306,7 @@ class _CopyShiftToTenantSheetState
 
       // Insert the shift
       final insertResponse = await supabase
-          .from('shift_plans')
+          .from('shifts')
           .insert(copiedShift)
           .select()
           .single();
