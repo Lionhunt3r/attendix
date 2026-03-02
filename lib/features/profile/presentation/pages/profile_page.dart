@@ -71,8 +71,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       // RT-007: Safe playerId extraction
       final playerId = tenantUser?['playerId'];
       if (playerId != null) {
+        // FN-002: Use correct table name 'player' (not 'players')
         final playerResponse = await supabase
-            .from('players')
+            .from('player')
             .select('*')
             .eq('id', playerId)
             .maybeSingle();
@@ -133,14 +134,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       // RT-006: Extract to local variable for null-safety
       final playerId = _profileData?['playerId'];
       if (playerId != null) {
+        // FN-002: Use correct table name 'player' (not 'players')
         await supabase
-            .from('players')
+            .from('player')
             .update({
               'firstName': _firstNameController.text.trim(),
               'lastName': _lastNameController.text.trim(),
               'phone': _phoneController.text.trim(),
             })
-            .eq('id', playerId);
+            .eq('id', playerId)
+            .eq('tenantId', tenant!.id!);
       }
 
       if (mounted) {
