@@ -1,0 +1,137 @@
+import 'package:flutter/material.dart';
+
+import '../../../../../core/constants/app_constants.dart';
+import '../../../../../core/theme/app_colors.dart';
+import '../../../../../data/models/person/person.dart';
+
+/// Accordion section for problem person management.
+class ProblemfallAccordion extends StatelessWidget {
+  const ProblemfallAccordion({
+    super.key,
+    required this.person,
+    required this.isExpanded,
+    required this.onToggle,
+    required this.problemSolved,
+    required this.onProblemSolvedChanged,
+    required this.problemNotes,
+    required this.onProblemNotesChanged,
+    required this.onResolveProblem,
+  });
+
+  final Person person;
+  final bool isExpanded;
+  final VoidCallback onToggle;
+  final bool problemSolved;
+  final ValueChanged<bool> onProblemSolvedChanged;
+  final String problemNotes;
+  final ValueChanged<String> onProblemNotesChanged;
+  final VoidCallback onResolveProblem;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!person.isCritical) return const SizedBox.shrink();
+
+    return Card(
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.paddingM,
+        vertical: AppDimensions.paddingXS,
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            title: const Text(
+              'Problemfall',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            trailing: Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+            onTap: onToggle,
+          ),
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppDimensions.paddingM,
+                0,
+                AppDimensions.paddingM,
+                AppDimensions.paddingM,
+              ),
+              child: _buildContent(context),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Reason display
+        if (person.criticalReason != null && person.criticalReason!.isNotEmpty) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppDimensions.paddingM),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Grund',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.danger,
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.paddingXS),
+                Text(
+                  person.criticalReason!,
+                  style: const TextStyle(color: AppColors.dark),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppDimensions.paddingM),
+        ],
+
+        // Problem solved toggle
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Mit Person gesprochen'),
+          subtitle: const Text('Bestätigen, dass das Problem besprochen wurde'),
+          value: problemSolved,
+          onChanged: onProblemSolvedChanged,
+          activeColor: AppColors.success,
+        ),
+
+        // Notes and resolve button (only when solved)
+        if (problemSolved) ...[
+          const SizedBox(height: AppDimensions.paddingM),
+          TextField(
+            decoration: const InputDecoration(
+              labelText: 'Anmerkungen (optional)',
+              hintText: 'Was wurde besprochen?',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            onChanged: onProblemNotesChanged,
+          ),
+          const SizedBox(height: AppDimensions.paddingM),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onResolveProblem,
+              icon: const Icon(Icons.check_circle),
+              label: const Text('Problem als gelöst markieren'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.success,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
