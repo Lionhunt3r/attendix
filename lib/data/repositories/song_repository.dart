@@ -119,11 +119,13 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
   /// Search songs by name or number
   Future<List<Song>> searchSongs(String query) async {
     try {
+      // SEC-003: Sanitize search input to prevent SQL wildcard injection
+      final sanitizedQuery = sanitizeSearchQuery(query);
       final response = await supabase
           .from('songs')
           .select('*')
           .eq('tenantId', currentTenantId)
-          .or('name.ilike.%$query%,conductor.ilike.%$query%')
+          .or('name.ilike.%$sanitizedQuery%,conductor.ilike.%$sanitizedQuery%')
           .order('number', nullsFirst: false)
           .order('name')
           .limit(50);

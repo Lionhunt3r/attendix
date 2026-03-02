@@ -25,6 +25,7 @@ class VoiceLeaderPage extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(voiceGroupMembersProvider);
           ref.invalidate(voiceGroupNameProvider);
+          await ref.read(voiceGroupMembersProvider.future);
         },
         child: membersAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),

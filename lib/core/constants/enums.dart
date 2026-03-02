@@ -161,6 +161,13 @@ enum AttendanceStatus {
   bool get isLate => this == AttendanceStatus.late || this == AttendanceStatus.lateExcused;
   bool get isNeutral => this == AttendanceStatus.neutral;
 
+  /// Returns true if this status counts as "attended" for percentage calculations.
+  /// BL-003: Centralized definition - present, late, and lateExcused count as attended.
+  bool get countsAsPresent =>
+      this == AttendanceStatus.present ||
+      this == AttendanceStatus.late ||
+      this == AttendanceStatus.lateExcused;
+
   /// UI color for this status
   Color get color => switch (this) {
     AttendanceStatus.present => AppColors.success,

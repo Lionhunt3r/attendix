@@ -99,6 +99,7 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
                 onRefresh: () async {
                   ref.invalidate(parentChildrenProvider);
                   ref.invalidate(childrenAttendancesProvider);
+                  await ref.read(childrenAttendancesProvider.future);
                 },
                 child: CustomScrollView(
                   slivers: [

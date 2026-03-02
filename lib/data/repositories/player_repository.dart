@@ -619,13 +619,15 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
   /// Search players by name
   Future<List<Person>> searchPlayers(String query) async {
     try {
+      // SEC-003: Sanitize search input to prevent SQL wildcard injection
+      final sanitizedQuery = sanitizeSearchQuery(query);
       final response = await supabase
           .from('player')
           .select('*')
           .eq('tenantId', currentTenantId)
           .isFilter('pending', false)
           .isFilter('left', null)
-          .or('firstName.ilike.%$query%,lastName.ilike.%$query%')
+          .or('firstName.ilike.%$sanitizedQuery%,lastName.ilike.%$sanitizedQuery%')
           .order('lastName')
           .limit(20);
 

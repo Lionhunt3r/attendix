@@ -129,6 +129,7 @@ class TeachersListPage extends ConsumerWidget {
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(teachersProvider);
+              await ref.read(teachersProvider.future);
             },
             child: ListView.builder(
               itemCount: teachers.length,

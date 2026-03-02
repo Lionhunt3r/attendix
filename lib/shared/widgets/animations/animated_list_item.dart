@@ -138,8 +138,9 @@ class TapScale extends StatefulWidget {
 
 class _TapScaleState extends State<TapScale>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
+  // RT-008: Use nullable instead of late to prevent LateInitializationError
+  AnimationController? _controller;
+  Animation<double>? _scaleAnimation;
 
   @override
   void initState() {
@@ -152,38 +153,43 @@ class _TapScaleState extends State<TapScale>
       begin: 1.0,
       end: widget.scale,
     ).animate(CurvedAnimation(
-      parent: _controller,
+      parent: _controller!,
       curve: Curves.easeInOut,
     ));
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   void _onTapDown(TapDownDetails details) {
-    _controller.forward();
+    _controller?.forward();
   }
 
   void _onTapUp(TapUpDetails details) {
-    _controller.reverse();
+    _controller?.reverse();
   }
 
   void _onTapCancel() {
-    _controller.reverse();
+    _controller?.reverse();
   }
 
   @override
   Widget build(BuildContext context) {
+    // RT-008: Guard against uninitialized animation
+    if (_scaleAnimation == null) {
+      return widget.child;
+    }
+
     return GestureDetector(
       onTapDown: widget.onTap != null ? _onTapDown : null,
       onTapUp: widget.onTap != null ? _onTapUp : null,
       onTapCancel: widget.onTap != null ? _onTapCancel : null,
       onTap: widget.onTap,
       child: ScaleTransition(
-        scale: _scaleAnimation,
+        scale: _scaleAnimation!,
         child: widget.child,
       ),
     );
@@ -210,8 +216,9 @@ class FadeIn extends StatefulWidget {
 }
 
 class _FadeInState extends State<FadeIn> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  // RT-008: Use nullable instead of late to prevent LateInitializationError
+  AnimationController? _controller;
+  Animation<double>? _animation;
 
   @override
   void initState() {
@@ -221,24 +228,29 @@ class _FadeInState extends State<FadeIn> with SingleTickerProviderStateMixin {
       vsync: this,
     );
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: widget.curve),
+      CurvedAnimation(parent: _controller!, curve: widget.curve),
     );
 
     Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
+      if (mounted) _controller?.forward();
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // RT-008: Guard against uninitialized animation
+    if (_animation == null) {
+      return Opacity(opacity: 0, child: widget.child);
+    }
+
     return FadeTransition(
-      opacity: _animation,
+      opacity: _animation!,
       child: widget.child,
     );
   }
@@ -266,9 +278,10 @@ class SlideUp extends StatefulWidget {
 }
 
 class _SlideUpState extends State<SlideUp> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _slideAnimation;
-  late Animation<double> _fadeAnimation;
+  // RT-008: Use nullable instead of late to prevent LateInitializationError
+  AnimationController? _controller;
+  Animation<Offset>? _slideAnimation;
+  Animation<double>? _fadeAnimation;
 
   @override
   void initState() {
@@ -280,28 +293,33 @@ class _SlideUpState extends State<SlideUp> with SingleTickerProviderStateMixin {
     _slideAnimation = Tween<Offset>(
       begin: Offset(0, widget.offset),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: widget.curve));
+    ).animate(CurvedAnimation(parent: _controller!, curve: widget.curve));
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: widget.curve),
+      CurvedAnimation(parent: _controller!, curve: widget.curve),
     );
 
     Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
+      if (mounted) _controller?.forward();
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // RT-008: Guard against uninitialized animations
+    if (_slideAnimation == null || _fadeAnimation == null) {
+      return Opacity(opacity: 0, child: widget.child);
+    }
+
     return FadeTransition(
-      opacity: _fadeAnimation,
+      opacity: _fadeAnimation!,
       child: SlideTransition(
-        position: _slideAnimation,
+        position: _slideAnimation!,
         child: widget.child,
       ),
     );

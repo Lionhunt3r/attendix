@@ -215,7 +215,9 @@ class _RegisterPlanSheetState extends ConsumerState<RegisterPlanSheet> {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: displayPlayers.map((person) {
+                      children: displayPlayers
+                          .where((person) => person.id != null) // BL-001: Filter out invalid persons
+                          .map((person) {
                         final isSelected = _selectedConductorIds.contains(person.id);
                         return FilterChip(
                           label: Text(person.fullName),

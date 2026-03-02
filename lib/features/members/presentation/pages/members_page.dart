@@ -54,6 +54,7 @@ class MembersPage extends ConsumerWidget {
             child: RefreshIndicator(
               onRefresh: () async {
                 ref.invalidate(membersGroupedProvider);
+                await ref.read(membersGroupedProvider.future);
               },
               child: groupsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),

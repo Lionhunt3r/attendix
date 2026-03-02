@@ -7,6 +7,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/debug_providers.dart';
@@ -45,10 +46,10 @@ final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
       final personAttendances = e['person_attendances'] as List?;
       if (personAttendances != null && personAttendances.isNotEmpty) {
         final total = personAttendances.length;
-        // Present = status 1, Late = status 4, LateExcused = status 5
+        // BL-003: Use centralized countsAsPresent definition
         final present = personAttendances.where((pa) {
-          final status = pa['status'];
-          return status == 1 || status == 4 || status == 5;
+          final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
+          return status.countsAsPresent;
         }).length;
         final calculatedPercentage = (present / total * 100).roundToDouble();
         return attendance.copyWith(percentage: calculatedPercentage);

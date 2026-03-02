@@ -263,7 +263,9 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                   Wrap(
                     spacing: AppDimensions.paddingS,
                     runSpacing: AppDimensions.paddingS,
-                    children: availableAttendees.map((person) {
+                    children: availableAttendees
+                        .where((person) => person.id != null) // BL-001: Filter out invalid persons
+                        .map((person) {
                       final isSelected = _selectedAttendeeIds.contains(person.id);
                       return FilterChip(
                         label: Text('${person.firstName} ${person.lastName}'),
