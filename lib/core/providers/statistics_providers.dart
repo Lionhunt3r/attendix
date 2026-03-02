@@ -303,7 +303,7 @@ final groupChartDataProvider = Provider<List<GroupChartData>>((ref) {
   final playerGroupMap = <int, String>{};
   for (final player in players) {
     if (player.id != null) {
-      playerGroupMap[player.id!] = player.groupName ?? 'Unbekannt';
+      playerGroupMap[player.id!] = player.groupName ?? 'Ohne Gruppe';
     }
   }
 
@@ -313,7 +313,7 @@ final groupChartDataProvider = Provider<List<GroupChartData>>((ref) {
   for (final pa in personAttendances) {
     if (pa.personId == null) continue;
 
-    final groupName = playerGroupMap[pa.personId] ?? 'Unbekannt';
+    final groupName = playerGroupMap[pa.personId] ?? 'Ohne Gruppe';
     final current = groupStats[groupName] ?? (present: 0, total: 0);
 
     final isPresent = pa.status == AttendanceStatus.present ||
@@ -535,7 +535,7 @@ final avgAgePerInstrumentProvider = Provider<List<GroupChartData>>((ref) {
                 ? 1
                 : 0);
 
-        final groupName = player.groupName ?? 'Unbekannt';
+        final groupName = player.groupName ?? 'Ohne Gruppe';
         groupAges.putIfAbsent(groupName, () => []).add(age);
       }
     }

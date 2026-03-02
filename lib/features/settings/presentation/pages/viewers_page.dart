@@ -76,7 +76,11 @@ class ViewersPage extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(viewersProvider),
+            // FN-011: await provider.future to show spinner until data loads
+            onRefresh: () async {
+              ref.invalidate(viewersProvider);
+              await ref.read(viewersProvider.future);
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               itemCount: viewers.length,

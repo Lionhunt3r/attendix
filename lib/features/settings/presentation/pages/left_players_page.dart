@@ -72,7 +72,11 @@ class LeftPlayersPage extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(leftPlayersProvider),
+            // FN-010: await provider.future to show spinner until data loads
+            onRefresh: () async {
+              ref.invalidate(leftPlayersProvider);
+              await ref.read(leftPlayersProvider.future);
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               itemCount: players.length,

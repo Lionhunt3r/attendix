@@ -100,15 +100,19 @@ final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
   upcoming.sort((a, b) => a.date.compareTo(b.date));
   past.sort((a, b) => b.date.compareTo(a.date));
 
-  // Extract current (first upcoming)
+  // BL-013: Extract current without mutating the upcoming list
   Attendance? current;
+  List<Attendance> remainingUpcoming;
   if (upcoming.isNotEmpty) {
-    current = upcoming.removeAt(0);
+    current = upcoming.first;
+    remainingUpcoming = upcoming.sublist(1);
+  } else {
+    remainingUpcoming = [];
   }
 
   return CategorizedAttendances(
     current: current,
-    upcoming: upcoming,
+    upcoming: remainingUpcoming,
     past: past,
   );
 });
@@ -116,8 +120,9 @@ final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
 /// Provider for average attendance percentage of past attendances
 final averageAttendancePercentProvider = Provider<double?>((ref) {
   final categorized = ref.watch(categorizedAttendancesProvider);
+  // BL-005: Include 0% attendances in average calculation (changed > 0 to != null)
   final pastAttendances = categorized.past
-      .where((a) => a.percentage != null && a.percentage! > 0)
+      .where((a) => a.percentage != null)
       .toList();
 
   if (pastAttendances.isEmpty) return null;

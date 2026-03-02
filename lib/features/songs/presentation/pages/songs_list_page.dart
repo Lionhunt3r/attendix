@@ -79,7 +79,8 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
         title: const Text('Lieder'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/settings'),
+          // FN-014: Use pop() instead of go() for consistent navigation
+          onPressed: () => context.pop(),
         ),
         actions: [
           // Group files directory (only show if there are files)
@@ -388,9 +389,14 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                 final currentSongs = currentSongsAsync.valueOrNull ?? [];
 
                 return RefreshIndicator(
+                  // FN-013: await provider.future to show spinner until data loads
                   onRefresh: () async {
                     ref.invalidate(songsProvider);
                     ref.invalidate(currentSongsProvider);
+                    await Future.wait([
+                      ref.read(songsProvider.future),
+                      ref.read(currentSongsProvider.future),
+                    ]);
                   },
                   child: ListView(
                     padding: const EdgeInsets.all(AppDimensions.paddingM),

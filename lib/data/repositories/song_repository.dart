@@ -270,14 +270,44 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
-  /// Delete a song category
+  /// Delete a song category and reorder remaining indices
+  /// BL-006: Ensures indices are consecutive after deletion
   Future<void> deleteSongCategory(String id) async {
     try {
+      // BL-006: Get the index of the category to be deleted
+      final toDelete = await supabase
+          .from('song_categories')
+          .select('index')
+          .eq('id', id)
+          .eq('tenant_id', currentTenantId)
+          .maybeSingle();
+
+      if (toDelete == null) return;
+
+      final deletedIndex = toDelete['index'] as int;
+
+      // Delete the category
       await supabase
           .from('song_categories')
           .delete()
           .eq('id', id)
           .eq('tenant_id', currentTenantId);
+
+      // BL-006: Decrement all indices > deletedIndex to fill the gap
+      final remaining = await supabase
+          .from('song_categories')
+          .select('id, index')
+          .eq('tenant_id', currentTenantId)
+          .gt('index', deletedIndex)
+          .order('index');
+
+      for (final cat in remaining) {
+        await supabase
+            .from('song_categories')
+            .update({'index': (cat['index'] as int) - 1})
+            .eq('id', cat['id'])
+            .eq('tenant_id', currentTenantId);
+      }
     } catch (e, stack) {
       handleError(e, stack, 'deleteSongCategory');
       rethrow;

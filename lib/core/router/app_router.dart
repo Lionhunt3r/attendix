@@ -63,6 +63,7 @@ class AuthChangeNotifier extends ChangeNotifier {
 }
 
 /// SEC-006: Protected routes with their required role checks
+/// SEC-017: Extended with missing analytics and export routes
 typedef RoleCheck = bool Function(Role role);
 
 const Map<String, RoleCheck> _protectedRoutes = {
@@ -83,6 +84,11 @@ const Map<String, RoleCheck> _protectedRoutes = {
   // Conductor routes (Admin, Responsible, Viewer)
   '/settings/teachers': _isConductor,
   '/people': _canSeePeopleTab,
+  // SEC-017: Analytics and export routes require conductor role
+  '/statistics': _isConductor,
+  '/planning': _isConductor,
+  '/history': _isConductor,
+  '/export': _isConductor,
 
   // Attendance management
   '/attendance': _canSeeAttendanceTab,
@@ -134,7 +140,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       // SEC-006: Role-based access control for protected routes
+      // SEC-008: Skip role check while role is still loading
       if (isLoggedIn && !isAuthRoute && !isTenantRegistration) {
+        final isRoleLoading = ref.read(isRoleLoadingProvider);
+
+        // SEC-008: If role is still loading and trying to access protected route,
+        // redirect to tenant selection to ensure role is loaded first
+        if (isRoleLoading) {
+          final location = state.matchedLocation;
+          for (final routePath in _protectedRoutes.keys) {
+            if (location == routePath || location.startsWith('$routePath/')) {
+              return '/tenants';
+            }
+          }
+        }
+
         final role = ref.read(currentRoleProvider);
         final location = state.matchedLocation;
 
