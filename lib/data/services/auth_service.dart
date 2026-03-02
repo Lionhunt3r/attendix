@@ -124,7 +124,8 @@ class AuthService {
           .maybeSingle();
 
       if (response == null) return null;
-      return Role.fromValue(response['role'] as int);
+      // RT-004: Safe type cast with fallback to Role.none (99)
+      return Role.fromValue(response['role'] as int? ?? 99);
     } catch (e) {
       return null;
     }
