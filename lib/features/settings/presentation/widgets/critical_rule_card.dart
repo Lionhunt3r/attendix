@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../data/models/tenant/tenant.dart';
+
+/// Card widget for displaying a critical rule
+class CriticalRuleCard extends StatelessWidget {
+  const CriticalRuleCard({
+    super.key,
+    required this.rule,
+    required this.onDelete,
+    required this.onEdit,
+  });
+
+  final CriticalRule rule;
+  final VoidCallback onDelete;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
+      child: ListTile(
+        leading: Icon(
+          Icons.warning_amber_rounded,
+          color: AppColors.warning,
+        ),
+        title: Text(
+          rule.name ?? _buildRuleDescription(),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (rule.name != null)
+              Text(
+                _buildRuleDescription(),
+                style: const TextStyle(fontSize: 12),
+              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                _buildOperatorChip(),
+                const SizedBox(width: 8),
+                if (!rule.enabled)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.medium.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Deaktiviert',
+                      style: TextStyle(fontSize: 10),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: onEdit,
+            ),
+            IconButton(
+              icon: Icon(Icons.delete, size: 20, color: AppColors.danger),
+              onPressed: onDelete,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOperatorChip() {
+    final isAnd = rule.operator == CriticalRuleOperator.and;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isAnd ? AppColors.info.withValues(alpha: 0.2) : AppColors.warning.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        isAnd ? 'UND' : 'ODER',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: isAnd ? AppColors.info : AppColors.warning,
+        ),
+      ),
+    );
+  }
+
+  String _buildRuleDescription() {
+    final threshold = rule.thresholdType == CriticalRuleThresholdType.count
+        ? '${rule.thresholdValue}x'
+        : '${rule.thresholdValue}%';
+
+    final statuses = rule.statuses
+        .map((s) => AttendanceStatus.fromValue(s).label)
+        .join(' / ');
+
+    final period = _getPeriodDescription();
+
+    return '$threshold $statuses $period';
+  }
+
+  String _getPeriodDescription() {
+    switch (rule.periodType) {
+      case CriticalRulePeriodType.days:
+        return 'in ${rule.periodDays ?? 30} Tagen';
+      case CriticalRulePeriodType.season:
+        return 'seit Saisonstart';
+      case CriticalRulePeriodType.allTime:
+      case null:
+        return 'insgesamt';
+    }
+  }
+}

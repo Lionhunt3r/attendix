@@ -7,12 +7,15 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/providers/organisation_providers.dart';
 import '../../../../data/models/tenant/tenant.dart';
 import '../../../../data/models/organisation/organisation.dart';
+import '../widgets/critical_rule_card.dart';
+import '../widgets/critical_rule_sheet.dart';
 
 /// German holiday regions
 const _holidayRegions = [
@@ -72,6 +75,9 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   // Extra fields
   List<ExtraField> _extraFields = [];
 
+  // Critical rules
+  List<CriticalRule> _criticalRules = [];
+
   bool _isLoading = true;
   bool _isSaving = false;
   bool _hasChanges = false;
@@ -116,6 +122,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       _registerId = tenant.registerId;
       _autoApproveRegistrations = tenant.autoApproveRegistrations;
       _extraFields = List.from(tenant.additionalFields ?? []);
+      _criticalRules = List.from(tenant.criticalRules ?? []);
 
     } catch (e) {
       if (mounted) {
@@ -168,6 +175,18 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
           'type': f.type,
           'defaultValue': f.defaultValue,
           if (f.options != null) 'options': f.options,
+        }).toList(),
+        'critical_rules': _criticalRules.map((r) => {
+          'id': r.id,
+          if (r.name != null) 'name': r.name,
+          'attendance_type_ids': r.attendanceTypeIds,
+          'statuses': r.statuses,
+          'threshold_type': r.thresholdType.name,
+          'threshold_value': r.thresholdValue,
+          if (r.periodType != null) 'period_type': r.periodType!.name == 'allTime' ? 'all' : r.periodType!.name,
+          if (r.periodDays != null) 'period_days': r.periodDays,
+          'operator': r.operator == CriticalRuleOperator.and ? 'AND' : 'OR',
+          'enabled': r.enabled,
         }).toList(),
       }).eq('id', tenantId);
 
@@ -534,6 +553,37 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                     onPressed: _showAddExtraFieldDialog,
                     icon: const Icon(Icons.add),
                     label: const Text('Feld hinzufügen'),
+                  ),
+
+                  const SizedBox(height: AppDimensions.paddingXL),
+
+                  // Critical rules section
+                  _buildSectionHeader('Problemfall-Regeln'),
+                  Text(
+                    'Definiere Regeln, wann Personen als Problemfall markiert werden.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.medium,
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+
+                  // List of critical rules
+                  if (_criticalRules.isNotEmpty) ...[
+                    ...List.generate(_criticalRules.length, (index) {
+                      final rule = _criticalRules[index];
+                      return CriticalRuleCard(
+                        rule: rule,
+                        onEdit: () => _showEditCriticalRuleSheet(index),
+                        onDelete: () => _confirmDeleteCriticalRule(index),
+                      );
+                    }),
+                  ],
+
+                  // Add rule button
+                  OutlinedButton.icon(
+                    onPressed: _showAddCriticalRuleSheet,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Regel hinzufügen'),
                   ),
 
                   const SizedBox(height: AppDimensions.paddingXL),
@@ -1245,6 +1295,90 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       });
       if (mounted) {
         ToastHelper.showSuccess(context, 'Feld gelöscht');
+      }
+    }
+  }
+
+  // Critical rule methods
+  Future<void> _showAddCriticalRuleSheet() async {
+    final attendanceTypesAsync = ref.read(attendanceTypesProvider);
+    final attendanceTypes = attendanceTypesAsync.valueOrNull ?? [];
+
+    if (attendanceTypes.isEmpty) {
+      ToastHelper.showError(context, 'Keine Terminarten vorhanden');
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => CriticalRuleSheet(
+        attendanceTypes: attendanceTypes,
+        onSave: (rule) {
+          setState(() {
+            _criticalRules.add(rule);
+            _markChanged();
+          });
+          ToastHelper.showSuccess(context, 'Regel hinzugefügt');
+        },
+      ),
+    );
+  }
+
+  Future<void> _showEditCriticalRuleSheet(int index) async {
+    final rule = _criticalRules[index];
+    final attendanceTypesAsync = ref.read(attendanceTypesProvider);
+    final attendanceTypes = attendanceTypesAsync.valueOrNull ?? [];
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => CriticalRuleSheet(
+        rule: rule,
+        attendanceTypes: attendanceTypes,
+        onSave: (updatedRule) {
+          setState(() {
+            _criticalRules[index] = updatedRule;
+            _markChanged();
+          });
+          ToastHelper.showSuccess(context, 'Regel aktualisiert');
+        },
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteCriticalRule(int index) async {
+    final rule = _criticalRules[index];
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Regel löschen?'),
+        content: Text(
+          'Möchtest du die Regel "${rule.name ?? 'Unbenannte Regel'}" wirklich löschen?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Abbrechen'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _criticalRules.removeAt(index);
+        _markChanged();
+      });
+      if (mounted) {
+        ToastHelper.showSuccess(context, 'Regel gelöscht');
       }
     }
   }

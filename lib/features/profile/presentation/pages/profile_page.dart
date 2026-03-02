@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -166,7 +167,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     );
 
     if (result == true && mounted) {
-      ToastHelper.showSuccess(context, 'Passwort-Reset E-Mail gesendet');
+      ToastHelper.showSuccess(context, 'Passwort erfolgreich geändert');
     }
   }
 
@@ -341,7 +342,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   ListTile(
                     leading: const Icon(Icons.lock_outline),
                     title: const Text('Passwort ändern'),
-                    subtitle: const Text('Sende einen Reset-Link an deine E-Mail'),
+                    subtitle: const Text('Neues Passwort festlegen'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: _changePassword,
                   ),
@@ -432,38 +433,126 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 }
 
 /// Dialog for changing password
-class _ChangePasswordDialog extends ConsumerWidget {
+class _ChangePasswordDialog extends ConsumerStatefulWidget {
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ChangePasswordDialog> createState() =>
+      _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _changePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      await supabase.auth.updateUser(
+        UserAttributes(password: _passwordController.text),
+      );
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Passwort ändern'),
-      content: const Text(
-        'Wir senden dir einen Link zum Zurücksetzen deines Passworts an deine registrierte E-Mail-Adresse.',
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: 'Neues Passwort',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Bitte Passwort eingeben';
+                }
+                if (value.length < 6) {
+                  return 'Mindestens 6 Zeichen';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _confirmController,
+              obscureText: _obscureConfirm,
+              decoration: InputDecoration(
+                labelText: 'Passwort bestätigen',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirm ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Bitte Passwort bestätigen';
+                }
+                if (value != _passwordController.text) {
+                  return 'Passwörter stimmen nicht überein';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
           child: const Text('Abbrechen'),
         ),
         ElevatedButton(
-          onPressed: () async {
-            try {
-              final supabase = ref.read(supabaseClientProvider);
-              final email = supabase.auth.currentUser?.email;
-              if (email != null) {
-                await supabase.auth.resetPasswordForEmail(email);
-                if (context.mounted) {
-                  Navigator.of(context).pop(true);
-                }
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ToastHelper.showError(context, 'Fehler: $e');
-                Navigator.of(context).pop(false);
-              }
-            }
-          },
-          child: const Text('Link senden'),
+          onPressed: _isLoading ? null : _changePassword,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Speichern'),
         ),
       ],
     );
