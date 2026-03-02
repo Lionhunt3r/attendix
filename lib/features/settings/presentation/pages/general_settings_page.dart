@@ -1302,13 +1302,17 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
 
   // Critical rule methods
   Future<void> _showAddCriticalRuleSheet() async {
-    final attendanceTypesAsync = ref.read(attendanceTypesProvider);
-    final attendanceTypes = attendanceTypesAsync.valueOrNull ?? [];
+    // Ensure attendance types are loaded
+    final attendanceTypes = await ref.read(attendanceTypesProvider.future);
 
     if (attendanceTypes.isEmpty) {
-      ToastHelper.showError(context, 'Keine Terminarten vorhanden');
+      if (mounted) {
+        ToastHelper.showError(context, 'Keine Terminarten vorhanden');
+      }
       return;
     }
+
+    if (!mounted) return;
 
     await showModalBottomSheet(
       context: context,
@@ -1328,8 +1332,10 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
 
   Future<void> _showEditCriticalRuleSheet(int index) async {
     final rule = _criticalRules[index];
-    final attendanceTypesAsync = ref.read(attendanceTypesProvider);
-    final attendanceTypes = attendanceTypesAsync.valueOrNull ?? [];
+    // Ensure attendance types are loaded
+    final attendanceTypes = await ref.read(attendanceTypesProvider.future);
+
+    if (!mounted) return;
 
     await showModalBottomSheet(
       context: context,
