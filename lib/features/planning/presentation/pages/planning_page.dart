@@ -130,9 +130,11 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     final songsAsync = ref.watch(planSongsProvider);
 
     return PopScope(
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
+        if (!didPop) {
           _invalidateProvidersOnExit();
+          Navigator.of(context).pop(_hasChanges);
         }
       },
       child: Scaffold(

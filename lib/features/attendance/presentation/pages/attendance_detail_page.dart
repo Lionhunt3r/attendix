@@ -59,6 +59,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   List<ChecklistItem> _localChecklist = [];
   bool _checklistLoaded = false;
 
+  // Plan accordion state - expand after returning from planning with changes
+  bool _planAccordionExpanded = false;
+
   // Local songs/history entries
   List<SongHistoryEntry> _songEntries = [];
   bool _isSavingSongs = false;
@@ -504,11 +507,18 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
                         PlanAccordion(
                           attendance: attendance,
-                          onCreate: () {
-                            context.push('/planning?attendanceId=${widget.attendanceId}');
+                          initiallyExpanded: _planAccordionExpanded,
+                          onCreate: () async {
+                            final hasChanges = await context.push<bool>('/planning?attendanceId=${widget.attendanceId}');
+                            if (hasChanges == true && mounted) {
+                              setState(() => _planAccordionExpanded = true);
+                            }
                           },
-                          onEdit: () {
-                            context.push('/planning?attendanceId=${widget.attendanceId}');
+                          onEdit: () async {
+                            final hasChanges = await context.push<bool>('/planning?attendanceId=${widget.attendanceId}');
+                            if (hasChanges == true && mounted) {
+                              setState(() => _planAccordionExpanded = true);
+                            }
                           },
                           onExportPdf: _exportPlanPdf,
                           onSendViaTelegram: _sendPlanViaTelegram,
