@@ -4,17 +4,19 @@ Scope: People Detail Page (`lib/features/people/`)
 
 ## Zusammenfassung
 
+**ALLE 17 BUGS GEFIXT!**
+
 | Kategorie | KRITISCH | HOCH | MITTEL | NIEDRIG | Gesamt |
 |-----------|----------|------|--------|---------|--------|
-| Security | 0 | 0 | ~~2~~ 0 | ~~2~~ 0 | ~~4~~ 0 |
-| Business-Logik | 0 | ~~2~~ 0 | ~~2~~ 1 | 0 | ~~4~~ 1 |
-| Funktional | 0 | 0 | ~~4~~ 2 | ~~2~~ 2 | ~~6~~ 4 |
-| Runtime | 0 | ~~2~~ 0 | ~~1~~ 0 | 0 | ~~3~~ 0 |
-| **Gesamt** | **0** | **0** | **3** | **2** | **5** |
+| Security | 0 | 0 | 0 | 0 | 0 |
+| Business-Logik | 0 | 0 | 0 | 0 | 0 |
+| Funktional | 0 | 0 | 0 | 0 | 0 |
+| Runtime | 0 | 0 | 0 | 0 | 0 |
+| **Gesamt** | **0** | **0** | **0** | **0** | **0** |
 
-## Status: 12 von 17 Bugs gefixt!
+## Gefixte Bugs (2026-03-02)
 
-**Gefixte Bugs (2026-03-02):**
+### Commit 1 (28ef5fa):
 - [x] SEC-001: Rollen-Prüfungen hinzugefügt
 - [x] RT-001: Force Unwraps abgesichert
 - [x] RT-002: imageUrl null-safe gemacht
@@ -26,12 +28,12 @@ Scope: People Detail Page (`lib/features/people/`)
 - [x] SEC-002: Debug-Logs in kDebugMode gewrappt
 - [x] SEC-003: Debug-Log in Handover Sheet in kDebugMode gewrappt
 
-**Verbleibende Bugs:**
-- [ ] BL-002: Handover ohne Rollen-Prüfung für Target-Tenant (MITTEL)
-- [ ] FN-004: setState in Build-Methode via addPostFrameCallback (MITTEL)
-- [ ] FN-005: FutureBuilder ohne Refresh-Mechanismus für Rolle (MITTEL)
-- [ ] BL-003: Account-Erstellung nicht implementiert (NIEDRIG)
-- [ ] FN-006: Keine Form-Validierung im Edit-Modus (NIEDRIG)
+### Commit 2:
+- [x] BL-002: Handover mit Rollen-Prüfung für Target-Tenant
+- [x] FN-004: setState in Build durch didChangeDependencies ersetzt
+- [x] FN-005: FutureBuilder durch State-basierte Rolle ersetzt
+- [x] BL-003: Account-Erstellung Button durch Info ersetzt
+- [x] FN-006: Form-Validierung mit GlobalKey hinzugefügt
 
 ---
 

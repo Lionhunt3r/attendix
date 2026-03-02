@@ -293,7 +293,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   bool _isEditing = false;
   bool _hasChanges = false;
   bool _isSaving = false;
-  
+
+  // FN-006: Form key for validation
+  final _formKey = GlobalKey<FormState>();
+
   // Form controllers
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
@@ -326,12 +329,55 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   bool _problemSolved = false;
   String _problemNotes = '';
 
+  // FN-005: User role state for refresh after update
+  Role? _userRole;
+  bool _isLoadingRole = false;
+
   @override
   void initState() {
     super.initState();
     _initFormData();
+    _loadUserRole();
   }
-  
+
+  // FN-005: Load user role on init - actual loading deferred to didChangeDependencies
+  Future<void> _loadUserRole() async {
+    if (widget.person.appId == null) return;
+    // Defer to didChangeDependencies for tenant access via ref
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // FN-005: Load role when dependencies are ready
+    if (_userRole == null && !_isLoadingRole && widget.person.appId != null) {
+      _fetchUserRole();
+    }
+  }
+
+  Future<void> _fetchUserRole() async {
+    final tenant = ref.read(currentTenantProvider);
+    final appId = widget.person.appId;
+    final tenantId = tenant?.id;
+
+    if (appId == null || tenantId == null) return;
+
+    setState(() => _isLoadingRole = true);
+    try {
+      final role = await _getUserRole(appId, tenantId);
+      if (mounted) {
+        setState(() {
+          _userRole = role ?? Role.player;
+          _isLoadingRole = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingRole = false);
+      }
+    }
+  }
+
   void _initFormData() {
     final p = widget.person;
     _firstNameController = TextEditingController(text: p.firstName);
@@ -381,6 +427,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   
   Future<void> _saveChanges() async {
     if (_isSaving) return;
+
+    // FN-006: Validate form before saving
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
     // SEC-001: Check role before saving
     final currentRole = ref.read(currentRoleProvider);
@@ -1050,42 +1101,59 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     final tenant = ref.watch(currentTenantProvider);
     final extraFields = tenant?.additionalFields ?? [];
 
-    return Card(
-      margin: const EdgeInsets.all(AppDimensions.paddingM),
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.paddingM),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Name Row
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _firstNameController,
-                    decoration: const InputDecoration(labelText: 'Vorname'),
-                    onChanged: (_) => _markChanged(),
+    // FN-006: Wrap in Form for validation
+    return Form(
+      key: _formKey,
+      child: Card(
+        margin: const EdgeInsets.all(AppDimensions.paddingM),
+        child: Padding(
+          padding: const EdgeInsets.all(AppDimensions.paddingM),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Name Row
+              Row(
+                children: [
+                  Expanded(
+                    // FN-006: Use TextFormField with validator
+                    child: TextFormField(
+                      controller: _firstNameController,
+                      decoration: const InputDecoration(labelText: 'Vorname *'),
+                      onChanged: (_) => _markChanged(),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Vorname ist erforderlich';
+                        }
+                        return null;
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: AppDimensions.paddingM),
-                Expanded(
-                  child: TextField(
-                    controller: _lastNameController,
-                    decoration: const InputDecoration(labelText: 'Nachname'),
-                    onChanged: (_) => _markChanged(),
+                  const SizedBox(width: AppDimensions.paddingM),
+                  Expanded(
+                    // FN-006: Use TextFormField with validator
+                    child: TextFormField(
+                      controller: _lastNameController,
+                      decoration: const InputDecoration(labelText: 'Nachname *'),
+                      onChanged: (_) => _markChanged(),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Nachname ist erforderlich';
+                        }
+                        return null;
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.paddingM),
+                ],
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
 
-            // Notes
-            TextField(
-              controller: _notesController,
-              decoration: const InputDecoration(labelText: 'Notizen'),
-              maxLines: 3,
-              onChanged: (_) => _markChanged(),
-            ),
+              // Notes
+              TextFormField(
+                controller: _notesController,
+                decoration: const InputDecoration(labelText: 'Notizen'),
+                maxLines: 3,
+                onChanged: (_) => _markChanged(),
+              ),
             const SizedBox(height: AppDimensions.paddingL),
 
             // Group Dropdown
@@ -1356,6 +1424,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
           ],
         ),
       ),
+    ),  // FN-006: Close Form widget
     );
   }
 
@@ -1817,20 +1886,27 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
             style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
           ),
         ],
+        // BL-003: Account creation not implemented - show info instead of non-working button
         if (person.appId == null && person.email != null) ...[
           const SizedBox(height: AppDimensions.paddingM),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => _showCreateAccountDialog(person, tenant),
-              icon: const Icon(Icons.person_add),
-              label: const Text('Account erstellen'),
+          Container(
+            padding: const EdgeInsets.all(AppDimensions.paddingM),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
             ),
-          ),
-          const SizedBox(height: AppDimensions.paddingXS),
-          const Text(
-            'Die Person erhält eine E-Mail mit dem Link zur Passwort-Einrichtung.',
-            style: TextStyle(fontSize: 12, color: AppColors.medium),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                SizedBox(width: AppDimensions.paddingS),
+                Expanded(
+                  child: Text(
+                    'Account-Erstellung ist über die Web-Verwaltung möglich.',
+                    style: TextStyle(fontSize: 13, color: AppColors.dark),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
         if (person.appId == null && person.email == null)
@@ -1874,54 +1950,50 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       Role.admin,
     ];
 
-    return FutureBuilder<Role?>(
-      future: _getUserRole(appId, tenantId),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    // FN-005: Use state-based role instead of FutureBuilder
+    if (_isLoadingRole) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-        final currentRole = snapshot.data ?? Role.player;
+    final currentRole = _userRole ?? Role.player;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Rolle',
-              style: TextStyle(fontSize: 12, color: AppColors.medium),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Rolle',
+          style: TextStyle(fontSize: 12, color: AppColors.medium),
+        ),
+        const SizedBox(height: AppDimensions.paddingXS),
+        DropdownButtonFormField<Role>(
+          value: currentRole,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: AppDimensions.paddingM,
+              vertical: AppDimensions.paddingS,
             ),
-            const SizedBox(height: AppDimensions.paddingXS),
-            DropdownButtonFormField<Role>(
-              value: currentRole,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: AppDimensions.paddingM,
-                  vertical: AppDimensions.paddingS,
-                ),
+          ),
+          items: availableRoles.map((role) {
+            return DropdownMenuItem(
+              value: role,
+              child: Row(
+                children: [
+                  Icon(_getRoleIcon(role), size: 20, color: AppColors.primary),
+                  const SizedBox(width: AppDimensions.paddingS),
+                  Text(_getRoleLabel(role)),
+                ],
               ),
-              items: availableRoles.map((role) {
-                return DropdownMenuItem(
-                  value: role,
-                  child: Row(
-                    children: [
-                      Icon(_getRoleIcon(role), size: 20, color: AppColors.primary),
-                      const SizedBox(width: AppDimensions.paddingS),
-                      Text(_getRoleLabel(role)),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (newRole) async {
-                if (newRole != null && newRole != currentRole) {
-                  // RT-001: appId and tenantId are already validated above
-                  await _updateUserRole(appId, tenantId, newRole);
-                }
-              },
-            ),
-          ],
-        );
-      },
+            );
+          }).toList(),
+          onChanged: (newRole) async {
+            if (newRole != null && newRole != currentRole) {
+              // RT-001: appId and tenantId are already validated above
+              await _updateUserRole(appId, tenantId, newRole);
+            }
+          },
+        ),
+      ],
     );
   }
 
@@ -1967,7 +2039,9 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
           .eq('user_id', userId)
           .eq('tenant_id', tenantId);
 
+      // FN-005: Update local state immediately after successful update
       if (mounted) {
+        setState(() => _userRole = newRole);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Rolle auf "${_getRoleLabel(newRole)}" geändert'),
@@ -2014,141 +2088,8 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     };
   }
 
-  Future<void> _showCreateAccountDialog(Person person, Tenant? tenant) async {
-    if (tenant?.id == null) return;
-
-    Role selectedRole = Role.player;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Account erstellen'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Account für ${person.fullName} erstellen?'),
-              const SizedBox(height: AppDimensions.paddingM),
-              Text('E-Mail: ${person.email}'),
-              const SizedBox(height: AppDimensions.paddingL),
-              const Text('Rolle:', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: AppDimensions.paddingS),
-              DropdownButtonFormField<Role>(
-                value: selectedRole,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: AppDimensions.paddingM,
-                    vertical: AppDimensions.paddingS,
-                  ),
-                ),
-                items: [
-                  Role.player,
-                  Role.helper,
-                  Role.viewer,
-                  Role.responsible,
-                ].map((role) {
-                  return DropdownMenuItem(
-                    value: role,
-                    child: Text(_getRoleLabel(role)),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setDialogState(() => selectedRole = value);
-                  }
-                },
-              ),
-              const SizedBox(height: AppDimensions.paddingM),
-              Container(
-                padding: const EdgeInsets.all(AppDimensions.paddingS),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 18, color: AppColors.info),
-                    SizedBox(width: AppDimensions.paddingS),
-                    Expanded(
-                      child: Text(
-                        'Die Person erhält eine E-Mail zum Setzen des Passworts.',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Abbrechen'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Account erstellen'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      await _createAccount(person, tenant!.id!, selectedRole);
-    }
-  }
-
-  Future<void> _createAccount(Person person, int tenantId, Role role) async {
-    // Show loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: AppDimensions.paddingL),
-            Text('Account wird erstellt...'),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      // Note: In production, this should be done via a server-side function
-      // to properly handle auth.admin.createUser
-      // For now, we show a message that this feature requires server setup
-
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account-Erstellung erfordert Server-Setup. Bitte an Administrator wenden.'),
-            backgroundColor: AppColors.warning,
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
-
-      // Ideal implementation would be:
-      // 1. Call a Supabase Edge Function that creates the user
-      // 2. The function uses service_role to call auth.admin.createUser
-      // 3. Update player.appId with the new user ID
-      // 4. Create tenant_users entry
-      // 5. Send password reset email
-
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
-        );
-      }
-    }
-  }
+  // BL-003: Removed _showCreateAccountDialog and _createAccount as feature not implemented
+  // Account creation should be done via web admin panel
 
   Future<void> _showUnlinkAccountDialog(Person person) async {
     final confirmed = await showDialog<bool>(
