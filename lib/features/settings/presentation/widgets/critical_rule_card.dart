@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/constants/enums.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/tenant/tenant.dart';
 
@@ -28,7 +27,7 @@ class CriticalRuleCard extends StatelessWidget {
           color: AppColors.warning,
         ),
         title: Text(
-          rule.name ?? _buildRuleDescription(),
+          rule.displayName,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
@@ -37,7 +36,7 @@ class CriticalRuleCard extends StatelessWidget {
           children: [
             if (rule.name != null)
               Text(
-                _buildRuleDescription(),
+                rule.description,
                 style: const TextStyle(fontSize: 12),
               ),
             const SizedBox(height: 4),
@@ -98,31 +97,5 @@ class CriticalRuleCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _buildRuleDescription() {
-    final threshold = rule.thresholdType == CriticalRuleThresholdType.count
-        ? '${rule.thresholdValue}x'
-        : '${rule.thresholdValue}%';
-
-    final statuses = rule.statuses
-        .map((s) => AttendanceStatus.fromValue(s).label)
-        .join(' / ');
-
-    final period = _getPeriodDescription();
-
-    return '$threshold $statuses $period';
-  }
-
-  String _getPeriodDescription() {
-    switch (rule.periodType) {
-      case CriticalRulePeriodType.days:
-        return 'in ${rule.periodDays ?? 30} Tagen';
-      case CriticalRulePeriodType.season:
-        return 'seit Saisonstart';
-      case CriticalRulePeriodType.allTime:
-      case null:
-        return 'insgesamt';
-    }
   }
 }

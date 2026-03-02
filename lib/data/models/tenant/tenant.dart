@@ -112,6 +112,36 @@ class CriticalRule with _$CriticalRule {
       _$CriticalRuleFromJson(json);
 }
 
+/// Extension for CriticalRule
+extension CriticalRuleExtension on CriticalRule {
+  /// Build a human-readable description of the rule
+  String get description {
+    final threshold = thresholdType == CriticalRuleThresholdType.count
+        ? '${thresholdValue}x'
+        : '$thresholdValue%';
+
+    final statusLabels = statuses.map((s) {
+      return switch (s) {
+        4 => 'Abwesend',
+        3 => 'Verspätet',
+        5 => 'Verspätet (entsch.)',
+        _ => 'Status $s',
+      };
+    }).join(' / ');
+
+    final period = switch (periodType) {
+      CriticalRulePeriodType.days => 'in ${periodDays ?? 30} Tagen',
+      CriticalRulePeriodType.season => 'seit Saisonstart',
+      _ => 'insgesamt',
+    };
+
+    return '$threshold $statusLabels $period';
+  }
+
+  /// Display name (name or auto-generated description)
+  String get displayName => name ?? description;
+}
+
 /// Tenant user association
 @freezed
 class TenantUser with _$TenantUser {
