@@ -70,6 +70,16 @@ mixin TenantAwareRepository on BaseRepository {
 
   /// Check if tenant is set
   bool get hasTenantId => _tenantId != null;
+
+  /// SEC-003: Sanitizes user input for use in ILIKE patterns
+  /// Escapes SQL wildcards (%, _) to prevent pattern injection
+  String sanitizeSearchQuery(String input) {
+    // Escape SQL ILIKE wildcards using backslash (PostgreSQL default)
+    return input
+        .replaceAll(r'\', r'\\') // Escape backslash first
+        .replaceAll('%', r'\%') // Escape %
+        .replaceAll('_', r'\_'); // Escape _
+  }
 }
 
 /// Custom exception for repository operations
