@@ -73,13 +73,19 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
       // Set tenant locally WITHOUT triggering auth sync
       await ref.read(currentTenantProvider.notifier).setTenantLocal(savedTenant);
 
+      // Wait for currentTenantUserProvider to load so router doesn't redirect back
+      await ref.read(currentTenantUserProvider.future);
+
+      if (!mounted) return;
+
+      // Get notifier BEFORE navigation (widget may be disposed after go())
+      final prefsNotifier = ref.read(userPreferencesNotifierProvider.notifier);
+
       // Navigate FIRST
       context.go(role.defaultRoute);
 
-      // Auth sync AFTER navigation
-      ref
-          .read(userPreferencesNotifierProvider.notifier)
-          .updateCurrentTenantId(savedTenant.id!);
+      // Auth sync AFTER navigation (fire and forget, notifier captured above)
+      prefsNotifier.updateCurrentTenantId(savedTenant.id!);
     } catch (e) {
       debugPrint('Auto-navigation failed: $e');
       if (mounted) {
@@ -117,13 +123,19 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
     // Set tenant locally WITHOUT triggering auth sync
     await ref.read(currentTenantProvider.notifier).setTenantLocal(tenant);
 
+    // Wait for currentTenantUserProvider to load so router doesn't redirect back
+    await ref.read(currentTenantUserProvider.future);
+
+    if (!mounted) return;
+
+    // Get notifier BEFORE navigation (widget may be disposed after go())
+    final prefsNotifier = ref.read(userPreferencesNotifierProvider.notifier);
+
     // Navigate FIRST - before auth sync can cause rebuilds
     context.go(role.defaultRoute);
 
-    // Auth sync AFTER navigation (fire and forget)
-    ref
-        .read(userPreferencesNotifierProvider.notifier)
-        .updateCurrentTenantId(tenant.id!);
+    // Auth sync AFTER navigation (fire and forget, notifier captured above)
+    prefsNotifier.updateCurrentTenantId(tenant.id!);
   }
 
   @override

@@ -98,16 +98,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         return false;
       }
 
-      // Set the tenant
-      await ref.read(currentTenantProvider.notifier).setTenant(savedTenant);
-
-      // Get user's role for this tenant
+      // Get user's role FIRST, before any state changes
       final role = await _getTenantUserRole(tenantId);
 
-      // Navigate to role-based default route
-      if (mounted) {
-        context.go(role.defaultRoute);
-      }
+      if (!mounted) return false;
+
+      // Set tenant locally WITHOUT triggering auth sync
+      await ref.read(currentTenantProvider.notifier).setTenantLocal(savedTenant);
+
+      // Wait for currentTenantUserProvider to load so router doesn't redirect back
+      await ref.read(currentTenantUserProvider.future);
+
+      if (!mounted) return false;
+
+      // Get notifier BEFORE navigation (widget may be disposed after go())
+      final prefsNotifier = ref.read(userPreferencesNotifierProvider.notifier);
+
+      // Navigate FIRST
+      context.go(role.defaultRoute);
+
+      // Auth sync AFTER navigation (fire and forget, notifier captured above)
+      prefsNotifier.updateCurrentTenantId(tenantId);
+
       return true;
     } catch (e) {
       debugPrint('Auto-navigation failed: $e');
