@@ -16,6 +16,7 @@ import '../../../../core/providers/conductor_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/export_service.dart';
+import '../../../../core/services/telegram_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
@@ -508,9 +509,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                             onEdit: () {
                               context.push('/planning/${widget.attendanceId}');
                             },
-                            onExportPdf: () async {
-                              ToastHelper.showInfo(context, 'PDF-Export wird vorbereitet...');
-                            },
+                            onExportPdf: _exportPlanPdf,
+                            onSendViaTelegram: _sendPlanViaTelegram,
                             onSharePlanChanged: _toggleSharePlan,
                           ),
 
@@ -965,6 +965,164 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     } catch (e) {
       if (mounted) {
         ToastHelper.showError(context, 'Fehler: $e');
+      }
+    }
+  }
+
+  // ============== PLAN EXPORT METHODS ==============
+
+  Future<void> _exportPlanPdf() async {
+    final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
+    final plan = attendance?.plan;
+
+    if (plan == null || plan.isEmpty) {
+      ToastHelper.showWarning(context, 'Kein Ablaufplan zum Exportieren');
+      return;
+    }
+
+    final fields = plan['fields'] as List?;
+    if (fields == null || fields.isEmpty) {
+      ToastHelper.showWarning(context, 'Keine Programmpunkte zum Exportieren');
+      return;
+    }
+
+    // Show format selection dialog
+    final format = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export-Format'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text('A4 (Standard)'),
+              subtitle: const Text('Ein Plan pro Seite'),
+              onTap: () => Navigator.pop(context, 'a4'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_cut),
+              title: const Text('2x A5 auf A4'),
+              subtitle: const Text('Zwei identische Pläne (Querformat)'),
+              onTap: () => Navigator.pop(context, '2xa5'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Abbrechen'),
+          ),
+        ],
+      ),
+    );
+
+    if (format == null || !mounted) return;
+
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant == null) {
+      ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+      return;
+    }
+
+    final startTime = plan['startTime'] as String? ?? attendance?.startTime ?? '17:00';
+    final endTime = plan['endTime'] as String?;
+    final dateStr = attendance?.formattedDate ?? DateTime.now().toIso8601String().substring(0, 10);
+
+    try {
+      final exportService = ExportService();
+
+      if (format == '2xa5') {
+        await exportService.exportPlanPdf2xA5(
+          context: context,
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: startTime,
+          endTime: endTime,
+          fields: fields.cast<Map<String, dynamic>>(),
+        );
+      } else {
+        await exportService.exportPlanPdf(
+          context: context,
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: startTime,
+          endTime: endTime,
+          fields: fields.cast<Map<String, dynamic>>(),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler beim Export: $e');
+      }
+    }
+  }
+
+  Future<void> _sendPlanViaTelegram() async {
+    final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
+    final plan = attendance?.plan;
+
+    if (plan == null || plan.isEmpty) {
+      ToastHelper.showWarning(context, 'Kein Ablaufplan zum Senden');
+      return;
+    }
+
+    final fields = plan['fields'] as List?;
+    if (fields == null || fields.isEmpty) {
+      ToastHelper.showWarning(context, 'Keine Programmpunkte zum Senden');
+      return;
+    }
+
+    // Check Telegram connection
+    final notificationConfig = await ref.read(notificationConfigProvider.future);
+    if (notificationConfig == null || !notificationConfig.isConnected || notificationConfig.telegramChatId == null) {
+      if (mounted) {
+        ToastHelper.showError(
+          context,
+          'Telegram nicht verbunden. Bitte zuerst in den Einstellungen verbinden.',
+        );
+      }
+      return;
+    }
+
+    final chatId = notificationConfig.telegramChatId!;
+
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant == null) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+      }
+      return;
+    }
+
+    final startTime = plan['startTime'] as String? ?? attendance?.startTime ?? '17:00';
+    final endTime = plan['endTime'] as String?;
+    final dateStr = attendance?.formattedDate ?? DateTime.now().toIso8601String().substring(0, 10);
+
+    try {
+      final exportService = ExportService();
+      final pdfBytes = await exportService.generatePlanPdfBytes(
+        tenantName: tenant.shortName,
+        date: dateStr,
+        startTime: startTime,
+        endTime: endTime,
+        fields: fields.cast<Map<String, dynamic>>(),
+      );
+
+      final telegramService = ref.read(telegramServiceProvider);
+      await telegramService.sendPlanPerTelegram(
+        fileBytes: pdfBytes,
+        name: '${tenant.shortName}_Plan_$dateStr',
+        chatId: chatId,
+        asImage: false,
+      );
+
+      if (mounted) {
+        ToastHelper.showSuccess(context, 'Plan per Telegram gesendet');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler beim Senden: $e');
       }
     }
   }
