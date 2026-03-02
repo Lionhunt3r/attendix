@@ -76,6 +76,7 @@ class ViewersPage extends ConsumerWidget {
           }
 
           return RefreshIndicator(
+            // FN-011: await provider.future to show spinner until data loads
             onRefresh: () async {
               ref.invalidate(viewersProvider);
               await ref.read(viewersProvider.future);

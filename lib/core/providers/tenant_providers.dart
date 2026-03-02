@@ -198,9 +198,16 @@ final currentTenantUserProvider = FutureProvider<TenantUser?>((ref) async {
 });
 
 /// Convenience provider for current user's role
+/// SEC-008: Returns Role.none while loading, but router handles this specially
 final currentRoleProvider = Provider<Role>((ref) {
   final tenantUserAsync = ref.watch(currentTenantUserProvider);
   final tenantUser = tenantUserAsync.valueOrNull;
   if (tenantUser == null) return Role.none;
   return tenantUser.roleEnum;
+});
+
+/// SEC-008: Provider that indicates if the role is still loading
+final isRoleLoadingProvider = Provider<bool>((ref) {
+  final tenantUserAsync = ref.watch(currentTenantUserProvider);
+  return tenantUserAsync.isLoading;
 });

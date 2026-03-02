@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'enums.dart';
@@ -10,8 +11,9 @@ class AppConstants {
   static const String appVersion = '0.1.11';
 
   /// Demo credentials from environment (for development only)
-  static String get demoMail => dotenv.env['DEMO_EMAIL'] ?? '';
-  static String get demoPassword => dotenv.env['DEMO_PASSWORD'] ?? '';
+  /// SEC-009: Only expose in debug mode
+  static String get demoMail => kDebugMode ? (dotenv.env['DEMO_EMAIL'] ?? '') : '';
+  static String get demoPassword => kDebugMode ? (dotenv.env['DEMO_PASSWORD'] ?? '') : '';
 }
 
 /// Default avatar image URL

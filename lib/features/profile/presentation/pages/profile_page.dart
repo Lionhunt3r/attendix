@@ -44,6 +44,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _loadProfile() async {
+    // RT-012: Guard against concurrent loads
+    if (_isLoading) return;
+
     setState(() => _isLoading = true);
 
     try {
@@ -81,7 +84,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         player = playerResponse;
       }
 
-      _profileData = {
+      // RT-012: Build profile data in local variable first
+      final profileData = {
         'email': user.email,
         'userId': user.id,
         'firstName': player?['firstName'] ?? tenantUser?['firstName'] ?? '',
@@ -91,9 +95,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         'playerId': tenantUser?['playerId'],
       };
 
-      _firstNameController.text = _profileData!['firstName'] ?? '';
-      _lastNameController.text = _profileData!['lastName'] ?? '';
-      _phoneController.text = _profileData!['phone'] ?? '';
+      // RT-012: Check mounted before setState
+      if (!mounted) return;
+
+      // RT-012: Atomic assignment after all async work
+      _profileData = profileData;
+      _firstNameController.text = profileData['firstName'] ?? '';
+      _lastNameController.text = profileData['lastName'] ?? '';
+      _phoneController.text = profileData['phone'] ?? '';
 
     } catch (e) {
       if (mounted) {
@@ -284,10 +293,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   TextFormField(
                     controller: _firstNameController,
                     enabled: _isEditing,
+                    textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(
                       labelText: 'Vorname',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
+                    // FN-008: Add required validator
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Vorname ist erforderlich';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: AppDimensions.paddingM),
 
@@ -295,10 +312,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   TextFormField(
                     controller: _lastNameController,
                     enabled: _isEditing,
+                    textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(
                       labelText: 'Nachname',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
+                    // FN-008: Add required validator
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Nachname ist erforderlich';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: AppDimensions.paddingM),
 
@@ -311,6 +336,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       labelText: 'Telefon',
                       prefixIcon: Icon(Icons.phone_outlined),
                     ),
+                    // FN-008: Add optional phone validator
+                    validator: (value) {
+                      if (value != null && value.trim().isNotEmpty) {
+                        final phoneRegex = RegExp(r'^[\d\s\+\-\(\)]+$');
+                        if (value.trim().length < 6) {
+                          return 'Telefonnummer zu kurz';
+                        }
+                        if (!phoneRegex.hasMatch(value)) {
+                          return 'Ungültige Telefonnummer';
+                        }
+                      }
+                      return null;
+                    },
                   ),
 
                   if (_isEditing) ...[

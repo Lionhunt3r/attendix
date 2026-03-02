@@ -23,9 +23,9 @@ abstract class BaseRepository {
 
   /// Handle Supabase errors consistently
   T handleError<T>(Object error, StackTrace stack, String operation) {
-    // SEC-019: Only log detailed stack traces in debug mode
-    debugPrint('[$runtimeType] Error in $operation: $error');
+    // SEC-006: Only log errors in debug mode to avoid exposing internal structure
     if (kDebugMode) {
+      debugPrint('[$runtimeType] Error in $operation: $error');
       debugPrint('$stack');
     }
 
@@ -100,6 +100,18 @@ class RepositoryException implements Exception {
   String toString() {
     return 'RepositoryException: $message (operation: $operation${code != null ? ', code: $code' : ''})';
   }
+}
+
+/// BL-002: Exception for duplicate attendance entries
+class DuplicateAttendanceException extends RepositoryException {
+  const DuplicateAttendanceException({
+    required super.message,
+    required this.existingId,
+    required this.date,
+  }) : super(operation: 'createAttendance', code: 'DUPLICATE');
+
+  final int existingId;
+  final String date;
 }
 
 /// Result type for operations that can fail

@@ -95,6 +95,7 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
           }
 
           return RefreshIndicator(
+            // FN-009: await provider.future to show spinner until data loads
             onRefresh: () async {
               ref.invalidate(pendingPlayersProvider);
               await ref.read(pendingPlayersProvider.future);

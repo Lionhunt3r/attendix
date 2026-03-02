@@ -93,8 +93,25 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Create a new attendance
+  /// BL-002: Checks for duplicate attendances on the same date
   Future<Attendance> createAttendance(Attendance attendance) async {
     try {
+      // BL-002: Check for existing attendance on the same date
+      final existing = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .eq('date', attendance.date)
+          .maybeSingle();
+
+      if (existing != null) {
+        throw DuplicateAttendanceException(
+          message: 'Ein Termin an diesem Datum existiert bereits',
+          existingId: existing['id'] as int,
+          date: attendance.date,
+        );
+      }
+
       final data = attendance.toJson();
       data['tenantId'] = currentTenantId;
       // Remove computed fields
@@ -108,6 +125,8 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
 
       return Attendance.fromJson(response);
     } catch (e, stack) {
+      // BL-002: Don't wrap DuplicateAttendanceException
+      if (e is DuplicateAttendanceException) rethrow;
       handleError(e, stack, 'createAttendance');
       rethrow;
     }
