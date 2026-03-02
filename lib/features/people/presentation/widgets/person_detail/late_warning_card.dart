@@ -25,6 +25,7 @@ class LateWarningCard extends ConsumerWidget {
       error: (_, __) => const SizedBox.shrink(),
       data: (stats) {
         final lateCount = stats['lateCount'] as int? ?? 0;
+        final lateStatuses = stats['lateStatuses'] as List<int>? ?? [3];
 
         // Get threshold from tenant's critical rules
         final tenant = ref.watch(currentTenantProvider);
@@ -40,6 +41,11 @@ class LateWarningCard extends ConsumerWidget {
         }
 
         if (lateCount < threshold) return const SizedBox.shrink();
+
+        // Dynamic text based on which statuses are counted
+        // If only status 3 (late) is counted, say "unentschuldigt"
+        // If status 5 (lateExcused) is also counted, just say "zu spät"
+        final lateTypeText = lateStatuses.contains(5) ? 'zu spät' : 'unentschuldigt zu spät';
 
         return Card(
           margin: const EdgeInsets.all(AppDimensions.paddingM),
@@ -58,7 +64,7 @@ class LateWarningCard extends ConsumerWidget {
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
-              '$lateCount× unentschuldigt zu spät (Schwelle: $threshold)',
+              '$lateCount× $lateTypeText (Schwelle: $threshold)',
               style: TextStyle(color: Colors.orange.shade800),
             ),
             trailing: FilledButton.tonal(

@@ -51,7 +51,19 @@ final personAttendanceStatsProvider =
       'attended': 0,
       'percentage': 0,
       'lateCount': 0,
+      'lateStatuses': <int>[3],
     };
+  }
+
+  // Get late statuses from CriticalRule - find first rule that includes status 3 (late)
+  List<int> lateStatuses = [3, 5]; // Fallback: both late statuses
+  if (tenant?.criticalRules != null) {
+    for (final rule in tenant!.criticalRules!) {
+      if (rule.statuses.contains(3)) {
+        lateStatuses = rule.statuses;
+        break;
+      }
+    }
   }
 
   final response = await supabase
@@ -79,10 +91,11 @@ final personAttendanceStatsProvider =
   }).length;
   final percentage = total > 0 ? (attended / total * 100).round() : 0;
 
+  // Count late based on CriticalRule statuses, not hardcoded values
   final lateCount = pastAttendances.where((a) {
     final status = a['status'];
     if (status is int) {
-      return status == 3 || status == 5;
+      return lateStatuses.contains(status);
     }
     return false;
   }).length;
@@ -92,6 +105,7 @@ final personAttendanceStatsProvider =
     'attended': attended,
     'percentage': percentage,
     'lateCount': lateCount,
+    'lateStatuses': lateStatuses,
   };
 });
 
