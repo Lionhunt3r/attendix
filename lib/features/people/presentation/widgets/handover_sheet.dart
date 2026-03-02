@@ -385,7 +385,8 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
             ...instrumentIds.map((instrumentId) {
               final sourceGroup = sourceGroups.firstWhere(
                 (g) => g.id == instrumentId,
-                orElse: () => Group(id: instrumentId, name: 'Unbekannt'),
+                // BL-008: Consistent fallback label
+                orElse: () => Group(id: instrumentId, name: 'Ohne Gruppe'),
               );
 
               // Auto-map if not already mapped
@@ -519,7 +520,8 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
         for (final instrumentId in instrumentIds) {
           final sourceGroup = sourceGroups.firstWhere(
             (g) => g.id == instrumentId,
-            orElse: () => Group(id: instrumentId, name: 'Unbekannt'),
+            // BL-008: Consistent fallback label
+            orElse: () => Group(id: instrumentId, name: 'Ohne Gruppe'),
           );
           _groupMapping[instrumentId] = _autoMapGroup(sourceGroup, _targetGroups);
         }

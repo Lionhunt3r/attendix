@@ -24,7 +24,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  bool _isLoading = true;
+  bool _isLoading = false;  // RT-012: Start false, set true after guard check
   bool _isSaving = false;
   bool _isEditing = false;
   Map<String, dynamic>? _profileData;
