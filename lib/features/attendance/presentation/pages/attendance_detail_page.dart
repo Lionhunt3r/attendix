@@ -448,7 +448,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
               final attendanceType = attendanceTypeAsync.valueOrNull;
               final hasChecklist = _localChecklist.isNotEmpty || (attendanceType?.checklist?.isNotEmpty ?? false);
               final hasSongs = attendanceType?.manageSongs ?? false;
-              final hasPlan = attendance.plan != null && attendance.plan!.isNotEmpty;
 
               return CustomScrollView(
                 slivers: [
@@ -503,16 +502,18 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                             onRemove: _removeSongEntry,
                           ),
 
-                        if (hasPlan)
-                          PlanAccordion(
-                            attendance: attendance,
-                            onEdit: () {
-                              context.push('/planning/${widget.attendanceId}');
-                            },
-                            onExportPdf: _exportPlanPdf,
-                            onSendViaTelegram: _sendPlanViaTelegram,
-                            onSharePlanChanged: _toggleSharePlan,
-                          ),
+                        PlanAccordion(
+                          attendance: attendance,
+                          onCreate: () {
+                            context.push('/planning/${widget.attendanceId}');
+                          },
+                          onEdit: () {
+                            context.push('/planning/${widget.attendanceId}');
+                          },
+                          onExportPdf: _exportPlanPdf,
+                          onSendViaTelegram: _sendPlanViaTelegram,
+                          onSharePlanChanged: _toggleSharePlan,
+                        ),
 
                         const SizedBox(height: AppDimensions.paddingS),
                       ],
