@@ -2001,10 +2001,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     final supabase = ref.read(supabaseClientProvider);
     try {
       final response = await supabase
-          .from('tenant_users')
+          .from('tenantUsers')
           .select('role')
-          .eq('user_id', userId)
-          .eq('tenant_id', tenantId)
+          .eq('userId', userId)
+          .eq('tenantId', tenantId)
           .maybeSingle();
 
       if (response == null) return null;
@@ -2034,10 +2034,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
 
     try {
       await supabase
-          .from('tenant_users')
+          .from('tenantUsers')
           .update({'role': newRole.value})
-          .eq('user_id', userId)
-          .eq('tenant_id', tenantId);
+          .eq('userId', userId)
+          .eq('tenantId', tenantId);
 
       // FN-005: Update local state immediately after successful update
       if (mounted) {
@@ -2145,10 +2145,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       if (person.appId != null && tenant?.id != null) {
         final supabase = ref.read(supabaseClientProvider);
         await supabase
-            .from('tenant_users')
+            .from('tenantUsers')
             .delete()
-            .eq('user_id', person.appId!)
-            .eq('tenant_id', tenant!.id!);
+            .eq('userId', person.appId!)
+            .eq('tenantId', tenant!.id!);
       }
 
       ref.invalidate(personProvider(widget.personId));
