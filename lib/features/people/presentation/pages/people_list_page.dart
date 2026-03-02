@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
@@ -49,14 +50,20 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
         final groupName = person.instrument != null ? groups[person.instrument] : null;
         return person.copyWith(groupName: groupName);
       } catch (parseError) {
-        debugPrint('Error parsing person: $parseError');
-        debugPrint('JSON data: $e');
+        // SEC-002: Only log in debug mode to avoid PII exposure
+        if (kDebugMode) {
+          debugPrint('Error parsing person: $parseError');
+          debugPrint('JSON data: $e');
+        }
         rethrow;
       }
     }).toList();
   } catch (e, stack) {
-    debugPrint('Error fetching people: $e');
-    debugPrint('Stack trace: $stack');
+    // SEC-002: Only log in debug mode to avoid PII exposure
+    if (kDebugMode) {
+      debugPrint('Error fetching people: $e');
+      debugPrint('Stack trace: $stack');
+    }
     rethrow;
   }
 });
@@ -493,9 +500,8 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
 
                 return RefreshIndicator(
                   onRefresh: () async {
-                    // FN-007: invalidate + await for proper RefreshIndicator behavior
-                    ref.invalidate(peopleListProvider);
-                    await ref.read(peopleListProvider.future);
+                    // FN-002: Use same provider as display (realtimePlayersProvider)
+                    ref.invalidate(realtimePlayersProvider);
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(
@@ -878,10 +884,12 @@ class _PersonListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cardShape = theme.cardTheme.shape as RoundedRectangleBorder? ??
-        RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.borderRadiusL),
-        );
+    // RT-004: Safe cast for cardShape - check type before casting
+    final cardShape = theme.cardTheme.shape is RoundedRectangleBorder
+        ? theme.cardTheme.shape as RoundedRectangleBorder
+        : RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.borderRadiusL),
+          );
     final cardBorderRadius =
         cardShape.borderRadius.resolve(Directionality.of(context));
 
@@ -909,8 +917,8 @@ class _PersonListItem extends StatelessWidget {
                       : person.paused
                           ? AppColors.warning.withValues(alpha: 0.2)
                           : AppColors.primaryLight.withValues(alpha: 0.2),
-                  backgroundImage: (person.imageUrl != null &&
-                          !person.imageUrl!.contains('.svg'))
+                  // RT-002: Use null-safe pattern for imageUrl
+                  backgroundImage: (person.imageUrl?.contains('.svg') == false)
                       ? NetworkImage(person.imageUrl!)
                       : null,
                   child: (person.imageUrl == null ||
@@ -1056,8 +1064,8 @@ class _PersonListItem extends StatelessWidget {
                   : person.paused
                       ? AppColors.warning.withValues(alpha: 0.2)
                       : AppColors.primaryLight.withValues(alpha: 0.2),
-              backgroundImage: (person.imageUrl != null &&
-                  !person.imageUrl!.contains('.svg'))
+              // RT-002: Use null-safe pattern for imageUrl
+              backgroundImage: (person.imageUrl?.contains('.svg') == false)
                   ? NetworkImage(person.imageUrl!)
                   : null,
               child: (person.imageUrl == null || person.imageUrl!.contains('.svg'))

@@ -52,7 +52,9 @@ final personAttendanceStatsProvider =
   final tenant = ref.watch(currentTenantProvider);
 
   // Guard against null tenant - Multi-Tenant Security
-  if (tenant?.id == null) {
+  // RT-001: Safe null check - store tenantId in local variable after check
+  final tenantId = tenant?.id;
+  if (tenantId == null) {
     return {
       'total': 0,
       'attended': 0,
@@ -67,7 +69,7 @@ final personAttendanceStatsProvider =
       .from('person_attendances')
       .select('status, attendance:attendance_id!inner(id, date, tenantId)')
       .eq('person_id', personId)
-      .eq('attendance.tenantId', tenant!.id!);
+      .eq('attendance.tenantId', tenantId);
 
   final attendances = response as List;
   final now = DateTime.now();
@@ -80,7 +82,15 @@ final personAttendanceStatsProvider =
   }).toList();
 
   final total = pastAttendances.length;
-  final attended = pastAttendances.where((a) => a['attended'] == true).length;
+  // BL-001: Fix attended calculation - use status field instead of non-existent 'attended'
+  // Status values: 1=present, 3=late, 5=lateExcused (all count as attended)
+  final attended = pastAttendances.where((a) {
+    final status = a['status'];
+    if (status is int) {
+      return status == 1 || status == 3 || status == 5;
+    }
+    return false;
+  }).length;
   final percentage = total > 0 ? (attended / total * 100).round() : 0;
   
   // Count late arrivals (status 3 = late, 5 = lateExcused)
@@ -371,7 +381,21 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   
   Future<void> _saveChanges() async {
     if (_isSaving) return;
-    
+
+    // SEC-001: Check role before saving
+    final currentRole = ref.read(currentRoleProvider);
+    if (!currentRole.canEdit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine Berechtigung zum Bearbeiten'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isSaving = true);
     
     try {
@@ -404,6 +428,13 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       final updatedHistory = [...existingHistory, ...newHistoryEntries];
       final tenant = ref.read(currentTenantProvider);
 
+      // RT-001: Safe null checks for person.id and tenant.id
+      final personId = person.id;
+      final tenantId = tenant?.id;
+      if (personId == null || tenantId == null) {
+        throw Exception('Person-ID oder Tenant-ID fehlt');
+      }
+
       await supabase.from('player').update({
         'firstName': _firstNameController.text,
         'lastName': _lastNameController.text,
@@ -424,7 +455,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'correctBirthday': true,
         'history': updatedHistory,
         'additional_fields': _additionalFieldValues.isNotEmpty ? _additionalFieldValues : null,
-      }).eq('id', person.id!).eq('tenantId', tenant!.id!);
+      }).eq('id', personId).eq('tenantId', tenantId);
       
       ref.invalidate(personProvider(widget.personId));
       ref.invalidate(realtimePlayersProvider);
@@ -574,6 +605,20 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Future<void> _pausePerson(String reason, String? until) async {
+    // SEC-001: Check role before pausing
+    final currentRole = ref.read(currentRoleProvider);
+    if (!currentRole.canEdit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine Berechtigung zum Pausieren'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
     final repository = ref.read(playerRepositoryWithTenantProvider);
     final person = widget.person;
 
@@ -611,6 +656,20 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Future<void> _unpausePerson() async {
+    // SEC-001: Check role before unpausing
+    final currentRole = ref.read(currentRoleProvider);
+    if (!currentRole.canEdit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine Berechtigung zum Reaktivieren'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
     final repository = ref.read(playerRepositoryWithTenantProvider);
     final person = widget.person;
 
@@ -698,6 +757,20 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Future<void> _archivePerson(String date, String note) async {
+    // SEC-001: Check role before archiving
+    final currentRole = ref.read(currentRoleProvider);
+    if (!currentRole.canEdit) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine Berechtigung zum Archivieren'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
     final repository = ref.read(playerRepositoryWithTenantProvider);
     final person = widget.person;
 
@@ -889,17 +962,20 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
           title: Text(_isEditing ? 'Person bearbeiten' : person.fullName),
           backgroundColor: person.isCritical ? AppColors.danger : null,
           actions: [
-            if (!_isEditing)
+            // SEC-001: Only show edit button if user has permission
+            if (!_isEditing && ref.watch(currentRoleProvider).canEdit)
               IconButton(
                 icon: const Icon(Icons.edit),
                 tooltip: 'Bearbeiten',
                 onPressed: () => setState(() => _isEditing = true),
               ),
-            IconButton(
-              icon: const Icon(Icons.more_vert),
-              tooltip: 'Mehr',
-              onPressed: _showMoreActions,
-            ),
+            // SEC-001: Only show more actions if user has permission
+            if (ref.watch(currentRoleProvider).canEdit)
+              IconButton(
+                icon: const Icon(Icons.more_vert),
+                tooltip: 'Mehr',
+                onPressed: _showMoreActions,
+              ),
           ],
         ),
         body: ListView(
@@ -1290,9 +1366,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       case 'text':
         return Padding(
           padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
-          child: TextField(
+          // FN-001: Use TextFormField with initialValue to avoid memory leak
+          child: TextFormField(
             decoration: InputDecoration(labelText: field.name),
-            controller: TextEditingController(text: currentValue?.toString() ?? ''),
+            initialValue: currentValue?.toString() ?? '',
             onChanged: (value) {
               _additionalFieldValues[field.id] = value;
               _markChanged();
@@ -1303,10 +1380,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       case 'textarea':
         return Padding(
           padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
-          child: TextField(
+          // FN-001: Use TextFormField with initialValue to avoid memory leak
+          child: TextFormField(
             decoration: InputDecoration(labelText: field.name),
             maxLines: 3,
-            controller: TextEditingController(text: currentValue?.toString() ?? ''),
+            initialValue: currentValue?.toString() ?? '',
             onChanged: (value) {
               _additionalFieldValues[field.id] = value;
               _markChanged();
@@ -1317,10 +1395,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
       case 'number':
         return Padding(
           padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
-          child: TextField(
+          // FN-001: Use TextFormField with initialValue to avoid memory leak
+          child: TextFormField(
             decoration: InputDecoration(labelText: field.name),
             keyboardType: TextInputType.number,
-            controller: TextEditingController(text: currentValue?.toString() ?? ''),
+            initialValue: currentValue?.toString() ?? '',
             onChanged: (value) {
               _additionalFieldValues[field.id] = int.tryParse(value) ?? 0;
               _markChanged();
@@ -1779,7 +1858,10 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   }
 
   Widget _buildRoleSelector(Person person, Tenant? tenant) {
-    if (person.appId == null || tenant?.id == null) {
+    // RT-001: Safe null checks - store in local variables after check
+    final appId = person.appId;
+    final tenantId = tenant?.id;
+    if (appId == null || tenantId == null) {
       return const SizedBox.shrink();
     }
 
@@ -1793,7 +1875,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     ];
 
     return FutureBuilder<Role?>(
-      future: _getUserRole(person.appId!, tenant!.id!),
+      future: _getUserRole(appId, tenantId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -1832,7 +1914,8 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               }).toList(),
               onChanged: (newRole) async {
                 if (newRole != null && newRole != currentRole) {
-                  await _updateUserRole(person.appId!, tenant.id!, newRole);
+                  // RT-001: appId and tenantId are already validated above
+                  await _updateUserRole(appId, tenantId, newRole);
                 }
               },
             ),
