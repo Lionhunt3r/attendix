@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
@@ -1349,12 +1350,13 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
 
   Future<void> _confirmDeleteCriticalRule(int index) async {
     final rule = _criticalRules[index];
+    final ruleName = rule.name ?? _buildRuleDescription(rule);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Regel löschen?'),
         content: Text(
-          'Möchtest du die Regel "${rule.name ?? 'Unbenannte Regel'}" wirklich löschen?',
+          'Möchtest du die Regel "$ruleName" wirklich löschen?',
         ),
         actions: [
           TextButton(
@@ -1381,6 +1383,25 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
         ToastHelper.showSuccess(context, 'Regel gelöscht');
       }
     }
+  }
+
+  /// Build a description for a critical rule (used as fallback name)
+  String _buildRuleDescription(CriticalRule rule) {
+    final threshold = rule.thresholdType == CriticalRuleThresholdType.count
+        ? '${rule.thresholdValue}x'
+        : '${rule.thresholdValue}%';
+
+    final statuses = rule.statuses
+        .map((s) => AttendanceStatus.fromValue(s).label)
+        .join('/');
+
+    final period = switch (rule.periodType) {
+      CriticalRulePeriodType.days => 'in ${rule.periodDays ?? 30} Tagen',
+      CriticalRulePeriodType.season => 'seit Saisonstart',
+      _ => 'insgesamt',
+    };
+
+    return '$threshold $statuses $period';
   }
 
   Future<void> _showUnsavedChangesDialog() async {
