@@ -63,6 +63,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
             onRefresh: () async {
               ref.invalidate(filteredAttendancesForStatsProvider);
               ref.invalidate(activePlayersForStatsProvider);
+              await ref.read(filteredAttendancesForStatsProvider.future);
             },
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppDimensions.paddingM),

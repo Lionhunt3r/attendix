@@ -214,7 +214,10 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                 }
 
                 return RefreshIndicator(
-                  onRefresh: () async => ref.invalidate(songHistoryProvider),
+                  onRefresh: () async {
+                    ref.invalidate(songHistoryProvider);
+                    await ref.read(songHistoryProvider.future);
+                  },
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM),
                     itemCount: grouped.length,
