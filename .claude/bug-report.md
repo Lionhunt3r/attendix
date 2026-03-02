@@ -1,258 +1,319 @@
-# Bug Report - Attendix People Detail Page
+# Bug Report - Attendix People Tab
 Generiert: 2026-03-02
-Scope: People Detail Page (`lib/features/people/`)
+Scope: People/Persons Tab (lib/features/people/, player_repository, player_providers)
 
 ## Zusammenfassung
 
-**ALLE 17 BUGS GEFIXT!**
-
 | Kategorie | KRITISCH | HOCH | MITTEL | NIEDRIG | Gesamt |
 |-----------|----------|------|--------|---------|--------|
-| Security | 0 | 0 | 0 | 0 | 0 |
-| Business-Logik | 0 | 0 | 0 | 0 | 0 |
-| Funktional | 0 | 0 | 0 | 0 | 0 |
-| Runtime | 0 | 0 | 0 | 0 | 0 |
-| **Gesamt** | **0** | **0** | **0** | **0** | **0** |
+| Security | 0 | 2 | 3 | 1 | 6 |
+| Business-Logik | 3 | 3 | 4 | 4 | 14 |
+| Funktional | 0 | 3 | 5 | 5 | 13 |
+| Runtime | 3 | 4 | 1 | 0 | 8 |
+| **Gesamt** | **6** | **12** | **13** | **10** | **41** |
 
-## Gefixte Bugs (2026-03-02)
+## Handlungsempfehlungen
 
-### Commit 1 (28ef5fa):
-- [x] SEC-001: Rollen-Prüfungen hinzugefügt
-- [x] RT-001: Force Unwraps abgesichert
-- [x] RT-002: imageUrl null-safe gemacht
-- [x] RT-003: availableTenants.firstOrNull verwendet
-- [x] RT-004: cardShape Cast abgesichert
-- [x] BL-001: attended-Berechnung korrigiert
-- [x] FN-001: TextEditingController Memory Leak behoben
-- [x] FN-002: RefreshIndicator Provider korrigiert
-- [x] SEC-002: Debug-Logs in kDebugMode gewrappt
-- [x] SEC-003: Debug-Log in Handover Sheet in kDebugMode gewrappt
+1. 🔴 **Sofort:** 6 kritische Bugs fixen (Runtime Force-Unwraps, Berechtigungsprüfungen)
+2. 🟠 **Diese Woche:** 12 hohe Bugs fixen (Type Casts, Validierungen, Race Conditions)
+3. 🟡 **Backlog:** 23 mittlere/niedrige Bugs
 
-### Commit 2:
-- [x] BL-002: Handover mit Rollen-Prüfung für Target-Tenant
-- [x] FN-004: setState in Build durch didChangeDependencies ersetzt
-- [x] FN-005: FutureBuilder durch State-basierte Rolle ersetzt
-- [x] BL-003: Account-Erstellung Button durch Info ersetzt
-- [x] FN-006: Form-Validierung mit GlobalKey hinzugefügt
+---
+
+## KRITISCH
+
+### RT-001: Force Unwrap auf tenant.id! ohne null-Check
+- **Kategorie:** Runtime
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:38`
+- **Problem:** `tenant.id!` wird force-unwrapped ohne vorherigen null-Check
+- **Fix:** `if (tenant?.id == null) return [];` vor dem Zugriff
+- **Status:** [ ] Offen
+
+### RT-002: Force Unwrap auf criticalRules! ohne null-Check
+- **Kategorie:** Runtime
+- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:61`
+- **Problem:** `tenant!.criticalRules!` doppeltes Force-Unwrap
+- **Fix:** Vollständigen null-Check hinzufügen
+- **Status:** [ ] Offen
+
+### RT-003: Force Unwrap auf tenant.id! in _unlinkAccount
+- **Kategorie:** Runtime
+- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:1039`
+- **Problem:** Force-Unwrap nach async-Operation, tenant könnte sich geändert haben
+- **Fix:** Lokale Variable vor async-Operation speichern
+- **Status:** [ ] Offen
+
+### BL-001: Fehlende Rollen-Berechtigungsprüfung in Slide-Aktionen
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:744-862`
+- **Problem:** `_pausePerson()`, `_unpausePerson()`, `_archivePerson()` prüfen nicht `canEdit`
+- **Fix:** `if (!currentRole.canEdit) return;` am Anfang jeder Methode
+- **Status:** [ ] Offen
+
+### BL-002: Handover-Berechtigung wird erst nach Start geprüft
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/widgets/handover_sheet.dart:590-603`
+- **Problem:** Berechtigungsprüfung erst nach Klick auf "Übertragen"
+- **Fix:** Berechtigung beim Auswählen der Ziel-Instanz prüfen
+- **Status:** [ ] Offen
+
+### BL-003: Viewer-Rolle sieht Aktionen die sie nicht ausführen kann
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart`
+- **Problem:** Slide-Aktionen werden auch für Viewer angezeigt
+- **Fix:** `endActionPane: canEdit ? ActionPane(...) : null`
+- **Status:** [ ] Offen
 
 ---
 
 ## HOCH
 
-### SEC-001: Fehlende Rollen-Prüfung bei Person bearbeiten/speichern/pausieren/archivieren
-- **Kategorie:** Security / Business-Logik
-- **Dateien:**
-  - `lib/features/people/presentation/pages/person_detail_page.dart:407` (_saveChanges)
-  - `lib/features/people/presentation/pages/person_detail_page.dart:576-723` (_pausePerson, _archivePerson)
-  - `lib/features/people/presentation/pages/person_create_page.dart:366` (_save)
-- **Problem:** Die Methoden `_saveChanges()`, `_pausePerson()`, `_unpausePerson()`, `_archivePerson()` und `_save()` haben keine Rollen-Prüfung (isConductor/canEdit). Jeder authentifizierte Benutzer mit Zugriff auf die Detail-Seite kann Personendaten ändern.
-- **Auswirkung:** Unautorisierte Datenmanipulation innerhalb eines Tenants. Obwohl RLS serverseitig schützt, bietet die UI nicht autorisierte Aktionen an.
-- **Fix:**
-```dart
-final currentUserRole = ref.read(currentRoleProvider);
-if (!currentUserRole.isConductor && !currentUserRole.isHelper) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Keine Berechtigung')),
-  );
-  return;
-}
-```
+### RT-005: Unsafe Type Cast in historie_accordion
+- **Kategorie:** Runtime
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/historie_accordion.dart:99-100`
+- **Problem:** `stats['percentage'] as int` ohne null-Coalescing
+- **Fix:** `stats['percentage'] as int? ?? 0`
 - **Status:** [ ] Offen
 
-### RT-001: Force Unwrap auf tenant!.id! und person.id! ohne Null-Check
+### RT-006: Late Variables ohne Initialization-Garantie
 - **Kategorie:** Runtime
-- **Dateien:**
-  - `lib/features/people/presentation/pages/person_detail_page.dart:70` (personAttendanceStatsProvider)
-  - `lib/features/people/presentation/pages/person_detail_page.dart:427` (_saveChanges)
-  - `lib/features/people/presentation/pages/person_detail_page.dart:1796` (_buildRoleSelector)
-- **Problem:** `tenant!.id!` und `person.id!` werden verwendet ohne vorherigen Null-Check. Bei fehlenden IDs crasht die App.
-- **Auswirkung:** Garantierte App-Crashes bei neuen Personen oder fehlenden Tenant-Daten.
-- **Fix:**
-```dart
-final tenantId = tenant?.id;
-if (person.id == null || tenantId == null) {
-  // Handle error gracefully
-  return;
-}
-```
+- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:280-294`
+- **Problem:** Mehrere `late` Variablen können LateInitializationError verursachen
+- **Fix:** Nullable Typ mit initialer Zuweisung verwenden
 - **Status:** [ ] Offen
 
-### RT-002: Force Unwrap bei imageUrl ohne konsistenten Check
+### RT-007: Force Unwrap auf Entity IDs in Selection
 - **Kategorie:** Runtime
-- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:913,917`
-- **Problem:** `person.imageUrl!.contains('.svg')` wird verwendet. Bei paralleler Ausführung oder State-Änderung könnte imageUrl zwischenzeitlich null werden.
-- **Fix:**
-```dart
-backgroundImage: (person.imageUrl?.contains('.svg') == false)
-    ? NetworkImage(person.imageUrl!)
-    : null,
-```
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/allgemein_accordion.dart:388,433,555`
+- **Problem:** `.map((t) => SelectionItem(value: t.id!, ...))` ohne null-Filter
+- **Fix:** `.where((t) => t.id != null)` vor dem Map
 - **Status:** [ ] Offen
 
-### RT-003: availableTenants.first ohne isNotEmpty Check
+### RT-004: Type Cast auf RoundedRectangleBorder
 - **Kategorie:** Runtime
-- **Datei:** `lib/features/people/presentation/widgets/handover_sheet.dart:82`
-- **Problem:** `availableTenants.first.id` wird verwendet. Zwischen Check und Zugriff könnte sich State ändern.
-- **Fix:**
-```dart
-_targetTenantId = availableTenants.firstOrNull?.id;
-if (_targetTenantId == null) return;
-```
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:889`
+- **Problem:** Cast könnte fehlschlagen bei anderem Theme
+- **Status:** [x] Bereits gefixt mit is-Check
+
+### SEC-001: Handover - Fehlende Autorisierungsprüfung im Repository
+- **Kategorie:** Security
+- **Datei:** `lib/data/repositories/player_repository.dart:866-962`
+- **Problem:** Repository prüft nicht Schreibrechte im Ziel-Tenant
+- **Fix:** Autorisierungsprüfung im Repository implementieren
 - **Status:** [ ] Offen
+
+### SEC-002: Fehlerdetails in UI angezeigt
+- **Kategorie:** Security
+- **Datei:** Mehrere (person_detail_page, person_create_page, people_list_page, handover_sheet)
+- **Problem:** Exception-Details `$e` werden dem User angezeigt
+- **Fix:** Generische Fehlermeldungen, Details nur in Debug-Mode
+- **Status:** [ ] Offen
+
+### FN-001: RefreshIndicator ohne await
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:413-417`
+- **Problem:** `onRefresh` ohne await auf Provider-Invalidierung
+- **Fix:** `await ref.read(realtimePlayersProvider.future)` hinzufügen
+- **Status:** [ ] Offen
+
+### FN-003: Fehlende Validierung bei teacher-Dropdown
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/allgemein_accordion.dart:361`
+- **Problem:** `hasTeacher=true` ohne Lehrer-Auswahl möglich
+- **Fix:** Validierung in `_saveChanges()` hinzufügen
+- **Status:** [ ] Offen
+
+### BL-004: Keine Duplikat-Prüfung beim Erstellen
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/pages/person_create_page.dart:366-411`
+- **Problem:** Keine Prüfung auf existierende E-Mail
+- **Fix:** Existenzprüfung vor Insert
+- **Status:** [ ] Offen
+
+### BL-005: Race Condition bei Handover
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/data/repositories/player_repository.dart:866-962`
+- **Problem:** Mehrere Operationen ohne Transaktion
+- **Fix:** Supabase RPC-Funktion oder Rollback-Logik
+- **Status:** [ ] Offen
+
+### BL-006: Pausierung entfernt aus Terminen ohne Rückgängig
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/data/repositories/player_repository.dart:361-365`
+- **Problem:** Attendance-Einträge werden bei Pause gelöscht
+- **Status:** [x] Teilweise implementiert (addToUpcoming bei unpause)
 
 ---
 
 ## MITTEL
 
-### BL-001: Statistik-Berechnung mit falscher Logik für 'attended'
-- **Kategorie:** Business-Logik
-- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:83-84`
-- **Problem:** `a['attended'] == true` sucht nach Feld das nicht existiert. Die Datenstruktur verwendet `status` als Integer (1=present).
-- **Auswirkung:** `attended` ist immer 0, Anwesenheitsrate wird falsch berechnet (immer 0%).
-- **Fix:**
-```dart
-final attended = pastAttendances.where((a) {
-  final status = a['status'] as int?;
-  return status == 1 || status == 3 || status == 5; // present, late, lateExcused
-}).length;
-```
-- **Status:** [ ] Offen
-
-### BL-002: Handover ohne Rollen-Prüfung für Target-Tenant
-- **Kategorie:** Business-Logik
-- **Datei:** `lib/features/people/presentation/widgets/handover_sheet.dart:543-604`
-- **Problem:** Die Handover-Logik prüft nicht, ob der Benutzer im Ziel-Tenant Admin-Rechte hat.
-- **Auswirkung:** Benutzer könnte Spieler in Tenants übertragen ohne dortige Berechtigung.
-- **Fix:** Rollenpruefung für Target-Tenant hinzufügen.
-- **Status:** [ ] Offen
-
-### FN-001: TextEditingController Memory Leak in _buildExtraFieldInput
-- **Kategorie:** Funktional
-- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:1295-1323`
-- **Problem:** Neue TextEditingController werden im Widget-Baum erstellt ohne dispose. Bei jedem Rebuild neue Controller.
-- **Auswirkung:** Memory Leak bei häufigen Rebuilds.
-- **Fix:**
-```dart
-TextFormField(
-  initialValue: currentValue?.toString() ?? '',
-  onChanged: (value) {
-    _additionalFieldValues[field.id] = value;
-    _markChanged();
-  },
-)
-```
-- **Status:** [ ] Offen
-
-### FN-002: Inkonsistente RefreshIndicator Provider-Verwendung
-- **Kategorie:** Funktional
-- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:412-416 vs 494-498`
-- **Problem:** Liste zeigt `realtimePlayersProvider`, aber RefreshIndicator invalidiert `peopleListProvider`.
-- **Auswirkung:** Pull-to-Refresh aktualisiert falschen Provider.
-- **Fix:** Konsistent `realtimePlayersProvider` verwenden.
-- **Status:** [ ] Offen
-
-### FN-003: Missing Email Validation in Edit Form
-- **Kategorie:** Funktional
-- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:973-1284`
-- **Problem:** Edit-Formular hat keine E-Mail-Validierung (Create-Page hat sie).
-- **Auswirkung:** User kann ungültige E-Mail-Adressen beim Bearbeiten eingeben.
-- **Fix:** E-Mail-Validierung hinzufügen.
-- **Status:** [ ] Offen
-
-### FN-004: setState in Build-Methode via addPostFrameCallback
-- **Kategorie:** Funktional
-- **Datei:** `lib/features/people/presentation/widgets/handover_sheet.dart:78-87`
-- **Problem:** Pattern mit addPostFrameCallback + setState in `.when(data:)` verursacht unnötige Rebuilds.
-- **Fix:** Initialisierung in initState oder didChangeDependencies.
-- **Status:** [ ] Offen
-
-### FN-005: FutureBuilder ohne Refresh-Mechanismus für Rolle
-- **Kategorie:** Funktional
-- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:1795-1843`
-- **Problem:** Nach Rollenänderung via `_updateUserRole` wird FutureBuilder nicht aktualisiert.
-- **Auswirkung:** UI zeigt alte Rolle bis Page neu geladen wird.
-- **Fix:** Rolle als State verwalten oder Provider invalidieren.
-- **Status:** [ ] Offen
-
-### RT-004: Unsafe Cast auf cardShape
-- **Kategorie:** Runtime
-- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:881`
-- **Problem:** `theme.cardTheme.shape as RoundedRectangleBorder?` kann bei anderem ShapeBorder-Typ fehlschlagen.
-- **Fix:**
-```dart
-final cardShape = theme.cardTheme.shape is RoundedRectangleBorder
-    ? theme.cardTheme.shape as RoundedRectangleBorder
-    : const RoundedRectangleBorder();
-```
-- **Status:** [ ] Offen
-
-### SEC-002: Debug-Logs könnten sensitive Daten enthalten
+### SEC-003: Debug-Prints mit sensiblen Daten
 - **Kategorie:** Security
-- **Dateien:**
-  - `lib/features/people/presentation/pages/people_list_page.dart:52-59`
-  - `lib/features/people/presentation/widgets/handover_sheet.dart:510`
-- **Problem:** Bei Fehlern werden JSON-Daten (potentiell PII) in Logs ausgegeben.
-- **Fix:**
-```dart
-if (kDebugMode) {
-  debugPrint('Error parsing person: $parseError');
-}
-```
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:55-56,64-65`
+- **Problem:** JSON-Daten mit PII werden geloggt
+- **Fix:** Nur Fehlermeldung loggen, nicht die Daten
+- **Status:** [ ] Offen
+
+### SEC-004: Fehlende MaxLength-Constraints
+- **Kategorie:** Security
+- **Datei:** person_detail_page, person_create_page, problemfall_accordion
+- **Problem:** TextField ohne `maxLength`
+- **Fix:** `maxLength: 500` (oder angemessen) hinzufügen
+- **Status:** [ ] Offen
+
+### SEC-005: UI-only Role Checks
+- **Kategorie:** Security
+- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:942-986`
+- **Problem:** Rollen-Update nur Frontend-geprüft
+- **Fix:** RLS-Policy auf tenantUsers sicherstellen
+- **Status:** [ ] Offen
+
+### FN-004: _launchPhone nicht implementiert
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/allgemein_accordion.dart:716-718`
+- **Problem:** Methode ist leer mit TODO
+- **Fix:** `url_launcher` mit `tel:$phone` implementieren
+- **Status:** [ ] Offen
+
+### FN-005: stats['percentage'] kann null sein
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/historie_accordion.dart:99-100`
+- **Problem:** Type Cast ohne null-Check
+- **Fix:** `as int? ?? 0`
+- **Status:** [ ] Offen
+
+### FN-006: Fehlende Error-State Anzeige in PersonHeader
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/person_header.dart:77-79`
+- **Problem:** Error-State wird mit `SizedBox.shrink()` behandelt
+- **Fix:** Fehlermeldung anzeigen
+- **Status:** [ ] Offen
+
+### FN-007: person.critical vs person.isCritical Inkonsistenz
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:916,932`
+- **Problem:** Inkonsistente Property-Verwendung
+- **Fix:** Auf `person.isCritical` vereinheitlichen
+- **Status:** [ ] Offen
+
+### FN-008: SelectionSheet Ergebnis nicht vollständig geprüft
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/allgemein_accordion.dart:263-270`
+- **Problem:** Abbruch könnte unexpected State verursachen
+- **Fix:** Explizite null-Prüfung bei Abbruch
+- **Status:** [ ] Offen
+
+### RT-010: Dynamic shift Parameter
+- **Kategorie:** Runtime
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/allgemein_accordion.dart:469-471`
+- **Problem:** `shift` als dynamic, kein Type-Check
+- **Fix:** Typsicheren Parameter verwenden
+- **Status:** [ ] Offen
+
+### BL-007: isCurrentlyPaused ignoriert abgelaufene Pause
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/data/models/person/person.dart:184-190`
+- **Problem:** Zeigt paused an obwohl pausedUntil abgelaufen
+- **Fix:** auto-unpause Job häufiger ausführen
+- **Status:** [ ] Offen
+
+### BL-008: Fehlende Warnung bei Handover ohne Gruppe
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/widgets/handover_sheet.dart:349-450`
+- **Problem:** Keine Warnung wenn Spieler ohne Gruppe übertragen wird
+- **Fix:** Warnung anzeigen
+- **Status:** [ ] Offen
+
+### BL-009: peopleListProvider ohne Gruppen-Fallback
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:22-69`
+- **Problem:** Fehler bei Gruppen-Laden blockiert gesamte Liste
+- **Fix:** Try-catch mit leerer Map als Fallback
+- **Status:** [ ] Offen
+
+### BL-010: Email-Validierung nur Client-seitig
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/pages/person_create_page.dart:217-225`
+- **Problem:** Keine serverseitige E-Mail-Validierung
+- **Fix:** Supabase Check Constraint hinzufügen
 - **Status:** [ ] Offen
 
 ---
 
 ## NIEDRIG
 
-### BL-003: Account-Erstellung nicht implementiert
+### SEC-006: Keine E-Mail-Domain-Validierung bei Handover
+- **Kategorie:** Security
+- **Datei:** `lib/data/repositories/player_repository.dart:937-955`
+- **Problem:** E-Mail ohne weitere Validierung übertragen
+- **Status:** [ ] Offen
+
+### FN-009: imageUrl vs img Property Inkonsistenz
+- **Kategorie:** Funktional
+- **Datei:** people_list_page.dart vs person_header.dart
+- **Problem:** Unterschiedliche Properties für Bild
+- **Status:** [ ] Offen
+
+### FN-010: problemNotes nicht persistent
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/problemfall_accordion.dart:119`
+- **Problem:** Notes gehen bei Refresh verloren
+- **Status:** [ ] Offen
+
+### FN-011: Keyboard-Type fehlt bei Notizen
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/widgets/person_detail/problemfall_accordion.dart:112-119`
+- **Problem:** Kein `textCapitalization`
+- **Status:** [ ] Offen
+
+### FN-012: Duplizierte Pause-Dialog-Logik
+- **Kategorie:** Funktional
+- **Datei:** people_list_page.dart, person_detail_page.dart
+- **Problem:** Code-Duplikation
+- **Status:** [ ] Offen
+
+### FN-013: Falscher Tooltip-Text
+- **Kategorie:** Funktional
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:320`
+- **Problem:** "Gruppe wechseln" navigiert zu Tenants
+- **Status:** [ ] Offen
+
+### BL-011: Selection Mode bei Tenant-Wechsel nicht zurückgesetzt
 - **Kategorie:** Business-Logik
-- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:2021-2052`
-- **Problem:** `_createAccount()` zeigt nur Hinweis, Funktion fehlt.
-- **Auswirkung:** UI bietet nicht funktionierende Funktion an.
-- **Fix:** Funktion implementieren oder Button ausblenden.
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:79-93`
+- **Problem:** Alte Selektionen bleiben nach Tenant-Wechsel
 - **Status:** [ ] Offen
 
-### FN-006: Keine Form-Validierung im Edit-Modus
-- **Kategorie:** Funktional
-- **Datei:** `lib/features/people/presentation/pages/person_detail_page.dart:961`
-- **Problem:** Kein Form mit GlobalKey und keine Pflichtfeld-Validierung.
-- **Auswirkung:** User kann leere Namen speichern.
-- **Fix:** Form mit Validierung hinzufügen.
+### BL-012: History-Einträge ohne Limit
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/data/repositories/player_repository.dart:256-265`
+- **Problem:** Unbegrenztes History-Array
 - **Status:** [ ] Offen
 
-### FN-007: Doppelte _loadTargetGroups Aufrufe
-- **Kategorie:** Funktional
-- **Datei:** `lib/features/people/presentation/widgets/handover_sheet.dart:343-346`
-- **Problem:** Methode wird redundant aufgerufen.
-- **Auswirkung:** Potentielle mehrfache API-Aufrufe.
-- **Fix:** Redundanten Aufruf entfernen.
+### BL-013: checkAndUnpausePlayers bei jedem Laden
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/features/people/presentation/pages/people_list_page.dart:31-32`
+- **Problem:** Unnötige DB-Queries bei jedem Refresh
 - **Status:** [ ] Offen
 
-### SEC-003: Debug-Log in Handover Sheet
-- **Kategorie:** Security (NIEDRIG)
-- **Datei:** `lib/features/people/presentation/widgets/handover_sheet.dart:510`
-- **Problem:** Wie SEC-002.
+### BL-014: Handover-Duplikat-Check unvollständig
+- **Kategorie:** Business-Logik
+- **Datei:** `lib/data/repositories/player_repository.dart:823-853`
+- **Problem:** Nur Email/AppId geprüft, nicht Name
 - **Status:** [ ] Offen
 
 ---
 
 ## Scan-Details
 
-- **Gescannte Dateien:** 4 Feature-Dateien + zugehörige Repositories/Providers
+- **Gescannte Dateien:** ~15 (People Feature + Repository + Providers)
 - **Scanner verwendet:** business-logic, functional, runtime, security
-- **Dauer:** ~2 Minuten
-- **Duplikate entfernt:** 6 (zusammengefasste Issues)
-
-## Positive Sicherheitsaspekte
-
-1. **Korrekte Multi-Tenant-Isolation:** Alle Supabase-Queries filtern nach `tenantId`
-2. **Rollen-Check bei Account-Operationen:** `_updateUserRole()` und `_unlinkAccount()` prüfen `isConductor`
-3. **Tenant-Guard in Providers:** Alle `*WithTenantProvider` verwenden `hasTenantId` Check
-4. **Inner-Joins für Cross-Table Security:** `person_attendances` wird korrekt via `!inner` Join gefiltert
+- **Dauer:** ~8 Minuten (parallel)
+- **False Positives entfernt:** 4 (bereits korrekt implementierte Patterns)
 
 ## Nächste Schritte
 
-1. **HOCH-Bugs zuerst:** Rollen-Prüfungen und Force-Unwraps fixen
-2. **attended-Berechnung:** BL-001 korrigiert die Statistik-Anzeige
-3. **Memory Leaks:** TextEditingController Pattern verbessern
-4. **Code Review:** Nach Fixes mit `/simplify` optimieren
+1. **Kritische Bugs SOFORT fixen** - Force Unwraps und Berechtigungsprüfungen
+2. **GitHub Issues erstellen** für die gefundenen Bugs
+3. **Hohe Bugs in Sprint einplanen** - Security und Validierungen
+4. **/fix-issues** für batch-fixing verwenden
