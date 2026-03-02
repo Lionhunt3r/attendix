@@ -76,7 +76,10 @@ class ViewersPage extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(viewersProvider),
+            onRefresh: () async {
+              ref.invalidate(viewersProvider);
+              await ref.read(viewersProvider.future);
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               itemCount: viewers.length,

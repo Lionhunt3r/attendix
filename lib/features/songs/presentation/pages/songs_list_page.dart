@@ -391,6 +391,10 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                   onRefresh: () async {
                     ref.invalidate(songsProvider);
                     ref.invalidate(currentSongsProvider);
+                    await Future.wait([
+                      ref.read(songsProvider.future),
+                      ref.read(currentSongsProvider.future),
+                    ]);
                   },
                   child: ListView(
                     padding: const EdgeInsets.all(AppDimensions.paddingM),
