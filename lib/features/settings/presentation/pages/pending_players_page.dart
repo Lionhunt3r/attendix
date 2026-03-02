@@ -95,7 +95,10 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(pendingPlayersProvider),
+            onRefresh: () async {
+              ref.invalidate(pendingPlayersProvider);
+              await ref.read(pendingPlayersProvider.future);
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               itemCount: players.length,

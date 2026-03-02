@@ -76,7 +76,10 @@ class ParentsPage extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(parentsProvider),
+            onRefresh: () async {
+              ref.invalidate(parentsProvider);
+              await ref.read(parentsProvider.future);
+            },
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               itemCount: parents.length,
