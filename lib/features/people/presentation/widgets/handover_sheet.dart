@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -33,6 +34,28 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
   String _progressMessage = '';
   final Map<int, int?> _groupMapping = {};
   List<Group> _targetGroups = [];
+  bool _initialized = false;
+
+  // FN-004: Move initialization to didChangeDependencies instead of build
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initializeTargetTenant();
+    }
+  }
+
+  void _initializeTargetTenant() {
+    final tenants = ref.read(userTenantsProvider).valueOrNull ?? [];
+    final currentTenant = ref.read(currentTenantProvider);
+    final availableTenants = tenants.where((t) => t.id != currentTenant?.id).toList();
+
+    if (availableTenants.isNotEmpty && _targetTenantId == null) {
+      _targetTenantId = availableTenants.first.id;
+      _initialized = true;
+      _loadTargetGroups();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,20 +98,10 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                     return _buildNoTenantsMessage();
                   }
 
-                  // Initialize target tenant if not set (using addPostFrameCallback to avoid setState during build)
-                  // RT-003: Use firstOrNull to safely handle empty list
-                  if (_targetTenantId == null) {
-                    final firstTenantId = availableTenants.firstOrNull?.id;
-                    if (firstTenantId != null) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted && _targetTenantId == null) {
-                          setState(() {
-                            _targetTenantId = firstTenantId;
-                          });
-                          _loadTargetGroups();
-                        }
-                      });
-                    }
+                  // FN-004: Initialization moved to didChangeDependencies
+                  // Late init if provider wasn't ready in didChangeDependencies
+                  if (_targetTenantId == null && !_initialized) {
+                    _initializeTargetTenant();
                   }
 
                   return ListView(
@@ -548,8 +561,44 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
     return null;
   }
 
+  /// BL-002: Get user's role in a specific tenant
+  Future<Role?> _getUserRoleInTenant(int tenantId) async {
+    final supabase = ref.read(supabaseClientProvider);
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return null;
+
+    try {
+      final response = await supabase
+          .from('tenantUsers')
+          .select('role')
+          .eq('tenantId', tenantId)
+          .eq('userId', userId)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return Role.fromValue(response['role'] as int? ?? 99);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Error getting user role in tenant: $e');
+      }
+      return null;
+    }
+  }
+
   Future<void> _performHandover(Tenant? currentTenant) async {
     if (_targetTenantId == null || currentTenant == null) return;
+
+    // BL-002: Check if user has edit permission in target tenant
+    final targetRole = await _getUserRoleInTenant(_targetTenantId!);
+    if (targetRole == null || !targetRole.canEdit) {
+      if (mounted) {
+        ToastHelper.showError(
+          context,
+          'Keine Berechtigung in der Ziel-Instanz',
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isTransferring = true;
