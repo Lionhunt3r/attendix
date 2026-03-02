@@ -505,10 +505,10 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                         PlanAccordion(
                           attendance: attendance,
                           onCreate: () {
-                            context.push('/planning/${widget.attendanceId}');
+                            context.push('/planning?attendanceId=${widget.attendanceId}');
                           },
                           onEdit: () {
-                            context.push('/planning/${widget.attendanceId}');
+                            context.push('/planning?attendanceId=${widget.attendanceId}');
                           },
                           onExportPdf: _exportPlanPdf,
                           onSendViaTelegram: _sendPlanViaTelegram,
