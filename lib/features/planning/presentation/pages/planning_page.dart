@@ -1,9 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
+import '../../../../core/providers/song_providers.dart';
 import '../../../../core/services/export_service.dart';
+import '../../../../core/services/telegram_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
@@ -18,6 +23,7 @@ class FieldSelection {
   String time;
   String? conductor;
   int? songId;
+  bool isNote;
 
   FieldSelection({
     required this.id,
@@ -25,6 +31,7 @@ class FieldSelection {
     required this.time,
     this.conductor,
     this.songId,
+    this.isNote = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -33,6 +40,7 @@ class FieldSelection {
         'time': time,
         'conductor': conductor,
         'songId': songId,
+        'isNote': isNote,
       };
 
   factory FieldSelection.fromJson(Map<String, dynamic> json) => FieldSelection(
@@ -41,6 +49,7 @@ class FieldSelection {
         time: json['time'] as String,
         conductor: json['conductor'] as String?,
         songId: json['songId'] as int?,
+        isNote: json['isNote'] as bool? ?? false,
       );
 }
 
@@ -115,12 +124,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {
-                _fields = [FieldSelection(id: 'default', name: 'Wort', time: '10')];
-              });
-              _calculateEnd();
-            },
+            onPressed: () => _resetToDefault(attendancesAsync.valueOrNull ?? []),
             tooltip: 'Zurücksetzen',
           ),
           PopupMenuButton<String>(
@@ -343,32 +347,44 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
                         child: Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
-                            leading: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  calculatedTime,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
+                            leading: field.isNote
+                                ? const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.note_outlined, color: AppColors.info),
+                                    ],
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        calculatedTime,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${field.time} min',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.medium,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                Text(
-                                  '${field.time} min',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.medium,
-                                  ),
-                                ),
-                              ],
-                            ),
                             title: Text(
                               field.name,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontStyle: field.isNote ? FontStyle.italic : FontStyle.normal,
+                              ),
                             ),
                             subtitle: field.conductor != null && field.conductor!.isNotEmpty
                                 ? Text(field.conductor!)
-                                : null,
+                                : field.isNote
+                                    ? Text('Notiz', style: TextStyle(color: AppColors.info, fontSize: 12))
+                                    : null,
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -388,11 +404,141 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddFieldDialog(songsAsync.valueOrNull ?? []),
+      floatingActionButton: _buildFloatingButtons(songsAsync.valueOrNull ?? []),
+    );
+  }
+
+  Widget _buildFloatingButtons(List<Song> songs) {
+    final notificationConfig = ref.watch(notificationConfigProvider).valueOrNull;
+    final hasTelegram = notificationConfig?.telegramChatId != null &&
+        notificationConfig!.telegramChatId!.isNotEmpty;
+
+    if (!hasTelegram) {
+      return FloatingActionButton(
+        onPressed: () => _showAddFieldDialog(songs),
         child: const Icon(Icons.add),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton.small(
+          heroTag: 'telegram',
+          onPressed: _showTelegramOptions,
+          backgroundColor: AppColors.info,
+          child: const Icon(Icons.send, size: 20),
+        ),
+        const SizedBox(height: 12),
+        FloatingActionButton(
+          heroTag: 'add',
+          onPressed: () => _showAddFieldDialog(songs),
+          child: const Icon(Icons.add),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showTelegramOptions() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('PDF (A4)'),
+              subtitle: const Text('Standard-Format'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_cut),
+              title: const Text('PDF (2x A5)'),
+              subtitle: const Text('Zwei Pläne auf einer Seite'),
+              onTap: () => Navigator.pop(ctx, '2xa5'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.image),
+              title: const Text('Als Bild'),
+              subtitle: const Text('Für schnelle Vorschau'),
+              onTap: () => Navigator.pop(ctx, 'image'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
+    if (result != null && mounted) await _sendViaTelegram(result);
+  }
+
+  Future<void> _sendViaTelegram(String format) async {
+    if (_fields.isEmpty) {
+      ToastHelper.showWarning(context, 'Keine Programmpunkte zum Senden');
+      return;
+    }
+
+    final tenant = ref.read(currentTenantProvider);
+    final notificationConfig = ref.read(notificationConfigProvider).valueOrNull;
+
+    if (tenant == null || notificationConfig?.telegramChatId == null) {
+      ToastHelper.showError(context, 'Telegram nicht konfiguriert');
+      return;
+    }
+
+    // Get date for filename
+    String dateStr = DateTime.now().toIso8601String().substring(0, 10);
+    if (_selectedAttendanceId != null) {
+      final attendances = ref.read(upcomingAttendancesProvider).valueOrNull ?? [];
+      final selected = attendances.where((a) => a.id == _selectedAttendanceId).firstOrNull;
+      if (selected != null) {
+        dateStr = selected.formattedDate;
+      }
+    }
+
+    try {
+      ToastHelper.showInfo(context, 'Sende Plan...');
+
+      final exportService = ExportService();
+      final telegramService = ref.read(telegramServiceProvider);
+
+      late final Uint8List bytes;
+
+      if (format == '2xa5') {
+        // Generate 2xA5 PDF
+        bytes = await exportService.generatePlan2xA5PdfBytes(
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: _formatTime(_startTime),
+          endTime: _endTime != null ? _formatTime(_endTime!) : null,
+          fields: _fields.map((f) => f.toJson()).toList(),
+        );
+      } else {
+        // Generate standard A4 PDF (also used for 'image' since we can't easily convert)
+        bytes = await exportService.generatePlanPdfBytes(
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: _formatTime(_startTime),
+          endTime: _endTime != null ? _formatTime(_endTime!) : null,
+          fields: _fields.map((f) => f.toJson()).toList(),
+        );
+      }
+
+      await telegramService.sendPlanPerTelegram(
+        fileBytes: bytes,
+        name: '${tenant.shortName}_Plan_$dateStr',
+        chatId: notificationConfig!.telegramChatId!,
+        asImage: format == 'image',
+      );
+
+      if (mounted) {
+        ToastHelper.showSuccess(context, 'Plan gesendet!');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler beim Senden: $e');
+      }
+    }
   }
 
   void _navigateAttendance(List<Attendance> attendances, int direction) {
@@ -408,44 +554,110 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   }
 
   void _loadPlanFromAttendance(Attendance attendance) {
-    if (attendance.plan != null) {
-      try {
-        final plan = attendance.plan as Map<String, dynamic>;
-        final fields = (plan['fields'] as List?)
-            ?.map((f) => FieldSelection.fromJson(f as Map<String, dynamic>))
-            .toList();
-
-        if (fields != null && fields.isNotEmpty) {
-          setState(() => _fields = fields);
-        }
-
-        // Parse time
-        final timeStr = plan['time'] as String?;
-        if (timeStr != null && timeStr.isNotEmpty) {
-          final parts = timeStr.split(':');
-          if (parts.length >= 2) {
-            setState(() {
-              _startTime = TimeOfDay(
-                hour: int.tryParse(parts[0]) ?? 17,
-                minute: int.tryParse(parts[1]) ?? 50,
-              );
-            });
-          }
-        }
-      } catch (e) {
-        // Plan parsing failed, keep defaults
-      }
+    if (attendance.plan != null && (attendance.plan as Map).isNotEmpty) {
+      _loadExistingPlan(attendance.plan!);
+    } else if (attendance.typeId != null) {
+      _loadDefaultPlanFromType(attendance.typeId!, attendance);
     } else {
-      // No plan, reset to defaults
-      setState(() {
-        _fields = [FieldSelection(id: 'default', name: 'Wort', time: '10')];
-        _startTime = attendance.type == 'uebung'
-            ? const TimeOfDay(hour: 17, minute: 50)
-            : const TimeOfDay(hour: 10, minute: 0);
-      });
+      _setDefaultFields(attendance);
+    }
+    _applyStartTimeFromType(attendance);
+    _calculateEnd();
+  }
+
+  void _loadExistingPlan(Map<String, dynamic> plan) {
+    try {
+      final fields = (plan['fields'] as List?)
+          ?.map((f) => FieldSelection.fromJson(f as Map<String, dynamic>))
+          .toList();
+
+      if (fields != null && fields.isNotEmpty) {
+        setState(() => _fields = fields);
+      }
+
+      // Parse time
+      final timeStr = plan['time'] as String?;
+      if (timeStr != null && timeStr.isNotEmpty) {
+        final parts = timeStr.split(':');
+        if (parts.length >= 2) {
+          setState(() {
+            _startTime = TimeOfDay(
+              hour: int.tryParse(parts[0]) ?? 17,
+              minute: int.tryParse(parts[1]) ?? 50,
+            );
+          });
+        }
+      }
+    } catch (e) {
+      // Plan parsing failed, keep defaults
+    }
+  }
+
+  void _loadDefaultPlanFromType(String typeId, Attendance attendance) {
+    final types = ref.read(attendanceTypesProvider).valueOrNull ?? [];
+    final type = types.where((t) => t.id == typeId).firstOrNull;
+
+    if (type?.defaultPlan == null ||
+        (type!.defaultPlan!['fields'] as List?)?.isEmpty != false) {
+      _setDefaultFields(attendance);
+      return;
     }
 
-    _calculateEnd();
+    final currentSongsData = ref.read(currentSongsProvider).valueOrNull ?? [];
+    final historyFlat = currentSongsData.expand((e) => e.history).toList();
+
+    final fields = <FieldSelection>[];
+    int placeholderIdx = 0;
+
+    for (final field in type.defaultPlan!['fields'] as List) {
+      final f = field as Map<String, dynamic>;
+      final id = f['id'] as String? ?? '';
+
+      if (id.startsWith('song-placeholder-')) {
+        // Replace with actual song from history
+        if (placeholderIdx < historyFlat.length) {
+          final h = historyFlat[placeholderIdx++];
+          fields.add(FieldSelection(
+            id: h.songId.toString(),
+            name: '${h.song?.number ?? ''}. ${h.song?.name ?? 'Werk'}'.replaceFirst('. ', '').trim(),
+            time: f['time'] as String? ?? '20',
+            conductor: h.conductorName ?? h.song?.conductor,
+            songId: h.songId,
+          ));
+        }
+      } else {
+        fields.add(FieldSelection.fromJson(f));
+      }
+    }
+
+    setState(() => _fields = fields.isEmpty
+        ? [FieldSelection(id: 'default', name: 'Wort', time: '10')]
+        : fields);
+  }
+
+  void _setDefaultFields(Attendance attendance) {
+    setState(() {
+      _fields = [FieldSelection(id: 'default', name: 'Wort', time: '10')];
+      _startTime = attendance.type == 'uebung'
+          ? const TimeOfDay(hour: 17, minute: 50)
+          : const TimeOfDay(hour: 10, minute: 0);
+    });
+  }
+
+  void _applyStartTimeFromType(Attendance attendance) {
+    if (attendance.typeId == null) return;
+    final types = ref.read(attendanceTypesProvider).valueOrNull ?? [];
+    final type = types.where((t) => t.id == attendance.typeId).firstOrNull;
+
+    if (type?.startTime != null && type!.startTime!.isNotEmpty) {
+      final parts = type.startTime!.split(':');
+      if (parts.length >= 2) {
+        setState(() => _startTime = TimeOfDay(
+              hour: int.tryParse(parts[0]) ?? 17,
+              minute: int.tryParse(parts[1]) ?? 50,
+            ));
+      }
+    }
   }
 
   String _formatTime(TimeOfDay time) {
@@ -464,6 +676,29 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     final hour = (totalMinutes ~/ 60) % 24;
     final minute = totalMinutes % 60;
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+  }
+
+  void _resetToDefault(List<Attendance> attendances) {
+    if (_selectedAttendanceId == null) {
+      setState(() => _fields = [FieldSelection(id: 'default', name: 'Wort', time: '10')]);
+      _calculateEnd();
+      return;
+    }
+    final attendance = attendances.where((a) => a.id == _selectedAttendanceId).firstOrNull;
+    if (attendance == null) {
+      setState(() => _fields = [FieldSelection(id: 'default', name: 'Wort', time: '10')]);
+      _calculateEnd();
+      return;
+    }
+    // Reload from type's default plan
+    if (attendance.typeId != null) {
+      _loadDefaultPlanFromType(attendance.typeId!, attendance);
+    } else {
+      _setDefaultFields(attendance);
+    }
+    _applyStartTimeFromType(attendance);
+    _calculateEnd();
+    _savePlan();
   }
 
   void _calculateEnd() {
@@ -495,10 +730,23 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   }
 
   Future<void> _showAddFieldDialog(List<Song> songs) async {
+    final existingSongIds = _fields
+        .where((f) => f.songId != null)
+        .map((f) => f.songId!)
+        .toSet();
+
     final result = await showModalBottomSheet<FieldSelection>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddFieldSheet(songs: songs),
+      builder: (context) => _AddFieldSheet(
+        songs: songs,
+        existingSongIds: existingSongIds,
+        onAddMultiple: (newFields) {
+          setState(() => _fields.addAll(newFields));
+          _calculateEnd();
+          _savePlan();
+        },
+      ),
     );
 
     if (result != null) {
@@ -517,29 +765,32 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Feld bearbeiten'),
+        title: Text(field.isNote ? 'Notiz bearbeiten' : 'Feld bearbeiten'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Name *'),
+                decoration: InputDecoration(labelText: field.isNote ? 'Notiz *' : 'Name *'),
+                maxLines: field.isNote ? 2 : 1,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: conductorController,
-                decoration: const InputDecoration(labelText: 'Ausführender'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: timeController,
-                decoration: const InputDecoration(
-                  labelText: 'Dauer (Minuten)',
-                  suffixText: 'min',
+              if (!field.isNote) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: conductorController,
+                  decoration: const InputDecoration(labelText: 'Ausführender'),
                 ),
-                keyboardType: TextInputType.number,
-              ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: timeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Dauer (Minuten)',
+                    suffixText: 'min',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
             ],
           ),
         ),
@@ -567,9 +818,10 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
         _fields[index] = FieldSelection(
           id: field.id,
           name: nameController.text.trim(),
-          conductor: conductorController.text.trim(),
-          time: timeController.text.trim().isNotEmpty ? timeController.text.trim() : '10',
+          conductor: field.isNote ? null : conductorController.text.trim(),
+          time: field.isNote ? '0' : (timeController.text.trim().isNotEmpty ? timeController.text.trim() : '10'),
           songId: field.songId,
+          isNote: field.isNote,
         );
       });
       _calculateEnd();
@@ -688,26 +940,33 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 }
 
 /// Bottom sheet for adding a new field
-class _AddFieldSheet extends StatefulWidget {
+class _AddFieldSheet extends ConsumerStatefulWidget {
   final List<Song> songs;
+  final Set<int> existingSongIds;
+  final void Function(List<FieldSelection>) onAddMultiple;
 
-  const _AddFieldSheet({required this.songs});
+  const _AddFieldSheet({
+    required this.songs,
+    required this.existingSongIds,
+    required this.onAddMultiple,
+  });
 
   @override
-  State<_AddFieldSheet> createState() => _AddFieldSheetState();
+  ConsumerState<_AddFieldSheet> createState() => _AddFieldSheetState();
 }
 
-class _AddFieldSheetState extends State<_AddFieldSheet> with SingleTickerProviderStateMixin {
+class _AddFieldSheetState extends ConsumerState<_AddFieldSheet> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _nameController = TextEditingController();
   final _conductorController = TextEditingController();
   final _timeController = TextEditingController(text: '20');
+  final _noteController = TextEditingController();
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -716,7 +975,50 @@ class _AddFieldSheetState extends State<_AddFieldSheet> with SingleTickerProvide
     _nameController.dispose();
     _conductorController.dispose();
     _timeController.dispose();
+    _noteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _addCurrentSongs(BuildContext sheetContext) async {
+    final currentSongsData = ref.read(currentSongsProvider).valueOrNull ?? [];
+    final historyFlat = currentSongsData.expand((e) => e.history).toList();
+
+    // Filter to songs not already in the plan
+    final newFields = historyFlat
+        .where((h) => h.songId != null && !widget.existingSongIds.contains(h.songId))
+        .map((h) => FieldSelection(
+              id: h.songId.toString(),
+              name: '${h.song?.number ?? ''}. ${h.song?.name ?? 'Werk'}'.replaceFirst('. ', '').trim(),
+              time: '20',
+              conductor: h.conductorName ?? h.song?.conductor,
+              songId: h.songId,
+            ))
+        .toList();
+
+    // Remove duplicates by songId
+    final seenIds = <int>{};
+    final uniqueFields = <FieldSelection>[];
+    for (final field in newFields) {
+      if (field.songId != null && !seenIds.contains(field.songId)) {
+        seenIds.add(field.songId!);
+        uniqueFields.add(field);
+      }
+    }
+
+    if (uniqueFields.isEmpty) {
+      ToastHelper.showInfo(sheetContext, 'Alle aktuellen Werke bereits im Plan');
+      return;
+    }
+
+    final count = uniqueFields.length;
+    widget.onAddMultiple(uniqueFields);
+    Navigator.pop(sheetContext);
+    // Use a post-frame callback to show toast after sheet is closed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, '$count Werke hinzugefügt');
+      }
+    });
   }
 
   @override
@@ -749,6 +1051,7 @@ class _AddFieldSheetState extends State<_AddFieldSheet> with SingleTickerProvide
             tabs: const [
               Tab(text: 'Werk auswählen'),
               Tab(text: 'Freitext'),
+              Tab(text: 'Notiz'),
             ],
           ),
           Expanded(
@@ -774,6 +1077,19 @@ class _AddFieldSheetState extends State<_AddFieldSheet> with SingleTickerProvide
                         onChanged: (v) => setState(() => _searchQuery = v),
                       ),
                     ),
+                    // "Add current songs" button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _addCurrentSongs(context),
+                          icon: const Icon(Icons.library_add),
+                          label: const Text('Aktuelle Werke hinzufügen'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Expanded(
                       child: ListView.builder(
                         controller: scrollController,
@@ -862,6 +1178,65 @@ class _AddFieldSheetState extends State<_AddFieldSheet> with SingleTickerProvide
                                 time: _timeController.text.trim().isNotEmpty
                                     ? _timeController.text.trim()
                                     : '10',
+                              ),
+                            );
+                          },
+                          child: const Text('Hinzufügen'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Note tab (no time duration)
+                SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: AppColors.info),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Notizen haben keine Zeitdauer und erscheinen im PDF als Hinweis.',
+                                style: TextStyle(fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _noteController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notiz *',
+                          hintText: 'z.B. "Pause", "Hinweis: ..."',
+                        ),
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (_noteController.text.trim().isEmpty) {
+                              ToastHelper.showWarning(context, 'Bitte eine Notiz eingeben');
+                              return;
+                            }
+                            Navigator.pop(
+                              context,
+                              FieldSelection(
+                                id: 'noteFld_${DateTime.now().millisecondsSinceEpoch}',
+                                name: _noteController.text.trim(),
+                                time: '0',
+                                isNote: true,
                               ),
                             );
                           },

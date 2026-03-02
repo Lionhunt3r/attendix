@@ -361,27 +361,81 @@ class ExportService {
   }) {
     final pdf = pw.Document();
 
-    // Calculate times for each field
-    final data = <List<String>>[];
+    // Calculate times for each field and build rows
     var currentMinutes = _parseTime(startTime);
 
+    // Build table rows manually to support colspan for notes
+    final tableRows = <pw.TableRow>[];
+
+    // Header row
+    tableRows.add(pw.TableRow(
+      decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF005238)),
+      children: [
+        _buildHeaderCell('Zeit', width: 60),
+        _buildHeaderCell('Programm', flex: 3),
+        _buildHeaderCell('Dirigent', flex: 2),
+        _buildHeaderCell('Dauer', width: 50),
+      ],
+    ));
+
+    // Data rows
     for (final field in fields) {
       final name = field['name'] as String? ?? '';
       final conductor = field['conductor'] as String? ?? '';
       final duration = int.tryParse(field['time']?.toString() ?? '0') ?? 0;
-
+      final isNote = field['isNote'] as bool? ?? false;
       final formattedTime = _formatMinutes(currentMinutes);
-      data.add([formattedTime, name, conductor, '$duration\'']);
+
+      if (isNote) {
+        // Note field: use 4 cells but make the note span visually by merging content
+        tableRows.add(pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF5F5F5)),
+          children: [
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text(formattedTime, style: const pw.TextStyle(fontSize: 11)),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text(
+                name,
+                style: pw.TextStyle(fontSize: 11, fontStyle: pw.FontStyle.italic),
+              ),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text('', style: const pw.TextStyle(fontSize: 11)),
+            ),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Text('', style: const pw.TextStyle(fontSize: 11)),
+            ),
+          ],
+        ));
+      } else {
+        tableRows.add(pw.TableRow(
+          children: [
+            _buildDataCell(formattedTime, width: 60),
+            _buildDataCell(name, flex: 3),
+            _buildDataCell(conductor, flex: 2),
+            _buildDataCell('$duration\'', width: 50),
+          ],
+        ));
+      }
 
       currentMinutes += duration;
     }
 
-    // Add end time row if specified
-    if (endTime != null) {
-      data.add([endTime, 'Ende', '', '']);
-    } else {
-      data.add([_formatMinutes(currentMinutes), 'Ende', '', '']);
-    }
+    // End time row
+    final finalTime = endTime ?? _formatMinutes(currentMinutes);
+    tableRows.add(pw.TableRow(
+      children: [
+        _buildDataCell(finalTime, width: 60),
+        _buildDataCell('Ende', flex: 3),
+        _buildDataCell('', flex: 2),
+        _buildDataCell('', width: 50),
+      ],
+    ));
 
     pdf.addPage(
       pw.Page(
@@ -403,28 +457,15 @@ class ExportService {
             pw.SizedBox(height: 20),
 
             // Table
-            pw.TableHelper.fromTextArray(
-              headers: ['Zeit', 'Programm', 'Dirigent', 'Dauer'],
-              data: data,
-              cellStyle: const pw.TextStyle(fontSize: 11),
-              headerStyle: pw.TextStyle(
-                fontSize: 11,
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-              ),
-              headerDecoration: const pw.BoxDecoration(
-                color: PdfColor.fromInt(0xFF005238),
-              ),
-              cellAlignment: pw.Alignment.centerLeft,
-              headerAlignment: pw.Alignment.center,
+            pw.Table(
               border: pw.TableBorder.all(color: PdfColors.grey300),
-              cellPadding: const pw.EdgeInsets.all(8),
               columnWidths: {
                 0: const pw.FixedColumnWidth(60),
                 1: const pw.FlexColumnWidth(3),
                 2: const pw.FlexColumnWidth(2),
                 3: const pw.FixedColumnWidth(50),
               },
+              children: tableRows,
             ),
           ],
         ),
@@ -432,6 +473,37 @@ class ExportService {
     );
 
     return pdf;
+  }
+
+  pw.Widget _buildHeaderCell(String text, {double? width, int flex = 1}) {
+    final content = pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      alignment: pw.Alignment.center,
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: 11,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColors.white,
+        ),
+      ),
+    );
+    if (width != null) {
+      return pw.SizedBox(width: width, child: content);
+    }
+    return pw.Expanded(flex: flex, child: content);
+  }
+
+  pw.Widget _buildDataCell(String text, {double? width, int flex = 1}) {
+    final content = pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      alignment: pw.Alignment.centerLeft,
+      child: pw.Text(text, style: const pw.TextStyle(fontSize: 11)),
+    );
+    if (width != null) {
+      return pw.SizedBox(width: width, child: content);
+    }
+    return pw.Expanded(flex: flex, child: content);
   }
 
   /// Parse time string "HH:MM" to minutes since midnight
@@ -547,32 +619,107 @@ class ExportService {
     required String? endTime,
     required List<Map<String, dynamic>> fields,
   }) async {
+    final pdf = _buildPlan2xA5PdfDocument(
+      tenantName: tenantName,
+      date: date,
+      startTime: startTime,
+      endTime: endTime,
+      fields: fields,
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: '${tenantName}_Probenprogramm_2xA5_$date.pdf',
+    );
+  }
+
+  /// Build a 2xA5 plan PDF document (shared logic for export and bytes generation)
+  pw.Document _buildPlan2xA5PdfDocument({
+    required String tenantName,
+    required String date,
+    required String startTime,
+    required String? endTime,
+    required List<Map<String, dynamic>> fields,
+  }) {
     final pdf = pw.Document();
 
-    // Calculate times for each field
-    final data = <List<String>>[];
-    var currentMinutes = _parseTime(startTime);
-
-    for (final field in fields) {
-      final name = field['name'] as String? ?? '';
-      final conductor = field['conductor'] as String? ?? '';
-      final duration = int.tryParse(field['time']?.toString() ?? '0') ?? 0;
-
-      final formattedTime = _formatMinutes(currentMinutes);
-      data.add([formattedTime, name, conductor, '$duration\'']);
-
-      currentMinutes += duration;
-    }
-
-    // Add end time row
-    if (endTime != null) {
-      data.add([endTime, 'Ende', '', '']);
-    } else {
-      data.add([_formatMinutes(currentMinutes), 'Ende', '', '']);
-    }
-
-    // Build single plan widget
+    // Build single plan widget with note support
     pw.Widget buildPlanContent() {
+      final tableRows = <pw.TableRow>[];
+
+      // Header row
+      tableRows.add(pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF005238)),
+        children: [
+          _buildSmallHeaderCell('Zeit', width: 35),
+          _buildSmallHeaderCell('Programm', flex: 3),
+          _buildSmallHeaderCell('Dirigent', flex: 2),
+          _buildSmallHeaderCell('', width: 25),
+        ],
+      ));
+
+      // Reset counter for second half
+      var mins = _parseTime(startTime);
+
+      // Data rows
+      for (final field in fields) {
+        final name = field['name'] as String? ?? '';
+        final conductor = field['conductor'] as String? ?? '';
+        final duration = int.tryParse(field['time']?.toString() ?? '0') ?? 0;
+        final isNote = field['isNote'] as bool? ?? false;
+        final formattedTime = _formatMinutes(mins);
+
+        if (isNote) {
+          // Note field: use 4 cells with gray background
+          tableRows.add(pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFF5F5F5)),
+            children: [
+              pw.Container(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(formattedTime, style: const pw.TextStyle(fontSize: 8)),
+              ),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text(
+                  name,
+                  style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic),
+                ),
+              ),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text('', style: const pw.TextStyle(fontSize: 8)),
+              ),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Text('', style: const pw.TextStyle(fontSize: 8)),
+              ),
+            ],
+          ));
+        } else {
+          tableRows.add(pw.TableRow(
+            children: [
+              _buildSmallDataCell(formattedTime, width: 35),
+              _buildSmallDataCell(name, flex: 3),
+              _buildSmallDataCell(conductor, flex: 2),
+              _buildSmallDataCell(duration > 0 ? '$duration\'' : '', width: 25),
+            ],
+          ));
+        }
+
+        mins += duration;
+      }
+
+      // End time row
+      final finalTime = endTime ?? _formatMinutes(mins);
+      tableRows.add(pw.TableRow(
+        children: [
+          _buildSmallDataCell(finalTime, width: 35),
+          _buildSmallDataCell('Ende', flex: 3),
+          _buildSmallDataCell('', flex: 2),
+          _buildSmallDataCell('', width: 25),
+        ],
+      ));
+
       return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -589,28 +736,15 @@ class ExportService {
           pw.SizedBox(height: 10),
 
           // Table with smaller font
-          pw.TableHelper.fromTextArray(
-            headers: ['Zeit', 'Programm', 'Dirigent', ''],
-            data: data,
-            cellStyle: const pw.TextStyle(fontSize: 8),
-            headerStyle: pw.TextStyle(
-              fontSize: 8,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-            ),
-            headerDecoration: const pw.BoxDecoration(
-              color: PdfColor.fromInt(0xFF005238),
-            ),
-            cellAlignment: pw.Alignment.centerLeft,
-            headerAlignment: pw.Alignment.center,
+          pw.Table(
             border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-            cellPadding: const pw.EdgeInsets.all(4),
             columnWidths: {
               0: const pw.FixedColumnWidth(35),
               1: const pw.FlexColumnWidth(3),
               2: const pw.FlexColumnWidth(2),
               3: const pw.FixedColumnWidth(25),
             },
+            children: tableRows,
           ),
         ],
       );
@@ -648,10 +782,38 @@ class ExportService {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-      name: '${tenantName}_Probenprogramm_2xA5_$date.pdf',
+    return pdf;
+  }
+
+  pw.Widget _buildSmallHeaderCell(String text, {double? width, int flex = 1}) {
+    final content = pw.Container(
+      padding: const pw.EdgeInsets.all(4),
+      alignment: pw.Alignment.center,
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: 8,
+          fontWeight: pw.FontWeight.bold,
+          color: PdfColors.white,
+        ),
+      ),
     );
+    if (width != null) {
+      return pw.SizedBox(width: width, child: content);
+    }
+    return pw.Expanded(flex: flex, child: content);
+  }
+
+  pw.Widget _buildSmallDataCell(String text, {double? width, int flex = 1}) {
+    final content = pw.Container(
+      padding: const pw.EdgeInsets.all(4),
+      alignment: pw.Alignment.centerLeft,
+      child: pw.Text(text, style: const pw.TextStyle(fontSize: 8)),
+    );
+    if (width != null) {
+      return pw.SizedBox(width: width, child: content);
+    }
+    return pw.Expanded(flex: flex, child: content);
   }
 
   /// Generate plan PDF as bytes (for sending via Telegram etc.)
@@ -663,6 +825,25 @@ class ExportService {
     required List<Map<String, dynamic>> fields,
   }) async {
     final pdf = _buildPlanPdfDocument(
+      tenantName: tenantName,
+      date: date,
+      startTime: startTime,
+      endTime: endTime,
+      fields: fields,
+    );
+
+    return pdf.save();
+  }
+
+  /// Generate 2xA5 plan PDF as bytes (for sending via Telegram etc.)
+  Future<Uint8List> generatePlan2xA5PdfBytes({
+    required String tenantName,
+    required String date,
+    required String startTime,
+    required String? endTime,
+    required List<Map<String, dynamic>> fields,
+  }) async {
+    final pdf = _buildPlan2xA5PdfDocument(
       tenantName: tenantName,
       date: date,
       startTime: startTime,

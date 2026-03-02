@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "0.1.12",
+      "date": "2.3.2026",
+      "changes": [
+        "📝 Notizfelder: Hinweise ohne Zeitdauer im Probenplan",
+        "🎵 Aktuelle Werke: Alle History-Songs auf einmal hinzufügen",
+        "📋 Default-Plan: Automatisch aus Termintyp laden",
+        "📲 Telegram-Versand: Plan direkt per Telegram senden",
+        "📄 Registerprobenplan: Als PDF exportieren"
+      ]
+    },
+    {
       "version": "0.1.11",
       "date": "2.3.2026",
       "changes": [

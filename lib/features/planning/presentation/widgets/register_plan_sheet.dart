@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/player_providers.dart';
@@ -443,11 +447,115 @@ class _RegisterPlanSheetState extends ConsumerState<RegisterPlanSheet> {
   Future<void> _sharePlan() async {
     if (_generatedPlan == null) return;
 
+    final format = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Format wählen'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('Als PDF'),
+              subtitle: const Text('Druckbar, A4 Querformat'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.text_snippet),
+              title: const Text('Als Text'),
+              subtitle: const Text('Zum Kopieren'),
+              onTap: () => Navigator.pop(ctx, 'text'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Abbrechen'),
+          ),
+        ],
+      ),
+    );
+
+    if (format == null || !mounted) return;
+
+    if (format == 'pdf') {
+      await _exportPdf();
+    } else {
+      await _showTextDialog();
+    }
+  }
+
+  Future<void> _exportPdf() async {
+    final tenant = ref.read(currentTenantProvider);
+    final plan = _generatedPlan!;
+    final date = DateFormat('dd.MM.yyyy').format(DateTime.now());
+
+    final pdf = pw.Document();
+
+    // Build table data
+    final headers = ['Zeit', ...plan.groups];
+    final data = plan.entries.map((entry) {
+      return [
+        entry.time,
+        ...plan.groups.map((g) => entry.groupAssignments[g] ?? '-'),
+      ];
+    }).toList();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(30),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              '${tenant?.shortName ?? 'Gruppe'} - Registerprobenplan',
+              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Stand: $date | ${plan.totalMinutes} Min. | ${plan.minutesPerUnit} Min./Einheit',
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+            pw.SizedBox(height: 16),
+            pw.TableHelper.fromTextArray(
+              headers: headers,
+              data: data,
+              cellStyle: const pw.TextStyle(fontSize: 10),
+              headerStyle: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColor.fromInt(0xFF005238),
+              ),
+              cellAlignment: pw.Alignment.center,
+              headerAlignment: pw.Alignment.center,
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              cellPadding: const pw.EdgeInsets.all(6),
+            ),
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'Dirigenten: ${plan.conductors.join(', ')}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+      name: '${tenant?.shortName ?? 'Gruppe'}_Registerprobenplan_$date.pdf',
+    );
+  }
+
+  Future<void> _showTextDialog() async {
     final service = RegisterPlanService();
     final text = service.formatAsText(_generatedPlan!);
 
-    // TODO: Implement share via share_plus or copy to clipboard
-    // For now, show in a dialog
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
