@@ -8,10 +8,15 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/group_providers.dart';
+import '../../../../core/providers/parent_providers.dart';
 import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/realtime_providers.dart';
+import '../../../../core/providers/shift_providers.dart';
+import '../../../../core/providers/teacher_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../data/models/parent/parent_model.dart';
 import '../../../../data/models/person/person.dart';
+import '../../../../data/models/shift/shift_plan.dart';
 import '../../../../data/models/tenant/tenant.dart';
 import '../../../../core/providers/tenant_providers.dart';
 
@@ -294,6 +299,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
   late DateTime? _joined;
   late bool _isLeader;
   late bool _hasTeacher;
+  late int? _selectedTeacherId;
+  late String? _selectedShiftId;
+  late String? _selectedShiftName;
+  late DateTime? _shiftStart;
+  late int? _selectedParentId;
   late Map<String, dynamic> _additionalFieldValues;
 
   // Section states
@@ -327,6 +337,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     _joined = p.joined != null ? DateTime.tryParse(p.joined!) : null;
     _isLeader = p.isLeader;
     _hasTeacher = p.hasTeacher;
+    _selectedTeacherId = p.teacher;
+    _selectedShiftId = p.shiftId;
+    _selectedShiftName = p.shiftName;
+    _shiftStart = p.shiftStart != null ? DateTime.tryParse(p.shiftStart!) : null;
+    _selectedParentId = p.parentId;
     _additionalFieldValues = Map.from(p.additionalFields ?? {});
   }
   
@@ -401,6 +416,11 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'joined': _joined?.toIso8601String(),
         'isLeader': _isLeader,
         'hasTeacher': _hasTeacher,
+        'teacher': _hasTeacher ? _selectedTeacherId : null,
+        'shift_id': _selectedShiftId,
+        'shift_name': _selectedShiftName,
+        'shift_start': _shiftStart?.toIso8601String(),
+        'parent_id': _selectedParentId,
         'correctBirthday': true,
         'history': updatedHistory,
         'additional_fields': _additionalFieldValues.isNotEmpty ? _additionalFieldValues : null,
@@ -1063,10 +1083,163 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               title: const Text('Spielt beim Lehrer'),
               value: _hasTeacher,
               onChanged: (value) {
-                setState(() => _hasTeacher = value);
+                setState(() {
+                  _hasTeacher = value;
+                  if (!value) _selectedTeacherId = null;
+                });
                 _markChanged();
               },
             ),
+
+            // Teacher Dropdown (only shown when hasTeacher is true)
+            if (_hasTeacher) ...[
+              const SizedBox(height: AppDimensions.paddingM),
+              Text('Lehrer', style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: AppDimensions.paddingXS),
+              ref.watch(teachersProvider).when(
+                loading: () => const LinearProgressIndicator(),
+                error: (e, _) => Text('Fehler: $e'),
+                data: (teachers) => DropdownButtonFormField<int>(
+                  value: _selectedTeacherId,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Lehrer auswählen',
+                  ),
+                  items: [
+                    const DropdownMenuItem<int>(value: null, child: Text('Kein Lehrer')),
+                    ...teachers.map((t) => DropdownMenuItem(
+                      value: t.id,
+                      child: Text(t.fullName),
+                    )),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _selectedTeacherId = value);
+                    _markChanged();
+                  },
+                ),
+              ),
+            ],
+
+            // Shift Plan Dropdown
+            const SizedBox(height: AppDimensions.paddingM),
+            Text('Schichtplan', style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: AppDimensions.paddingXS),
+            ref.watch(shiftsProvider).when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('Fehler: $e'),
+              data: (shifts) {
+                final selectedShift = shifts.where((s) => s.id == _selectedShiftId).firstOrNull;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _selectedShiftId,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'Schichtplan auswählen',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(value: null, child: Text('Kein Schichtplan')),
+                        ...shifts.map((s) => DropdownMenuItem(
+                          value: s.id,
+                          child: Text(s.name),
+                        )),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedShiftId = value;
+                          // Reset shift name and start when shift changes
+                          _selectedShiftName = null;
+                          _shiftStart = null;
+                        });
+                        _markChanged();
+                      },
+                    ),
+                    // Show shift name dropdown or date picker based on shift type
+                    if (selectedShift != null) ...[
+                      const SizedBox(height: AppDimensions.paddingM),
+                      if (selectedShift.hasNamedShifts) ...[
+                        Text('Schicht', style: Theme.of(context).textTheme.labelMedium),
+                        const SizedBox(height: AppDimensions.paddingXS),
+                        Builder(builder: (context) {
+                          final uniqueShiftNames = selectedShift.shifts
+                              .map((s) => s.name)
+                              .toSet()
+                              .toList();
+                          return DropdownButtonFormField<String>(
+                            value: _selectedShiftName,
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                              hintText: 'Schicht auswählen',
+                            ),
+                            items: [
+                              const DropdownMenuItem<String>(value: null, child: Text('Keine Schicht')),
+                              ...uniqueShiftNames.map((name) => DropdownMenuItem(
+                                value: name,
+                                child: Text(name),
+                              )),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _selectedShiftName = value);
+                              _markChanged();
+                            },
+                          );
+                        }),
+                      ] else ...[
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Schichtplan-Start'),
+                          subtitle: Text(_shiftStart != null
+                            ? DateFormat('dd.MM.yyyy').format(_shiftStart!)
+                            : 'Nicht angegeben'),
+                          trailing: const Icon(Icons.calendar_today),
+                          onTap: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: _shiftStart ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (date != null) {
+                              setState(() => _shiftStart = date);
+                              _markChanged();
+                            }
+                          },
+                        ),
+                      ],
+                    ],
+                  ],
+                );
+              },
+            ),
+
+            // Parent Dropdown
+            const SizedBox(height: AppDimensions.paddingM),
+            Text('Erziehungsberechtigter', style: Theme.of(context).textTheme.labelMedium),
+            const SizedBox(height: AppDimensions.paddingXS),
+            ref.watch(parentsProvider).when(
+              loading: () => const LinearProgressIndicator(),
+              error: (e, _) => Text('Fehler: $e'),
+              data: (parents) => DropdownButtonFormField<int>(
+                value: _selectedParentId,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Erziehungsberechtigten auswählen',
+                ),
+                items: [
+                  const DropdownMenuItem<int>(value: null, child: Text('Kein Erziehungsberechtigter')),
+                  ...parents.map((p) => DropdownMenuItem(
+                    value: p.id,
+                    child: Text(p.fullName),
+                  )),
+                ],
+                onChanged: (value) {
+                  setState(() => _selectedParentId = value);
+                  _markChanged();
+                },
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
 
             // Other Exercise
             TextField(

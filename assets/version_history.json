@@ -1,6 +1,15 @@
 {
   "versions": [
     {
+      "version": "0.1.11",
+      "date": "2.3.2026",
+      "changes": [
+        "👨‍🏫 Lehrer-Dropdown: Lehrer direkt bei Person auswählen",
+        "⏰ Schichtplan-Dropdown: Schichtplan und Startdatum zuweisen",
+        "👨‍👩‍👧 Eltern-Dropdown: Erziehungsberechtigten verknüpfen"
+      ]
+    },
+    {
       "version": "0.1.10",
       "date": "27.2.2026",
       "changes": [

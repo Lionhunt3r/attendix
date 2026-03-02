@@ -7,7 +7,7 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'Attendix';
-  static const String appVersion = '0.1.10';
+  static const String appVersion = '0.1.11';
 
   /// Demo credentials from environment (for development only)
   static String get demoMail => dotenv.env['DEMO_EMAIL'] ?? '';
