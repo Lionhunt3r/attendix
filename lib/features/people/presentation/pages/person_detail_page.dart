@@ -12,6 +12,7 @@ import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
+import '../../../../data/models/tenant/tenant.dart';
 import '../widgets/person_detail/person_detail.dart';
 
 /// Provider for single person with group name
@@ -55,12 +56,17 @@ final personAttendanceStatsProvider =
     };
   }
 
-  // Get late statuses from CriticalRule - find first rule that includes status 3 (late)
+  // Get late rule from CriticalRules - find first rule that includes status 3 (late)
   List<int> lateStatuses = [3, 5]; // Fallback: both late statuses
+  CriticalRulePeriodType? latePeriodType;
+  int? latePeriodDays;
+
   if (tenant?.criticalRules != null) {
     for (final rule in tenant!.criticalRules!) {
-      if (rule.statuses.contains(3)) {
+      if (rule.statuses.contains(3) && rule.enabled) {
         lateStatuses = rule.statuses;
+        latePeriodType = rule.periodType;
+        latePeriodDays = rule.periodDays;
         break;
       }
     }
@@ -91,13 +97,36 @@ final personAttendanceStatsProvider =
   }).length;
   final percentage = total > 0 ? (attended / total * 100).round() : 0;
 
-  // Count late based on CriticalRule statuses, not hardcoded values
+  // Determine the start date for counting late based on periodType
+  DateTime? lateCountStartDate;
+  if (latePeriodType == CriticalRulePeriodType.season) {
+    // Use tenant's seasonStart
+    if (tenant?.seasonStart != null) {
+      lateCountStartDate = DateTime.tryParse(tenant!.seasonStart!);
+    }
+  } else if (latePeriodType == CriticalRulePeriodType.days) {
+    // Use last X days
+    lateCountStartDate = now.subtract(Duration(days: latePeriodDays ?? 30));
+  }
+  // For allTime or null, lateCountStartDate remains null (count all)
+
+  // Count late based on CriticalRule statuses AND periodType
   final lateCount = pastAttendances.where((a) {
     final status = a['status'];
-    if (status is int) {
-      return lateStatuses.contains(status);
+    if (status is! int || !lateStatuses.contains(status)) {
+      return false;
     }
-    return false;
+
+    // If we have a start date filter, apply it
+    if (lateCountStartDate != null) {
+      final attendance = a['attendance'] as Map<String, dynamic>?;
+      final date = DateTime.tryParse(attendance?['date'] ?? '');
+      if (date == null || date.isBefore(lateCountStartDate)) {
+        return false;
+      }
+    }
+
+    return true;
   }).length;
 
   return {

@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Tests for personAttendanceStatsProvider
 ///
-/// These tests verify that lateCount is calculated based on CriticalRule statuses,
-/// not hardcoded values.
+/// These tests verify that lateCount is calculated based on CriticalRule statuses
+/// AND periodType (season/days/allTime), not hardcoded values.
 void main() {
   late String personDetailPageSource;
 
@@ -66,6 +66,58 @@ void main() {
             contains('rule.statuses'),
           ]),
           reason: 'Provider should use CriticalRule statuses for filtering, not hardcoded values',
+        );
+      });
+
+      test('should respect CriticalRule periodType when counting late', () {
+        // The provider should read periodType from the CriticalRule
+        expect(
+          personDetailPageSource,
+          contains('latePeriodType'),
+          reason: 'Provider should extract periodType from CriticalRule',
+        );
+
+        // Should handle season periodType with tenant.seasonStart
+        expect(
+          personDetailPageSource,
+          contains('CriticalRulePeriodType.season'),
+          reason: 'Provider should handle season periodType',
+        );
+
+        expect(
+          personDetailPageSource,
+          contains('seasonStart'),
+          reason: 'Provider should use tenant.seasonStart when periodType is season',
+        );
+
+        // Should handle days periodType
+        expect(
+          personDetailPageSource,
+          contains('CriticalRulePeriodType.days'),
+          reason: 'Provider should handle days periodType',
+        );
+
+        expect(
+          personDetailPageSource,
+          contains('latePeriodDays'),
+          reason: 'Provider should use periodDays from CriticalRule when periodType is days',
+        );
+      });
+
+      test('should filter attendances by date when periodType is set', () {
+        // When counting late, the filter should check the attendance date
+        // against the calculated start date (seasonStart or now - periodDays)
+        expect(
+          personDetailPageSource,
+          contains('lateCountStartDate'),
+          reason: 'Provider should calculate a start date based on periodType',
+        );
+
+        // Should filter out attendances before the start date
+        expect(
+          personDetailPageSource,
+          contains('isBefore(lateCountStartDate'),
+          reason: 'Provider should filter out attendances before the period start date',
         );
       });
     });
