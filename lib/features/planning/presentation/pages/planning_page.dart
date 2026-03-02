@@ -107,6 +107,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   List<FieldSelection> _fields = [
     FieldSelection(id: 'default', name: 'Wort', time: '10'),
   ];
+  bool _hasChanges = false;
 
   @override
   void initState() {
@@ -114,12 +115,26 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
     _selectedAttendanceId = widget.attendanceId;
   }
 
+  /// Invalidate providers when leaving the page so other pages see updated data
+  void _invalidateProvidersOnExit() {
+    if (_hasChanges && _selectedAttendanceId != null) {
+      ref.invalidate(attendanceDetailProvider(_selectedAttendanceId!));
+      ref.invalidate(upcomingAttendancesProvider);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final attendancesAsync = ref.watch(upcomingAttendancesProvider);
     final songsAsync = ref.watch(planSongsProvider);
 
-    return Scaffold(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          _invalidateProvidersOnExit();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Probenplan'),
         actions: [
@@ -406,6 +421,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
         ],
       ),
       floatingActionButton: _buildFloatingButtons(songsAsync.valueOrNull ?? []),
+      ),
     );
   }
 
@@ -851,9 +867,8 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
           .eq('id', _selectedAttendanceId!)
           .eq('tenantId', tenant!.id!);
 
-      // Invalidate providers so other pages see the updated plan
-      ref.invalidate(attendanceDetailProvider(_selectedAttendanceId!));
-      ref.invalidate(upcomingAttendancesProvider);
+      // Mark as changed so providers are invalidated on exit
+      _hasChanges = true;
     } catch (e) {
       // Silent fail - auto-save
     }
