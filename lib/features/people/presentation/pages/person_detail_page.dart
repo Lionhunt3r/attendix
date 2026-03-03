@@ -92,7 +92,7 @@ final personAttendanceStatsProvider =
   final attended = pastAttendances.where((a) {
     final status = a['status'];
     if (status is int) {
-      return status == 1 || status == 3 || status == 5;
+      return AttendanceStatus.fromValue(status).countsAsPresent;
     }
     return false;
   }).length;
