@@ -22,7 +22,7 @@ final personProvider =
   final tenant = ref.watch(currentTenantProvider);
   final groups = await ref.watch(groupsMapProvider.future);
 
-  if (tenant == null) return null;
+  if (tenant == null || tenant.id == null) return null;
 
   final response = await supabase
       .from('player')
@@ -62,7 +62,8 @@ final personAttendanceStatsProvider =
   int? latePeriodDays;
 
   if (tenant?.criticalRules != null) {
-    for (final rule in tenant!.criticalRules!) {
+    final rules = tenant!.criticalRules!;
+    for (final rule in rules) {
       if (rule.statuses.contains(3) && rule.enabled) {
         lateStatuses = rule.statuses;
         latePeriodType = rule.periodType;

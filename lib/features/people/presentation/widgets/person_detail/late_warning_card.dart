@@ -31,7 +31,8 @@ class LateWarningCard extends ConsumerWidget {
         final tenant = ref.watch(currentTenantProvider);
         int threshold = 3;
         if (tenant?.criticalRules != null) {
-          for (final rule in tenant!.criticalRules!) {
+          final rules = tenant!.criticalRules!;
+          for (final rule in rules) {
             // Status 3 = late
             if (rule.statuses.contains(3)) {
               threshold = rule.thresholdValue;
