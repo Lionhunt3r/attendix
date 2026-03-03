@@ -30,7 +30,7 @@ class PlanAccordion extends StatefulWidget {
 }
 
 class _PlanAccordionState extends State<PlanAccordion> {
-  final ExpansibleController _controller = ExpansibleController();
+  final ExpansionTileController _controller = ExpansionTileController();
   bool _wasInitiallyExpanded = false;
 
   @override
