@@ -5,7 +5,7 @@ import '../../../../../core/theme/app_colors.dart';
 import '../../../../../data/models/attendance/attendance.dart';
 
 /// Accordion widget for displaying attendance plan/schedule
-class PlanAccordion extends StatelessWidget {
+class PlanAccordion extends StatefulWidget {
   const PlanAccordion({
     super.key,
     required this.attendance,
@@ -14,6 +14,7 @@ class PlanAccordion extends StatelessWidget {
     required this.onSharePlanChanged,
     this.onCreate,
     this.onSendViaTelegram,
+    this.initiallyExpanded = false,
   });
 
   final Attendance attendance;
@@ -22,10 +23,33 @@ class PlanAccordion extends StatelessWidget {
   final void Function(bool) onSharePlanChanged;
   final VoidCallback? onCreate;
   final VoidCallback? onSendViaTelegram;
+  final bool initiallyExpanded;
+
+  @override
+  State<PlanAccordion> createState() => _PlanAccordionState();
+}
+
+class _PlanAccordionState extends State<PlanAccordion> {
+  final ExpansibleController _controller = ExpansibleController();
+  bool _wasInitiallyExpanded = false;
+
+  @override
+  void didUpdateWidget(PlanAccordion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Expand the tile when initiallyExpanded changes from false to true
+    if (widget.initiallyExpanded && !_wasInitiallyExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _controller.expand();
+        }
+      });
+    }
+    _wasInitiallyExpanded = widget.initiallyExpanded;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final plan = attendance.plan;
+    final plan = widget.attendance.plan;
     final hasPlan = plan != null && plan.isNotEmpty;
 
     // Parse plan fields
@@ -34,7 +58,7 @@ class PlanAccordion extends StatelessWidget {
       fields = (plan['fields'] as List).cast<Map<String, dynamic>>();
     }
 
-    final startTime = plan?['startTime'] as String? ?? attendance.startTime ?? '17:00';
+    final startTime = plan?['startTime'] as String? ?? widget.attendance.startTime ?? '17:00';
     final endTime = plan?['endTime'] as String?;
 
     return Card(
@@ -43,6 +67,8 @@ class PlanAccordion extends StatelessWidget {
         vertical: AppDimensions.paddingXS,
       ),
       child: ExpansionTile(
+        controller: _controller,
+        initiallyExpanded: widget.initiallyExpanded,
         leading: const Icon(Icons.schedule, color: AppColors.primary),
         title: Row(
           children: [
@@ -66,7 +92,7 @@ class PlanAccordion extends StatelessWidget {
               ),
             const Spacer(),
             // Share plan toggle indicator
-            if (attendance.sharePlan)
+            if (widget.attendance.sharePlan)
               Tooltip(
                 message: 'Plan wird mit Mitgliedern geteilt',
                 child: Icon(
@@ -83,13 +109,13 @@ class PlanAccordion extends StatelessWidget {
             secondary: const Icon(Icons.share),
             title: const Text('Plan teilen'),
             subtitle: Text(
-              attendance.sharePlan
+              widget.attendance.sharePlan
                   ? 'Plan ist für Mitglieder sichtbar'
                   : 'Plan ist nur für Dirigenten sichtbar',
               style: TextStyle(fontSize: 12, color: AppColors.medium),
             ),
-            value: attendance.sharePlan,
-            onChanged: onSharePlanChanged,
+            value: widget.attendance.sharePlan,
+            onChanged: widget.onSharePlanChanged,
           ),
           const Divider(height: 1),
           if (!hasPlan || fields.isEmpty)
@@ -109,7 +135,7 @@ class PlanAccordion extends StatelessWidget {
                   ),
                   const SizedBox(height: AppDimensions.paddingM),
                   FilledButton.icon(
-                    onPressed: onCreate ?? onEdit,
+                    onPressed: widget.onCreate ?? widget.onEdit,
                     icon: const Icon(Icons.add),
                     label: const Text('Ablaufplan erstellen'),
                   ),
@@ -162,18 +188,18 @@ class PlanAccordion extends StatelessWidget {
               runSpacing: 8,
               children: [
                 TextButton.icon(
-                  onPressed: onEdit,
+                  onPressed: widget.onEdit,
                   icon: const Icon(Icons.edit, size: 18),
                   label: const Text('Bearbeiten'),
                 ),
                 TextButton.icon(
-                  onPressed: onExportPdf,
+                  onPressed: widget.onExportPdf,
                   icon: const Icon(Icons.picture_as_pdf, size: 18),
                   label: const Text('PDF'),
                 ),
-                if (onSendViaTelegram != null)
+                if (widget.onSendViaTelegram != null)
                   TextButton.icon(
-                    onPressed: onSendViaTelegram,
+                    onPressed: widget.onSendViaTelegram,
                     icon: const Icon(Icons.telegram, size: 18),
                     label: const Text('Telegram'),
                   ),
