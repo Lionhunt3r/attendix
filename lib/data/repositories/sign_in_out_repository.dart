@@ -226,6 +226,17 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
           }
       };
 
+      // Get attendance types to resolve includeInAverage
+      final attendanceTypes = await supabase
+          .from('attendance_types')
+          .select('id, include_in_average')
+          .inFilter('tenantId', tenantIds);
+
+      final includeInAverageMap = {
+        for (final at in attendanceTypes as List)
+          at['id'].toString(): at['include_in_average'] as bool? ?? true,
+      };
+
       // Map to CrossTenantPersonAttendance
       return (response as List).map((json) {
         final attendance = json['attendance'] as Map<String, dynamic>?;
@@ -249,6 +260,7 @@ class SignInOutRepository extends BaseRepository with TenantAwareRepository {
           plan: attendance?['plan'] as Map<String, dynamic>?,
           sharePlan: attendance?['share_plan'] == true,
           typeId: attendance?['type_id']?.toString(),
+          includeInAverage: includeInAverageMap[attendance?['type_id']?.toString()] ?? true,
         );
       }).toList();
     } catch (e, stack) {
@@ -305,6 +317,7 @@ class CrossTenantPersonAttendance {
   final Map<String, dynamic>? plan;
   final bool sharePlan;
   final String? typeId;
+  final bool includeInAverage;
 
   CrossTenantPersonAttendance({
     this.id,
@@ -323,6 +336,7 @@ class CrossTenantPersonAttendance {
     this.plan,
     this.sharePlan = false,
     this.typeId,
+    this.includeInAverage = true,
   });
 
   /// Check if this attendance is in the past

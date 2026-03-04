@@ -65,7 +65,10 @@ final currentAttendanceProvider = Provider<CrossTenantPersonAttendance?>((ref) {
 final attendanceStatsProvider = Provider<AttendanceStats>((ref) {
   final past = ref.watch(pastAttendancesAcrossTenantsProvider);
 
-  if (past.isEmpty) {
+  // Only count attendances where the type has includeInAverage=true
+  final relevant = past.where((a) => a.includeInAverage).toList();
+
+  if (relevant.isEmpty) {
     return const AttendanceStats(
       percentage: 0,
       lateCount: 0,
@@ -74,17 +77,17 @@ final attendanceStatsProvider = Provider<AttendanceStats>((ref) {
     );
   }
 
-  final attended = past.where((a) => a.attended).length;
-  final late = past
+  final attended = relevant.where((a) => a.attended).length;
+  final late = relevant
       .where((a) =>
           a.status == AttendanceStatus.late ||
           a.status == AttendanceStatus.lateExcused)
       .length;
 
   return AttendanceStats(
-    percentage: (attended / past.length * 100).round(),
+    percentage: (attended / relevant.length * 100).round(),
     lateCount: late,
-    totalCount: past.length,
+    totalCount: relevant.length,
     presentCount: attended,
   );
 });

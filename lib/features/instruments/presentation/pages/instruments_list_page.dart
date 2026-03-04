@@ -365,9 +365,19 @@ Future<void> _showEditDialog(
       final notifier = ref.read(groupNotifierProvider.notifier);
 
       if (result['_delete'] == true) {
-        await notifier.deleteGroup(group!.id!);
-        if (context.mounted) {
-          ToastHelper.showSuccess(context, 'Instrument gelöscht');
+        try {
+          await notifier.deleteGroup(group!.id!);
+          if (context.mounted) {
+            ToastHelper.showSuccess(context, 'Instrument gelöscht');
+          }
+        } catch (e) {
+          if (context.mounted) {
+            final message = e.toString().contains('Spieler sind noch zugewiesen')
+                ? e.toString().replaceAll('Exception: ', '')
+                : 'Instrument kann nicht gelöscht werden. Bitte weise zuerst alle Spieler einem anderen Instrument zu.';
+            ToastHelper.showError(context, message);
+          }
+          return;
         }
       } else if (group != null) {
         await notifier.updateGroup(group.id!, result);

@@ -8,6 +8,7 @@ import '../../../../../core/providers/tenant_providers.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../../../../data/models/person/person.dart';
 import '../../../../../shared/widgets/editable/editable_info_row.dart';
+import '../../../../../shared/widgets/sheets/field_editor_sheet.dart';
 
 /// Accordion section displaying account information.
 class AccountAccordion extends ConsumerWidget {
@@ -22,6 +23,7 @@ class AccountAccordion extends ConsumerWidget {
     required this.onUnlinkAccount,
     required this.onCreateAccount,
     required this.canEdit,
+    this.onFieldChanged,
   });
 
   final Person person;
@@ -33,11 +35,12 @@ class AccountAccordion extends ConsumerWidget {
   final VoidCallback onUnlinkAccount;
   final VoidCallback onCreateAccount;
   final bool canEdit;
+  final void Function(String field, dynamic value)? onFieldChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Only show if person has email or appId
-    if (person.email == null && person.appId == null) {
+    // Only hide if person has no email, no appId, and user can't edit
+    if (person.email == null && person.appId == null && !canEdit) {
       return const SizedBox.shrink();
     }
 
@@ -78,13 +81,15 @@ class AccountAccordion extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Email
-        InfoRow(
+        EditableInfoRow(
           icon: Icons.email,
           label: 'E-Mail',
           value: person.email ?? 'Nicht angegeben',
+          editable: canEdit && person.appId == null,
           onTap: person.email != null
               ? () => _launchEmail(person.email!)
               : null,
+          onEdit: () => _editEmail(context),
         ),
 
         // Account linked status
@@ -226,9 +231,31 @@ class AccountAccordion extends ConsumerWidget {
   }
 
   Future<void> _launchEmail(String email) async {
-    final uri = Uri.parse('mailto:$email');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    try {
+      final uri = Uri.parse('mailto:$email');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      }
+    } catch (_) {
+      // PWA may not support mailto: links
+    }
+  }
+
+  Future<void> _editEmail(BuildContext context) async {
+    final result = await FieldEditorSheet.show(
+      context,
+      title: 'E-Mail',
+      initialValue: person.email ?? '',
+      keyboardType: TextInputType.emailAddress,
+      validator: (value) {
+        if (value != null && value.trim().isNotEmpty && !value.contains('@')) {
+          return 'Bitte gültige E-Mail eingeben';
+        }
+        return null;
+      },
+    );
+    if (result != null) {
+      onFieldChanged?.call('email', result.isEmpty ? null : result);
     }
   }
 

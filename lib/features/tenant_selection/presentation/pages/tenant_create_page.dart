@@ -21,6 +21,7 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
   final _formKey = GlobalKey<FormState>();
   final _shortNameController = TextEditingController();
   final _longNameController = TextEditingController();
+  final _mainGroupNameController = TextEditingController();
   String _selectedType = 'orchestra';
   bool _isLoading = false;
 
@@ -28,6 +29,7 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
   void dispose() {
     _shortNameController.dispose();
     _longNameController.dispose();
+    _mainGroupNameController.dispose();
     super.dispose();
   }
 
@@ -129,6 +131,20 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
               description: 'Für andere Gruppen oder Vereine',
             ),
 
+            const SizedBox(height: AppDimensions.paddingL),
+
+            // Main group name
+            TextFormField(
+              controller: _mainGroupNameController,
+              decoration: InputDecoration(
+                labelText: 'Name der ersten $_groupLabel',
+                hintText: _groupHint,
+                helperText: 'Die erste $_groupLabel deiner Organisation',
+                prefixIcon: const Icon(Icons.group),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+
             const SizedBox(height: AppDimensions.paddingXL),
 
             // Submit button
@@ -150,6 +166,18 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
       ),
     );
   }
+
+  String get _groupLabel => switch (_selectedType) {
+    'orchestra' => 'Instrumentengruppe',
+    'choir' => 'Stimmgruppe',
+    _ => 'Gruppe',
+  };
+
+  String get _groupHint => switch (_selectedType) {
+    'orchestra' => 'z.B. Streicher',
+    'choir' => 'z.B. Sopran',
+    _ => 'z.B. Gruppe 1',
+  };
 
   Widget _buildTypeOption({
     required String value,
@@ -264,9 +292,13 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
         _ => 'Gruppe 1',
       };
 
+      final groupName = _mainGroupNameController.text.trim().isNotEmpty
+          ? _mainGroupNameController.text.trim()
+          : defaultGroupName;
+
       await supabase.from('instruments').insert({
         'tenantId': tenantId,
-        'name': defaultGroupName,
+        'name': groupName,
         'isSection': true,
       });
 

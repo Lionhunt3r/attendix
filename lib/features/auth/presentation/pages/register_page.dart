@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -48,12 +49,31 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         password: _passwordController.text,
       );
 
+      if (!mounted) return;
       setState(() {
         _registrationSuccess = true;
       });
     } catch (e) {
+      if (!mounted) return;
+      String errorMessage;
+      if (e is AuthException) {
+        errorMessage = switch (e.message) {
+          'User already registered' =>
+            'Diese E-Mail-Adresse ist bereits registriert.',
+          _ when e.message.contains('password') =>
+            'Das Passwort erfüllt nicht die Anforderungen.',
+          _ when e.message.contains('rate limit') || e.message.contains('Too many') =>
+            'Zu viele Versuche. Bitte warte einen Moment.',
+          _ when e.message.contains('email') =>
+            'Bitte gib eine gültige E-Mail-Adresse ein.',
+          _ => 'Registrierung fehlgeschlagen: ${e.message}',
+        };
+      } else {
+        errorMessage =
+            'Registrierung fehlgeschlagen. Bitte versuche es erneut.';
+      }
       setState(() {
-        _errorMessage = 'Registrierung fehlgeschlagen. Bitte versuche es erneut.';
+        _errorMessage = errorMessage;
       });
     } finally {
       if (mounted) {

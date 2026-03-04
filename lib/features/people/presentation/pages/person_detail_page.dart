@@ -452,6 +452,8 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         _draft = _draft.copyWith(examinee: value as bool);
       } else if (field == 'testResult') {
         _draft = _draft.copyWith(testResult: value as String?);
+      } else if (field == 'email') {
+        _draft = _draft.copyWith(email: value as String?);
       } else if (field.startsWith('additionalFields.')) {
         final fieldId = field.substring('additionalFields.'.length);
         _additionalFieldValues[fieldId] = value;
@@ -548,6 +550,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'range': _draft.range?.isEmpty ?? true ? null : _draft.range,
         'examinee': _draft.examinee,
         'testResult': _draft.testResult?.isEmpty ?? true ? null : _draft.testResult,
+        'email': _draft.email?.isEmpty ?? true ? null : _draft.email,
       }).eq('id', personId).eq('tenantId', tenantId);
 
       ref.invalidate(personProvider(widget.personId));
@@ -1536,6 +1539,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               onUnlinkAccount: _unlinkAccount,
               onCreateAccount: () => _createAccount(person),
               canEdit: canEdit,
+              onFieldChanged: _onFieldChanged,
             ),
 
             // Historie Accordion

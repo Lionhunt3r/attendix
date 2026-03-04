@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -73,8 +74,32 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       }
     } catch (e) {
       debugPrint('Login error: $e');
+      String errorMessage;
+      if (e is AuthException) {
+        errorMessage = switch (e.message) {
+          'Invalid login credentials' =>
+            'E-Mail oder Passwort ist falsch.',
+          'Email not confirmed' =>
+            'Bitte bestätige zuerst deine E-Mail-Adresse.',
+          'User not found' =>
+            'Kein Konto mit dieser E-Mail gefunden.',
+          'Too many requests' =>
+            'Zu viele Versuche. Bitte warte einen Moment.',
+          'User banned' || 'User is banned' =>
+            'Dein Konto wurde gesperrt. Bitte kontaktiere den Administrator.',
+          _ when e.message.contains('rate limit') =>
+            'Zu viele Anfragen. Bitte warte einen Moment.',
+          _ when e.message.contains('network') =>
+            'Netzwerkfehler. Bitte prüfe deine Internetverbindung.',
+          _ => 'Login fehlgeschlagen: ${e.message}',
+        };
+      } else {
+        errorMessage =
+            'Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.';
+      }
+      if (!mounted) return;
       setState(() {
-        _errorMessage = 'Login fehlgeschlagen: ${e.toString()}';
+        _errorMessage = errorMessage;
       });
     } finally {
       if (mounted) {

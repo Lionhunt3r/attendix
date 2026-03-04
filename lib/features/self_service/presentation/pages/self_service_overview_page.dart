@@ -141,6 +141,7 @@ class _SelfServiceOverviewPageState
                   child: _StatsHeader(
                     stats: stats,
                     player: playerAsync.valueOrNull,
+                    onShowSongs: () => showUpcomingSongsSheet(context),
                   ),
                 ),
 
@@ -688,10 +689,11 @@ class _SelfServiceOverviewPageState
 
 /// Stats header showing attendance percentage and late count
 class _StatsHeader extends StatelessWidget {
-  const _StatsHeader({required this.stats, this.player});
+  const _StatsHeader({required this.stats, this.player, this.onShowSongs});
 
   final AttendanceStats stats;
   final Person? player;
+  final VoidCallback? onShowSongs;
 
   @override
   Widget build(BuildContext context) {
@@ -739,6 +741,14 @@ class _StatsHeader extends StatelessWidget {
               ),
             ],
           ),
+          if (onShowSongs != null) ...[
+            const SizedBox(height: AppDimensions.paddingM),
+            ActionChip(
+              avatar: const Icon(Icons.library_music, size: 18),
+              label: const Text('Aktuelle Stücke'),
+              onPressed: onShowSongs,
+            ),
+          ],
         ],
       ),
     );

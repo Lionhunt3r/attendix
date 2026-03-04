@@ -1,6 +1,21 @@
 {
   "versions": [
     {
+      "version": "0.1.21",
+      "date": "4.3.2026",
+      "changes": [
+        "🐛 Login: Differenzierte Fehlermeldungen bei falschen Zugangsdaten",
+        "🐛 Registrierung: mounted-Check verhindert setState nach Dispose",
+        "🐛 Statistik: include_in_average wird jetzt beachtet",
+        "🐛 Instrumente: Löschen zeigt Hinweis wenn Spieler zugewiesen",
+        "🐛 Stimmführer: N+1 Query durch Batch-Abfrage ersetzt",
+        "✨ Person-Detail: E-Mail-Adresse editierbar (für Dirigenten)",
+        "✨ Übersicht: Aktuelle Stücke prominenter als Chip",
+        "✨ Tenant-Erstellung: Hauptgruppen-Name eingebbar",
+        "✨ Einstellungen: Feiertage ein-/ausblenden Toggle"
+      ]
+    },
+    {
       "version": "0.1.19",
       "date": "4.3.2026",
       "changes": [

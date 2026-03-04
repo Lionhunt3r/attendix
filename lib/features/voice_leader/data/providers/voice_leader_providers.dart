@@ -91,42 +91,49 @@ final voiceGroupMembersProvider = FutureProvider<List<VoiceGroupMember>>((ref) a
       .map((e) => Person.fromJson(e as Map<String, dynamic>))
       .toList();
 
-  // Get upcoming absences for all players
+  // Get upcoming absences for all players in a single batch query
   final List<VoiceGroupMember> members = [];
   final now = DateTime.now();
 
-  for (final player in players) {
-    if (player.id == null) continue;
+  final playerIds = players.where((p) => p.id != null).map((p) => p.id!).toList();
 
-    // Get upcoming absences (excused=2, absent=4, late_excused=5)
-    final absencesResponse = await supabase
+  // Single batch query for ALL players' absences (fixes N+1)
+  final List<dynamic> absencesResponse;
+  if (playerIds.isNotEmpty) {
+    absencesResponse = await supabase
         .from('person_attendances')
         .select('*, attendance:attendance_id(id, date, type, typeInfo)')
-        .eq('person_id', player.id!)
+        .inFilter('person_id', playerIds)
         .inFilter('status', [2, 4, 5]);
+  } else {
+    absencesResponse = [];
+  }
 
-    final absences = <UpcomingAbsence>[];
-    for (final item in absencesResponse as List) {
-      final attendance = item['attendance'];
-      if (attendance == null) continue;
+  // Group absences by person_id
+  final absencesByPerson = <int, List<UpcomingAbsence>>{};
+  for (final item in absencesResponse) {
+    final personId = item['person_id'] as int;
+    final attendance = item['attendance'];
+    if (attendance == null) continue;
 
-      final dateStr = attendance['date'] as String?;
-      if (dateStr == null) continue;
+    final dateStr = attendance['date'] as String?;
+    if (dateStr == null) continue;
 
-      final date = DateTime.tryParse(dateStr);
-      if (date == null || date.isBefore(now)) continue;
+    final date = DateTime.tryParse(dateStr);
+    if (date == null || date.isBefore(now)) continue;
 
-      absences.add(UpcomingAbsence(
-        attendanceId: attendance['id'] as int,
-        date: date,
-        status: item['status'] as int,
-        typeName: attendance['typeInfo']?['short'] as String?,
-      ));
-    }
+    absencesByPerson.putIfAbsent(personId, () => []).add(UpcomingAbsence(
+      attendanceId: attendance['id'] as int,
+      date: date,
+      status: item['status'] as int,
+      typeName: attendance['typeInfo']?['short'] as String?,
+    ));
+  }
 
-    // Sort by date
+  // Build members list
+  for (final player in players) {
+    final absences = absencesByPerson[player.id] ?? [];
     absences.sort((a, b) => a.date.compareTo(b.date));
-
     members.add(VoiceGroupMember(
       person: player,
       upcomingAbsences: absences,

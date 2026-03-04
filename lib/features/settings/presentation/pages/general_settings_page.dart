@@ -64,6 +64,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   bool _withExcuses = true;
   bool _parents = false;
   bool _showMembersList = false;
+  bool _showHolidays = false;
 
   // Sharing
   bool _songSharingEnabled = false;
@@ -116,6 +117,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       _withExcuses = tenant.withExcuses;
       _parents = tenant.parents ?? false;
       _showMembersList = tenant.showMembersList;
+      _showHolidays = tenant.showHolidays;
       _songSharingEnabled = tenant.songSharingId != null && tenant.songSharingId!.isNotEmpty;
       _songSharingId = tenant.songSharingId;
       _registrationEnabled = tenant.registerId != null && tenant.registerId!.isNotEmpty;
@@ -162,6 +164,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
             ? _practiceEndController.text.trim() : null,
         'seasonStart': _seasonStart?.toIso8601String().split('T')[0],
         'region': _selectedRegion.isNotEmpty ? _selectedRegion : null,
+        'showHolidays': _showHolidays,
         'maintainTeachers': _maintainTeachers,
         'withExcuses': _withExcuses,
         'parents': _parents,
@@ -376,20 +379,31 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
 
                   // Holidays section
                   _buildSectionHeader('Feiertage'),
-                  DropdownButtonFormField<String>(
-                    value: _selectedRegion,
-                    decoration: const InputDecoration(
-                      labelText: 'Bundesland',
-                    ),
-                    items: _holidayRegions.map((r) => DropdownMenuItem(
-                      value: r.$1,
-                      child: Text(r.$2),
-                    )).toList(),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Feiertage im Kalender anzeigen'),
+                    subtitle: const Text('Feiertage werden im Kalender hervorgehoben'),
+                    value: _showHolidays,
                     onChanged: (v) {
-                      setState(() => _selectedRegion = v ?? '');
+                      setState(() => _showHolidays = v);
                       _markChanged();
                     },
                   ),
+                  if (_showHolidays)
+                    DropdownButtonFormField<String>(
+                      value: _selectedRegion,
+                      decoration: const InputDecoration(
+                        labelText: 'Bundesland',
+                      ),
+                      items: _holidayRegions.map((r) => DropdownMenuItem(
+                        value: r.$1,
+                        child: Text(r.$2),
+                      )).toList(),
+                      onChanged: (v) {
+                        setState(() => _selectedRegion = v ?? '');
+                        _markChanged();
+                      },
+                    ),
 
                   const SizedBox(height: AppDimensions.paddingXL),
 
