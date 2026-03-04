@@ -258,7 +258,7 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
   }
 }
 
-class _TenantCard extends StatelessWidget {
+class _TenantCard extends ConsumerWidget {
   const _TenantCard({
     required this.tenant,
     required this.onTap,
@@ -276,7 +276,9 @@ class _TenantCard extends StatelessWidget {
       : _displayName.toUpperCase();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isFavorite = tenant.favorite == true;
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -323,6 +325,19 @@ class _TenantCard extends StatelessWidget {
                     ],
                   ],
                 ),
+              ),
+
+              // Favorite toggle
+              IconButton(
+                icon: Icon(
+                  isFavorite ? Icons.star : Icons.star_border,
+                  color: isFavorite ? AppColors.warning : AppColors.medium,
+                ),
+                onPressed: () {
+                  if (tenant.id != null) {
+                    toggleTenantFavorite(ref, tenant.id!, !isFavorite);
+                  }
+                },
               ),
 
               const Icon(

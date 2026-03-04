@@ -82,6 +82,7 @@ class NotificationConfig {
     bool? reminders,
     bool? checklist,
     List<int>? enabledTenants,
+    bool clearEnabledTenants = false,
   }) =>
       NotificationConfig(
         id: id ?? this.id,
@@ -96,7 +97,7 @@ class NotificationConfig {
         criticals: criticals ?? this.criticals,
         reminders: reminders ?? this.reminders,
         checklist: checklist ?? this.checklist,
-        enabledTenants: enabledTenants ?? this.enabledTenants,
+        enabledTenants: clearEnabledTenants ? null : (enabledTenants ?? this.enabledTenants),
       );
 
   bool get isConnected => telegramChatId != null && telegramChatId!.isNotEmpty;

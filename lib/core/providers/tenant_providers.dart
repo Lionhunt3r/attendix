@@ -145,25 +145,29 @@ class CurrentTenantNotifier extends StateNotifier<Tenant?> {
   }
 }
 
-/// Provider for user's tenants list
+/// Provider for user's tenants list (sorted: favorites first)
 final userTenantsProvider = FutureProvider<List<Tenant>>((ref) async {
   final supabase = ref.watch(supabaseClientProvider);
   final userId = supabase.auth.currentUser?.id;
-  
+
   if (userId == null) return [];
 
-  // First get tenant user records
+  // Get tenant user records including favorite flag
   final tenantUsersResponse = await supabase
       .from('tenantUsers')
-      .select('tenantId')
+      .select('tenantId, favorite')
       .eq('userId', userId);
 
   if ((tenantUsersResponse as List).isEmpty) return [];
 
-  // Get tenant IDs
-  final tenantIds = (tenantUsersResponse as List)
-      .map((item) => item['tenantId'] as int)
-      .toList();
+  // Build favorite map
+  final favoriteMap = <int, bool>{};
+  final tenantIds = <int>[];
+  for (final item in tenantUsersResponse as List) {
+    final tenantId = item['tenantId'] as int;
+    tenantIds.add(tenantId);
+    favoriteMap[tenantId] = item['favorite'] as bool? ?? false;
+  }
 
   // Then get the tenants
   final tenantsResponse = await supabase
@@ -173,8 +177,20 @@ final userTenantsProvider = FutureProvider<List<Tenant>>((ref) async {
 
   final List<Tenant> tenants = [];
   for (final item in tenantsResponse as List) {
-    tenants.add(Tenant.fromJson(item as Map<String, dynamic>));
+    final tenant = Tenant.fromJson(item as Map<String, dynamic>);
+    // Merge favorite from tenantUsers into Tenant model
+    final isFavorite = favoriteMap[tenant.id] ?? false;
+    tenants.add(isFavorite ? tenant.copyWith(favorite: true) : tenant);
   }
+
+  // Sort: favorites first, then alphabetically
+  tenants.sort((a, b) {
+    final aFav = a.favorite == true ? 0 : 1;
+    final bFav = b.favorite == true ? 0 : 1;
+    if (aFav != bFav) return aFav.compareTo(bFav);
+    return a.name.compareTo(b.name);
+  });
+
   return tenants;
 });
 
@@ -211,3 +227,53 @@ final isRoleLoadingProvider = Provider<bool>((ref) {
   final tenantUserAsync = ref.watch(currentTenantUserProvider);
   return tenantUserAsync.isLoading;
 });
+
+/// Toggle favorite status for a tenant
+Future<void> toggleTenantFavorite(WidgetRef ref, int tenantId, bool favorite) async {
+  final supabase = ref.read(supabaseClientProvider);
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) return;
+
+  try {
+    await supabase
+        .from('tenantUsers')
+        .update({'favorite': favorite})
+        .eq('tenantId', tenantId)
+        .eq('userId', userId);
+
+    ref.invalidate(userTenantsProvider);
+  } catch (e) {
+    // Rethrow so caller can handle (e.g. show toast)
+    rethrow;
+  }
+}
+
+/// Delete a tenant (admin-only, cascading)
+Future<void> deleteTenant(WidgetRef ref, int tenantId) async {
+  final supabase = ref.read(supabaseClientProvider);
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) throw Exception('Nicht eingeloggt');
+
+  // Verify user is admin of this tenant before deleting
+  final tenantUser = await supabase
+      .from('tenantUsers')
+      .select('role')
+      .eq('tenantId', tenantId)
+      .eq('userId', userId)
+      .maybeSingle();
+
+  if (tenantUser == null || tenantUser['role'] != Role.admin.value) {
+    throw Exception('Keine Berechtigung zum Löschen');
+  }
+
+  // Delete the tenant — Supabase cascading handles related records
+  await supabase.from('tenants').delete().eq('id', tenantId);
+
+  // Clear current tenant if it was the deleted one
+  final currentId = ref.read(currentTenantIdProvider);
+  if (currentId == tenantId) {
+    await ref.read(currentTenantProvider.notifier).clearTenant();
+  }
+
+  ref.invalidate(userTenantsProvider);
+}

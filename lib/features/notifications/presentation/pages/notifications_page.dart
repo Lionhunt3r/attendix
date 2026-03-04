@@ -4,10 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/telegram_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/tenant/tenant.dart';
 
 /// Notifications Page - Telegram connection and notification settings
 class NotificationsPage extends ConsumerStatefulWidget {
@@ -69,6 +71,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     }
 
     final isConnected = _config!.isConnected;
+    final tenantsAsync = ref.watch(userTenantsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -78,88 +81,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
         padding: const EdgeInsets.all(AppDimensions.paddingM),
         children: [
           // Telegram connection card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppDimensions.paddingM),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isConnected
-                              ? AppColors.success.withValues(alpha: 0.1)
-                              : AppColors.medium.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.telegram,
-                          size: 32,
-                          color: isConnected ? AppColors.success : AppColors.medium,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Telegram',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              isConnected ? 'Verbunden' : 'Nicht verbunden',
-                              style: TextStyle(
-                                color: isConnected ? AppColors.success : AppColors.medium,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (!isConnected) ...[
-                    const Text(
-                      'Verbinde dein Telegram-Konto, um Benachrichtigungen zu erhalten.',
-                      style: TextStyle(color: AppColors.medium),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _connectTelegram,
-                        icon: const Icon(Icons.link),
-                        label: const Text('Mit Telegram verbinden'),
-                      ),
-                    ),
-                  ] else ...[
-                    const Text(
-                      'Dein Telegram-Konto ist verbunden. Du erhältst Benachrichtigungen über den Attendix Bot.',
-                      style: TextStyle(color: AppColors.medium),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _disconnectTelegram,
-                        icon: const Icon(Icons.link_off, color: AppColors.danger),
-                        label: const Text(
-                          'Verbindung trennen',
-                          style: TextStyle(color: AppColors.danger),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
+          _buildTelegramCard(isConnected),
 
           const SizedBox(height: 24),
 
@@ -174,6 +96,12 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
           ),
 
           const SizedBox(height: 16),
+
+          // Per-instance toggles (B7-021)
+          if (_config!.enabled && isConnected)
+            _buildInstanceToggles(tenantsAsync),
+
+          if (_config!.enabled && isConnected) const SizedBox(height: 16),
 
           // Notification categories
           if (_config!.enabled && isConnected) ...[
@@ -260,6 +188,193 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     );
   }
 
+  Widget _buildTelegramCard(bool isConnected) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.paddingM),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isConnected
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.medium.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.telegram,
+                    size: 32,
+                    color: isConnected ? AppColors.success : AppColors.medium,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Telegram',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isConnected ? 'Verbunden' : 'Nicht verbunden',
+                        style: TextStyle(
+                          color: isConnected ? AppColors.success : AppColors.medium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (!isConnected) ...[
+              const Text(
+                'Verbinde dein Telegram-Konto, um Benachrichtigungen zu erhalten.',
+                style: TextStyle(color: AppColors.medium),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _connectTelegram,
+                  icon: const Icon(Icons.link),
+                  label: const Text('Mit Telegram verbinden'),
+                ),
+              ),
+            ] else ...[
+              const Text(
+                'Dein Telegram-Konto ist verbunden. Du erhältst Benachrichtigungen über den Attendix Bot.',
+                style: TextStyle(color: AppColors.medium),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _disconnectTelegram,
+                  icon: const Icon(Icons.link_off, color: AppColors.danger),
+                  label: const Text(
+                    'Verbindung trennen',
+                    style: TextStyle(color: AppColors.danger),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build per-instance notification toggles (B7-021)
+  Widget _buildInstanceToggles(AsyncValue<List<Tenant>> tenantsAsync) {
+    return tenantsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (tenants) {
+        if (tenants.length <= 1) return const SizedBox.shrink();
+
+        final enabledTenants = _config!.enabledTenants;
+        // If enabledTenants is null, all are enabled (default behavior)
+        final allEnabled = enabledTenants == null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Gruppen',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Wähle, für welche Gruppen du Benachrichtigungen erhalten möchtest.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.medium,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: Column(
+                children: tenants.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final tenant = entry.value;
+                  final tenantId = tenant.id;
+                  final isEnabled = allEnabled || (tenantId != null && enabledTenants.contains(tenantId));
+
+                  return Column(
+                    children: [
+                      if (index > 0) const Divider(height: 1),
+                      SwitchListTile(
+                        title: Text(
+                          tenant.shortName.isNotEmpty ? tenant.shortName : tenant.longName,
+                        ),
+                        subtitle: tenant.longName != tenant.shortName
+                            ? Text(
+                                tenant.longName,
+                                style: const TextStyle(fontSize: 12),
+                              )
+                            : null,
+                        secondary: Icon(
+                          Icons.group,
+                          color: isEnabled ? AppColors.primary : AppColors.medium,
+                        ),
+                        value: isEnabled,
+                        onChanged: (v) => _toggleTenantNotification(tenantId, v, tenants),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _toggleTenantNotification(int? tenantId, bool enabled, List<Tenant> tenants) {
+    if (tenantId == null) return;
+
+    final currentEnabled = _config!.enabledTenants;
+    List<int> newEnabledTenants;
+
+    if (currentEnabled == null) {
+      // Currently all enabled — create list with all except the toggled one
+      if (enabled) return; // Already all enabled
+      newEnabledTenants = tenants
+          .map((t) => t.id)
+          .whereType<int>()
+          .where((id) => id != tenantId)
+          .toList();
+    } else {
+      newEnabledTenants = List.of(currentEnabled);
+      if (enabled) {
+        if (!newEnabledTenants.contains(tenantId)) {
+          newEnabledTenants.add(tenantId);
+        }
+        // If all tenants are now enabled, set to null (default = all)
+        final allTenantIds = tenants.map((t) => t.id).whereType<int>().toSet();
+        if (allTenantIds.every(newEnabledTenants.contains)) {
+          _updateConfig(_config!.copyWith(clearEnabledTenants: true));
+          return;
+        }
+      } else {
+        newEnabledTenants.remove(tenantId);
+      }
+    }
+
+    _updateConfig(_config!.copyWith(enabledTenants: newEnabledTenants));
+  }
+
   Future<void> _connectTelegram() async {
     final supabase = ref.read(supabaseClientProvider);
     final user = supabase.auth.currentUser;
@@ -342,6 +457,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   }
 
   Future<void> _updateConfig(NotificationConfig newConfig) async {
+    final previousConfig = _config;
     setState(() => _config = newConfig);
 
     try {
@@ -349,6 +465,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       await telegramService.updateNotificationConfig(newConfig);
     } catch (e) {
       if (mounted) {
+        setState(() => _config = previousConfig);
         ToastHelper.showError(context, 'Fehler beim Speichern: $e');
       }
     }

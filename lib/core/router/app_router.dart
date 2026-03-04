@@ -24,6 +24,7 @@ import '../../features/settings/presentation/pages/attendance_types_page.dart';
 import '../../features/settings/presentation/pages/attendance_type_edit_page.dart';
 import '../../features/settings/presentation/pages/user_management_page.dart';
 import '../../features/settings/presentation/pages/pending_players_page.dart';
+import '../../features/settings/presentation/pages/batch_account_creation_page.dart';
 import '../../features/settings/presentation/pages/left_players_page.dart';
 import '../../features/settings/presentation/pages/calendar_subscription_page.dart';
 import '../../features/settings/presentation/pages/viewers_page.dart';
@@ -79,6 +80,7 @@ const Map<String, RoleCheck> _protectedRoutes = {
   '/settings/meetings': _isAdminOrResponsible,
   '/settings/shifts': _isAdminOrResponsible,
   '/settings/pending': _isAdminOrResponsible,
+  '/settings/batch-accounts': _isAdmin,
   '/settings/left': _isAdminOrResponsible,
 
   // Conductor routes (Admin, Responsible, Viewer)
@@ -455,6 +457,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: 'pending',
                 name: 'pendingPlayers',
                 builder: (context, state) => const PendingPlayersPage(),
+              ),
+              GoRoute(
+                path: 'batch-accounts',
+                name: 'batchAccountCreation',
+                builder: (context, state) => const BatchAccountCreationPage(),
               ),
               GoRoute(
                 path: 'left',
