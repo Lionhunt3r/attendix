@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/song_filter_providers.dart';
+import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/song/song.dart';
@@ -62,7 +63,7 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final songsAsync = ref.watch(songsProvider);
+    final songsAsync = ref.watch(realtimeSongsProvider);
     final filteredSongs = ref.watch(filteredSongsProvider);
     final filter = ref.watch(songFilterProvider);
     final viewOptions = ref.watch(songViewOptionsProvider);
@@ -319,7 +320,7 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                     Text('Fehler: $error'),
                     const SizedBox(height: AppDimensions.paddingM),
                     ElevatedButton(
-                      onPressed: () => ref.invalidate(songsProvider),
+                      onPressed: () => ref.invalidate(realtimeSongsProvider),
                       child: const Text('Erneut versuchen'),
                     ),
                   ],
@@ -391,12 +392,9 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                 return RefreshIndicator(
                   // FN-013: await provider.future to show spinner until data loads
                   onRefresh: () async {
-                    ref.invalidate(songsProvider);
+                    // FN-013: Invalidate realtime provider for manual refresh
+                    ref.invalidate(realtimeSongsProvider);
                     ref.invalidate(currentSongsProvider);
-                    await Future.wait([
-                      ref.read(songsProvider.future),
-                      ref.read(currentSongsProvider.future),
-                    ]);
                   },
                   child: ListView(
                     padding: const EdgeInsets.all(AppDimensions.paddingM),

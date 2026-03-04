@@ -5,8 +5,8 @@ import '../../data/models/person/person.dart';
 import '../config/supabase_config.dart';
 import 'tenant_providers.dart';
 
-/// Provider for attendance detail
-/// FN-004: Added tenantId filter for multi-tenant security
+/// Provider for attendance detail with realtime updates
+/// Watches realtimeAttendanceDetailProvider to auto-refresh on person_attendances changes
 final attendanceDetailProvider = FutureProvider.autoDispose.family<Attendance?, int>((ref, attendanceId) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
@@ -21,7 +21,6 @@ final attendanceDetailProvider = FutureProvider.autoDispose.family<Attendance?, 
       .maybeSingle();
 
   if (response == null) return null;
-  // response is already Map<String, dynamic> from maybeSingle()
   return Attendance.fromJson(response);
 });
 

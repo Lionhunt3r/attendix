@@ -266,6 +266,64 @@ final realtimeAttendanceDetailProvider = StreamProvider.autoDispose
   }
 });
 
+/// Provider for realtime pending player changes subscription
+///
+/// Subscribes to the player table filtered by pending=true and invalidates
+/// when changes occur (new registrations)
+final realtimePendingPlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) async* {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenantId = ref.watch(currentTenantIdProvider);
+  final playerRepo = ref.watch(playerRepositoryWithTenantProvider);
+
+  if (tenantId == null) {
+    yield [];
+    return;
+  }
+
+  // Initial data
+  final initialData = await playerRepo.getPendingPlayers();
+  yield initialData;
+
+  // Create a stream controller
+  final controller = StreamController<List<Person>>();
+
+  // Setup realtime channel — listen for all player changes (pending flag changes)
+  final channel = supabase
+      .channel('pending_player_changes_$tenantId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'player',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'tenantId',
+          value: tenantId,
+        ),
+        callback: (payload) async {
+          try {
+            final freshData = await playerRepo.getPendingPlayers();
+            if (!controller.isClosed) {
+              controller.add(freshData);
+            }
+          } catch (e) {
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          }
+        },
+      )
+      .subscribe();
+
+  ref.onDispose(() {
+    channel.unsubscribe();
+    controller.close();
+  });
+
+  await for (final data in controller.stream) {
+    yield data;
+  }
+});
+
 /// Manager class for handling multiple realtime subscriptions
 ///
 /// Use this to manually manage subscriptions if needed
