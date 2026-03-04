@@ -91,33 +91,40 @@ class _PlanAccordionState extends State<PlanAccordion> {
                 ),
               ),
             const Spacer(),
-            // Share plan toggle indicator
-            if (widget.attendance.sharePlan)
-              Tooltip(
-                message: 'Plan wird mit Mitgliedern geteilt',
-                child: Icon(
-                  Icons.share,
-                  size: 16,
-                  color: AppColors.success,
+            // Compact share plan toggle
+            Tooltip(
+              message: widget.attendance.sharePlan
+                  ? 'Plan wird mit Mitgliedern geteilt'
+                  : 'Plan ist nur für Dirigenten sichtbar',
+              child: GestureDetector(
+                onTap: () {}, // absorb tap to prevent ExpansionTile toggle
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.share,
+                      size: 14,
+                      color: widget.attendance.sharePlan
+                          ? AppColors.success
+                          : AppColors.medium,
+                    ),
+                    SizedBox(
+                      height: 24,
+                      width: 40,
+                      child: FittedBox(
+                        child: Switch(
+                          value: widget.attendance.sharePlan,
+                          onChanged: widget.onSharePlanChanged,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            ),
           ],
         ),
         children: [
-          // Share plan toggle
-          SwitchListTile(
-            secondary: const Icon(Icons.share),
-            title: const Text('Plan teilen'),
-            subtitle: Text(
-              widget.attendance.sharePlan
-                  ? 'Plan ist für Mitglieder sichtbar'
-                  : 'Plan ist nur für Dirigenten sichtbar',
-              style: TextStyle(fontSize: 12, color: AppColors.medium),
-            ),
-            value: widget.attendance.sharePlan,
-            onChanged: widget.onSharePlanChanged,
-          ),
-          const Divider(height: 1),
           if (!hasPlan || fields.isEmpty)
             Padding(
               padding: const EdgeInsets.all(AppDimensions.paddingL),
