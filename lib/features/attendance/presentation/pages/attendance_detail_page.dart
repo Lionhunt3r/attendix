@@ -1617,7 +1617,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
       // Invalidate providers so caches are consistent with DB
       ref.invalidate(realtimeAttendanceListProvider);
-      ref.invalidate(filteredPersonAttendancesForAttendanceProvider(widget.attendanceId));
+      // Must invalidate the DATA provider (does the actual Supabase query),
+      // not just the filter wrapper which would return cached stale data.
+      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
 
       // Fire-and-forget: update stored percentage for consistency
       ref.read(attendanceNotifierProvider.notifier)
