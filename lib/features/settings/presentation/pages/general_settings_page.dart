@@ -327,7 +327,12 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _showUnsavedChangesDialog();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Allgemeine Einstellungen'),
         leading: IconButton(
@@ -687,6 +692,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                 ],
               ),
             ),
+    ),
     );
   }
 
@@ -1482,24 +1488,33 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   }
 
   Future<void> _showUnsavedChangesDialog() async {
-    final result = await showDialog<bool>(
+    final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ungespeicherte Änderungen'),
-        content: const Text('Möchtest du die Änderungen verwerfen?'),
+        content: const Text('Du hast ungespeicherte Änderungen. Was möchtest du tun?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(ctx).pop('cancel'),
             child: const Text('Abbrechen'),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop('discard'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             child: const Text('Verwerfen'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop('save'),
+            child: const Text('Speichern'),
           ),
         ],
       ),
     );
-    if (result == true && mounted) {
+    if (result == null || result == 'cancel') return;
+    if (result == 'save') {
+      await _saveSettings();
+    }
+    if (mounted) {
       context.pop();
     }
   }

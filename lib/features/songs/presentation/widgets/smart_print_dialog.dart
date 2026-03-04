@@ -58,6 +58,16 @@ class _SmartPrintDialogState extends ConsumerState<SmartPrintDialog> {
     }
   }
 
+  void _applyPreset(int numerator, int denominator) {
+    if (_copyInfos == null) return;
+    setState(() {
+      for (int i = 0; i < _copyInfos!.length; i++) {
+        final count = (_copyInfos![i].playerCount * numerator / denominator).ceil();
+        _copyInfos![i] = _copyInfos![i].copyWith(copies: count.clamp(1, 99));
+      }
+    });
+  }
+
   void _updateCopies(int index, int newCopies) {
     // RT-007: Add bounds check
     final infos = _copyInfos;
@@ -193,6 +203,23 @@ class _SmartPrintDialogState extends ConsumerState<SmartPrintDialog> {
         const Text(
           'Kopien pro Instrument:',
           style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: AppDimensions.paddingXS),
+        Wrap(
+          spacing: AppDimensions.paddingS,
+          children: [
+            ActionChip(label: const Text('1:1'), onPressed: () => _applyPreset(1, 1)),
+            ActionChip(label: const Text('1:2'), onPressed: () => _applyPreset(1, 2)),
+            ActionChip(label: const Text('1:3'), onPressed: () => _applyPreset(1, 3)),
+            ActionChip(label: const Text('Je 1'), onPressed: () {
+              if (_copyInfos == null) return;
+              setState(() {
+                for (int i = 0; i < _copyInfos!.length; i++) {
+                  _copyInfos![i] = _copyInfos![i].copyWith(copies: 1);
+                }
+              });
+            }),
+          ],
         ),
         const SizedBox(height: AppDimensions.paddingS),
         ConstrainedBox(

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -254,6 +255,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                 'Dein Telegram-Konto ist verbunden. Du erhältst Benachrichtigungen über den Attendix Bot.',
                 style: TextStyle(color: AppColors.medium),
               ),
+              const SizedBox(height: 8),
+              _buildUserIdRow(),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -270,6 +273,33 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildUserIdRow() {
+    final userId = ref.read(supabaseClientProvider).auth.currentUser?.id ?? '';
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Benutzer-ID: $userId',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.medium,
+                  fontFamily: 'monospace',
+                ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.copy, size: 16),
+          tooltip: 'ID kopieren',
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: userId));
+            ToastHelper.showSuccess(context, 'Benutzer-ID kopiert');
+          },
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
     );
   }
 
@@ -463,6 +493,16 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     try {
       final telegramService = ref.read(telegramServiceProvider);
       await telegramService.updateNotificationConfig(newConfig);
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gespeichert'),
+            duration: Duration(milliseconds: 800),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _config = previousConfig);

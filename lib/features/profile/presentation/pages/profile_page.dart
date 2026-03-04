@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -23,6 +25,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  DateTime? _birthday;
 
   bool _isLoading = false;  // RT-012: Start false, set true after guard check
   bool _isSaving = false;
@@ -91,6 +94,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         'firstName': player?['firstName'] ?? tenantUser?['firstName'] ?? '',
         'lastName': player?['lastName'] ?? tenantUser?['lastName'] ?? '',
         'phone': player?['phone'] ?? tenantUser?['phone'] ?? '',
+        'birthday': player?['birthday'] ?? '',
         'tenantRole': tenantUser?['role'],
         'playerId': tenantUser?['playerId'],
       };
@@ -103,6 +107,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       _firstNameController.text = profileData['firstName'] ?? '';
       _lastNameController.text = profileData['lastName'] ?? '';
       _phoneController.text = profileData['phone'] ?? '';
+      final birthdayStr = profileData['birthday'] as String?;
+      _birthday = birthdayStr != null && birthdayStr.isNotEmpty
+          ? DateTime.tryParse(birthdayStr)
+          : null;
 
     } catch (e) {
       if (mounted) {
@@ -152,6 +160,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               'firstName': _firstNameController.text.trim(),
               'lastName': _lastNameController.text.trim(),
               'phone': _phoneController.text.trim(),
+              'birthday': _birthday?.toIso8601String().split('T')[0],
             })
             .eq('id', playerId)
             .eq('tenantId', tenantId);
@@ -170,6 +179,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       if (mounted) {
         setState(() => _isSaving = false);
       }
+    }
+  }
+
+  Future<void> _pickBirthday() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthday ?? DateTime(2000, 1, 1),
+      firstDate: DateTime(1920),
+      lastDate: DateTime.now(),
+      locale: const Locale('de', 'DE'),
+    );
+    if (picked != null) {
+      setState(() => _birthday = picked);
     }
   }
 
@@ -349,6 +371,27 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       }
                       return null;
                     },
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+
+                  // Birthday
+                  GestureDetector(
+                    onTap: _isEditing ? _pickBirthday : null,
+                    child: AbsorbPointer(
+                      child: TextFormField(
+                        enabled: _isEditing,
+                        decoration: InputDecoration(
+                          labelText: 'Geburtsdatum',
+                          prefixIcon: const Icon(Icons.cake_outlined),
+                          suffixIcon: _isEditing ? const Icon(Icons.calendar_today, size: 18) : null,
+                        ),
+                        controller: TextEditingController(
+                          text: _birthday != null
+                              ? DateFormat('dd.MM.yyyy').format(_birthday!)
+                              : '',
+                        ),
+                      ),
+                    ),
                   ),
 
                   if (_isEditing) ...[

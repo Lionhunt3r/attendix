@@ -1,6 +1,29 @@
 {
   "versions": [
     {
+      "version": "0.1.25",
+      "date": "4.3.2026",
+      "changes": [
+        "✨ Lehrer: Benutzerfreundliche Fehlermeldung",
+        "✨ Benachrichtigungen: Benutzer-ID mit Kopier-Button",
+        "✨ Einstellungen: Telegram Support-Kontakt",
+        "✨ Instrumente: Notenschlüssel in der Listenansicht",
+        "✨ Instrumente: Dynamische Labels (Stimme/Instrument/Gruppe)",
+        "✨ Personenübergabe: Bestätigungsdialog vor Transfer",
+        "✨ Einstellungen: 3-Optionen-Dialog bei ungespeicherten Änderungen",
+        "✨ Selbstservice: SegmentedButton für Gruppierungsmodus",
+        "✨ Einstellungen: Pull-to-Refresh auf Hauptseite",
+        "✨ Benachrichtigungen: Speicher-Feedback bei Auto-Save",
+        "✨ Lieder: Teilen-Link im Menü",
+        "✨ Mitglieder: Gruppenfilter-Chips",
+        "✨ Profil: Geburtsdatum-Feld mit DatePicker",
+        "✨ Einstellungen: Badge für ausstehende Registrierungen",
+        "✨ Smart Print: Druckverhältnis-Presets (1:1, 1:2, 1:3)",
+        "✨ Personenübergabe: Gruppenfilter",
+        "🔧 PopScope für Schutz bei ungespeicherten Änderungen"
+      ]
+    },
+    {
       "version": "0.1.24",
       "date": "4.3.2026",
       "changes": [

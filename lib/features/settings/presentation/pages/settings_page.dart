@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/debug_providers.dart';
+import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/pwa_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/pwa_service.dart';
@@ -22,13 +24,20 @@ class SettingsPage extends ConsumerWidget {
     final tenant = ref.watch(currentTenantProvider);
     // Use effectiveRoleProvider to support debug role override
     final role = ref.watch(effectiveRoleProvider);
+    final pendingCount = ref.watch(pendingPlayersProvider).valueOrNull?.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Einstellungen'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppDimensions.paddingM),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(currentTenantProvider);
+          ref.invalidate(userTenantsProvider);
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(AppDimensions.paddingM),
         children: [
           // PWA Install Hint (only shown on mobile web)
           const _PwaInstallHint(),
@@ -192,6 +201,12 @@ class SettingsPage extends ConsumerWidget {
                   ),
                   title: 'Ausstehende Registrierungen',
                   subtitle: 'Neue Selbst-Registrierungen prüfen',
+                  trailing: pendingCount > 0
+                      ? Badge(
+                          label: Text('$pendingCount'),
+                          child: const Icon(Icons.chevron_right, color: AppColors.medium),
+                        )
+                      : null,
                   onTap: () => context.push('/settings/pending'),
                 ),
                 if (role.isAdmin)
@@ -250,6 +265,12 @@ class SettingsPage extends ConsumerWidget {
                   title: 'Feedback & Hilfe',
                   subtitle: 'Fragen stellen oder Feedback geben',
                   onTap: () => showFeedbackSheet(context),
+                ),
+                _SettingsTile(
+                  leading: _SettingsIcon(icon: Icons.telegram, color: const Color(0xFF0088CC)),
+                  title: 'Telegram Support',
+                  subtitle: 'Direkt per Telegram kontaktieren',
+                  onTap: () => _openTelegramSupport(context),
                 ),
               ],
             ),
@@ -397,8 +418,16 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: AppDimensions.paddingL),
         ],
       ),
+      ),
     );
   }
+}
+
+void _openTelegramSupport(BuildContext context) {
+  launchUrl(
+    Uri.parse('https://t.me/attendix_bot'),
+    mode: LaunchMode.externalApplication,
+  );
 }
 
 class _SettingsSection extends StatelessWidget {

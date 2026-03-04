@@ -83,30 +83,42 @@ final memberCountProvider = Provider<int>((ref) {
 /// Provider for filtered members based on search term
 final membersSearchTermProvider = StateProvider<String>((ref) => '');
 
+/// Provider for group filter (null = show all groups)
+final membersGroupFilterProvider = StateProvider<int?>((ref) => null);
+
 /// Provider for filtered members
 final filteredMembersGroupedProvider = Provider<AsyncValue<List<MembersGroup>>>((ref) {
   final groupsAsync = ref.watch(membersGroupedProvider);
   final searchTerm = ref.watch(membersSearchTermProvider).toLowerCase();
+  final groupFilter = ref.watch(membersGroupFilterProvider);
 
   return groupsAsync.whenData((groups) {
-    if (searchTerm.isEmpty) return groups;
+    var filtered = groups;
 
-    final List<MembersGroup> filtered = [];
+    // Apply group filter
+    if (groupFilter != null) {
+      filtered = filtered.where((g) => g.groupId == groupFilter).toList();
+    }
 
-    for (final group in groups) {
-      final matchingMembers = group.members.where((p) {
-        return p.firstName.toLowerCase().contains(searchTerm) ||
-            p.lastName.toLowerCase().contains(searchTerm) ||
-            group.groupName.toLowerCase().contains(searchTerm);
-      }).toList();
+    // Apply search filter
+    if (searchTerm.isNotEmpty) {
+      final List<MembersGroup> searchFiltered = [];
+      for (final group in filtered) {
+        final matchingMembers = group.members.where((p) {
+          return p.firstName.toLowerCase().contains(searchTerm) ||
+              p.lastName.toLowerCase().contains(searchTerm) ||
+              group.groupName.toLowerCase().contains(searchTerm);
+        }).toList();
 
-      if (matchingMembers.isNotEmpty) {
-        filtered.add(MembersGroup(
-          groupId: group.groupId,
-          groupName: group.groupName,
-          members: matchingMembers,
-        ));
+        if (matchingMembers.isNotEmpty) {
+          searchFiltered.add(MembersGroup(
+            groupId: group.groupId,
+            groupName: group.groupName,
+            members: matchingMembers,
+          ));
+        }
       }
+      return searchFiltered;
     }
 
     return filtered;

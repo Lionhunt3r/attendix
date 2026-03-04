@@ -9,6 +9,7 @@ import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/instrument/instrument.dart';
 import '../../../../data/models/person/person.dart';
@@ -37,6 +38,12 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
   final Map<int, int?> _groupMapping = {};
   List<Group> _targetGroups = [];
   bool _initialized = false;
+  int? _sourceGroupFilter;
+
+  List<Person> get _filteredPlayers {
+    if (_sourceGroupFilter == null) return widget.selectedPlayers;
+    return widget.selectedPlayers.where((p) => p.instrument == _sourceGroupFilter).toList();
+  }
 
   @override
   void initState() {
@@ -220,6 +227,15 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
   }
 
   Widget _buildPlayersSummary() {
+    final sourceGroups = ref.watch(groupsProvider).valueOrNull ?? [];
+    // Only show groups that have selected players
+    final relevantGroupIds = widget.selectedPlayers
+        .where((p) => p.instrument != null)
+        .map((p) => p.instrument!)
+        .toSet();
+    final relevantGroups = sourceGroups.where((g) => relevantGroupIds.contains(g.id)).toList();
+    final players = _filteredPlayers;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.paddingM),
@@ -231,7 +247,7 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                 const Icon(Icons.people, color: AppColors.primary),
                 const SizedBox(width: AppDimensions.paddingS),
                 Text(
-                  '${widget.selectedPlayers.length} Spieler ausgewählt',
+                  '${players.length} von ${widget.selectedPlayers.length} Spieler',
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 16,
@@ -239,11 +255,41 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                 ),
               ],
             ),
+            if (relevantGroups.length > 1) ...[
+              const SizedBox(height: AppDimensions.paddingS),
+              SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: AppDimensions.paddingXS),
+                      child: FilterChip(
+                        label: const Text('Alle'),
+                        selected: _sourceGroupFilter == null,
+                        onSelected: (_) => setState(() => _sourceGroupFilter = null),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    ...relevantGroups.map((g) => Padding(
+                          padding: const EdgeInsets.only(right: AppDimensions.paddingXS),
+                          child: FilterChip(
+                            label: Text(g.shortName ?? g.name),
+                            selected: _sourceGroupFilter == g.id,
+                            onSelected: (_) => setState(() =>
+                                _sourceGroupFilter = _sourceGroupFilter == g.id ? null : g.id),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: AppDimensions.paddingS),
             Wrap(
               spacing: AppDimensions.paddingS,
               runSpacing: AppDimensions.paddingXS,
-              children: widget.selectedPlayers.take(10).map((p) {
+              children: players.take(10).map((p) {
                 return Chip(
                   label: Text(p.fullName),
                   avatar: CircleAvatar(
@@ -256,11 +302,11 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                 );
               }).toList(),
             ),
-            if (widget.selectedPlayers.length > 10)
+            if (players.length > 10)
               Padding(
                 padding: const EdgeInsets.only(top: AppDimensions.paddingS),
                 child: Text(
-                  '... und ${widget.selectedPlayers.length - 10} weitere',
+                  '... und ${players.length - 10} weitere',
                   style: const TextStyle(color: AppColors.medium),
                 ),
               ),
@@ -610,6 +656,32 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
       return;
     }
 
+    // Get target tenant name for confirmation
+    final tenants = ref.read(userTenantsProvider).valueOrNull ?? [];
+    final targetTenant = tenants.where((t) => t.id == _targetTenantId).firstOrNull;
+    if (targetTenant == null) {
+      if (mounted) ToastHelper.showError(context, 'Ziel-Instanz nicht gefunden');
+      return;
+    }
+
+    // Confirmation dialog
+    final playersToTransfer = _filteredPlayers;
+    final playerCount = playersToTransfer.length;
+    final isTransfer = !_stayInInstance;
+    if (!mounted) return;
+    final confirmed = await DialogHelper.showConfirmation(
+      context,
+      title: isTransfer ? 'Spieler übertragen?' : 'Spieler kopieren?',
+      message: isTransfer
+          ? '$playerCount Spieler an "${targetTenant.name}" übertragen? '
+            'Die Spieler werden in dieser Instanz archiviert. '
+            'Dieser Vorgang kann nicht rückgängig gemacht werden.'
+          : '$playerCount Spieler nach "${targetTenant.name}" kopieren?',
+      confirmText: isTransfer ? 'Übertragen' : 'Kopieren',
+      isDestructive: isTransfer,
+    );
+    if (!confirmed) return;
+
     setState(() {
       _isTransferring = true;
       _progressMessage = 'Bereite Übertragung vor...';
@@ -617,15 +689,9 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
 
     try {
       final playerRepo = ref.read(playerRepositoryWithTenantProvider);
-      final tenants = ref.read(userTenantsProvider).valueOrNull ?? [];
-      // BL-009: Use firstOrNull and validate tenant exists
-      final targetTenant = tenants.where((t) => t.id == _targetTenantId).firstOrNull;
-      if (targetTenant == null) {
-        throw Exception('Ziel-Instanz nicht gefunden');
-      }
 
       final results = await playerRepo.handoverPlayers(
-        players: widget.selectedPlayers,
+        players: playersToTransfer,
         targetTenantId: _targetTenantId!,
         groupMapping: _groupMapping,
         targetTenantName: targetTenant.longName,
