@@ -140,6 +140,15 @@ class _SongCreatePageState extends ConsumerState<SongCreatePage> {
                 prefixIcon: Icon(Icons.link),
               ),
               keyboardType: TextInputType.url,
+              validator: (value) {
+                if (value != null && value.trim().isNotEmpty) {
+                  final uri = Uri.tryParse(value.trim());
+                  if (uri == null || !uri.hasScheme || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+                    return 'Bitte eine gültige URL eingeben (https://...)';
+                  }
+                }
+                return null;
+              },
             ),
             const SizedBox(height: AppDimensions.paddingM),
 

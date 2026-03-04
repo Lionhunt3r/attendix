@@ -195,7 +195,16 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       ref.invalidate(userTenantsProvider);
 
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Einstellungen gespeichert');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Einstellungen gespeichert. Lade die App neu, damit alle Änderungen wirksam werden.'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'OK',
+              onPressed: () {},
+            ),
+          ),
+        );
         setState(() => _hasChanges = false);
       }
     } catch (e) {

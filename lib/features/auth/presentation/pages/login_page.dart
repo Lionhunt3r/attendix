@@ -300,6 +300,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: AppDimensions.paddingL),
+                    Text(
+                      'v${AppConstants.appVersion}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.medium,
+                      ),
+                    ),
                   ],
                 ),
               ),

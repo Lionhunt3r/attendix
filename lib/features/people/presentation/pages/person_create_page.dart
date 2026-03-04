@@ -8,6 +8,7 @@ import '../../../../core/providers/player_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/utils/tenant_label_utils.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
 import '../../../../core/providers/group_providers.dart';
@@ -160,16 +161,18 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
             instrumentsAsync.when(
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('Fehler: $e'),
-              data: (instruments) => DropdownButtonFormField<int>(
+              data: (instruments) {
+                final label = groupLabel(tenant?.type);
+                return DropdownButtonFormField<int>(
                 value: _selectedInstrument,
-                decoration: const InputDecoration(
-                  labelText: 'Instrument',
-                  prefixIcon: Icon(Icons.music_note),
+                decoration: InputDecoration(
+                  labelText: label,
+                  prefixIcon: const Icon(Icons.music_note),
                 ),
                 items: [
-                  const DropdownMenuItem<int>(
+                  DropdownMenuItem<int>(
                     value: null,
-                    child: Text('Kein Instrument'),
+                    child: Text('Kein $label'),
                   ),
                   ...instruments.map((i) => DropdownMenuItem<int>(
                     value: i.id,
@@ -177,7 +180,8 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
                   )),
                 ],
                 onChanged: (value) => setState(() => _selectedInstrument = value),
-              ),
+              );
+              },
             ),
             const SizedBox(height: AppDimensions.paddingM),
 

@@ -278,7 +278,6 @@ class _SelfServiceOverviewPageState
       'Beruflich verhindert',
       'Familienfeier',
       'Urlaub',
-      'Sonstiger Grund',
     ];
 
     String? selectedReason = await showModalBottomSheet<String>(
@@ -337,35 +336,53 @@ class _SelfServiceOverviewPageState
 
   Future<void> _showCustomReasonDialog(BuildContext context) async {
     final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Abmeldegrund'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Bitte gib einen Grund an',
+    try {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Abmeldegrund'),
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'Bitte gib einen Grund an (mind. 5 Zeichen)',
+              ),
+              autofocus: true,
+              validator: (value) {
+                if (value == null || value.trim().length < 5) {
+                  return 'Bitte mindestens 5 Zeichen eingeben';
+                }
+                return null;
+              },
+            ),
           ),
-          autofocus: true,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Abbrechen'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(context).pop(controller.text.trim());
+                }
+              },
+              child: const Text('Bestätigen'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Abbrechen'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: const Text('Bestätigen'),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (reason != null && reason.isNotEmpty && mounted) {
-      if (context.mounted) {
-        Navigator.of(context).pop(reason);
+      if (reason != null && reason.isNotEmpty && mounted) {
+        if (context.mounted) {
+          Navigator.of(context).pop(reason);
+        }
       }
+    } finally {
+      controller.dispose();
     }
   }
 

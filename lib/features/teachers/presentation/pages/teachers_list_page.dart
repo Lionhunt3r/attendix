@@ -373,6 +373,9 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Bitte einen Namen eingeben';
                     }
+                    if (value.trim().length < 2) {
+                      return 'Name muss mindestens 2 Zeichen haben';
+                    }
                     return null;
                   },
                 ),
@@ -384,6 +387,15 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
                     hintText: 'z.B. +49 123 456789',
                   ),
                   keyboardType: TextInputType.phone,
+                  validator: (value) {
+                    if (value != null && value.trim().isNotEmpty) {
+                      final cleaned = value.trim().replaceAll(RegExp(r'[\s\-\(\)]'), '');
+                      if (!RegExp(r'^\+?[0-9]{4,15}$').hasMatch(cleaned)) {
+                        return 'Bitte eine gültige Telefonnummer eingeben';
+                      }
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: AppDimensions.paddingM),
 
