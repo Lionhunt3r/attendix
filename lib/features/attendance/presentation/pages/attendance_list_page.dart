@@ -7,7 +7,6 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/debug_providers.dart';
@@ -21,118 +20,6 @@ import '../../../../shared/widgets/common/empty_state.dart';
 import '../../../../shared/widgets/display/percentage_badge.dart';
 import '../../../../shared/widgets/animations/animated_list_item.dart';
 
-
-/// Provider for attendance list
-final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  // Guard against null tenant or null tenant.id
-  if (tenant?.id == null) return [];
-
-  // Load attendances with person_attendances to calculate percentage
-  final response = await supabase
-      .from('attendance')
-      .select('*, person_attendances(status)')
-      .eq('tenantId', tenant!.id!)
-      .order('date', ascending: false)
-      .limit(50);
-
-  return (response as List).map((e) {
-    final attendance = Attendance.fromJson(e as Map<String, dynamic>);
-
-    // Calculate percentage from person_attendances if not already set
-    if (attendance.percentage == null || attendance.percentage == 0) {
-      final personAttendances = e['person_attendances'] as List?;
-      if (personAttendances != null && personAttendances.isNotEmpty) {
-        final total = personAttendances.length;
-        // BL-003: Use centralized countsAsPresent definition
-        final present = personAttendances.where((pa) {
-          final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
-          return status.countsAsPresent;
-        }).length;
-        final calculatedPercentage = (present / total * 100).roundToDouble();
-        return attendance.copyWith(percentage: calculatedPercentage);
-      }
-    }
-    return attendance;
-  }).toList();
-});
-
-/// Data class for categorized attendances (memoized)
-class CategorizedAttendances {
-  final Attendance? current;
-  final List<Attendance> upcoming;
-  final List<Attendance> past;
-
-  const CategorizedAttendances({
-    this.current,
-    required this.upcoming,
-    required this.past,
-  });
-}
-
-/// Provider that categorizes and sorts attendances (computed once per data change)
-final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
-  final attendances = ref.watch(attendanceListProvider).valueOrNull ?? [];
-
-  final now = DateTime.now();
-  final todayStart = DateTime(now.year, now.month, now.day);
-
-  final upcoming = <Attendance>[];
-  final past = <Attendance>[];
-
-  for (final attendance in attendances) {
-    final date = DateTime.tryParse(attendance.date);
-    if (date == null) {
-      past.add(attendance);
-      continue;
-    }
-    final dateOnly = DateTime(date.year, date.month, date.day);
-    if (dateOnly.isBefore(todayStart)) {
-      past.add(attendance);
-    } else {
-      upcoming.add(attendance);
-    }
-  }
-
-  // Sort once
-  upcoming.sort((a, b) => a.date.compareTo(b.date));
-  past.sort((a, b) => b.date.compareTo(a.date));
-
-  // BL-013: Extract current without mutating the upcoming list
-  Attendance? current;
-  List<Attendance> remainingUpcoming;
-  if (upcoming.isNotEmpty) {
-    current = upcoming.first;
-    remainingUpcoming = upcoming.sublist(1);
-  } else {
-    remainingUpcoming = [];
-  }
-
-  return CategorizedAttendances(
-    current: current,
-    upcoming: remainingUpcoming,
-    past: past,
-  );
-});
-
-/// Provider for average attendance percentage of past attendances
-final averageAttendancePercentProvider = Provider<double?>((ref) {
-  final categorized = ref.watch(categorizedAttendancesProvider);
-  // BL-005: Include 0% attendances in average calculation (changed > 0 to != null)
-  final pastAttendances = categorized.past
-      .where((a) => a.percentage != null)
-      .toList();
-
-  if (pastAttendances.isEmpty) return null;
-
-  final sum = pastAttendances.fold<double>(
-    0,
-    (acc, a) => acc + (a.percentage ?? 0),
-  );
-  return sum / pastAttendances.length;
-});
 
 /// Attendance list page
 class AttendanceListPage extends ConsumerStatefulWidget {

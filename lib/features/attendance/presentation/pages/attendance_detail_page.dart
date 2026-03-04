@@ -12,6 +12,7 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_detail_providers.dart';
+import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/conductor_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -1612,6 +1613,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
             'changed_by': supabase.auth.currentUser?.id,
           })
           .eq('id', personAttendanceId);
+
+      // Recalculate percentage so list page updates via realtime
+      ref.read(attendanceNotifierProvider.notifier)
+          .recalculatePercentage(widget.attendanceId);
+      // Also directly invalidate for immediate local feedback
+      ref.invalidate(attendanceListProvider);
     } catch (e) {
       if (mounted) {
         if (previousStatus != null) {
