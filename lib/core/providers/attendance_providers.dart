@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/supabase_config.dart';
 import '../constants/enums.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/repositories/repositories.dart';
@@ -129,6 +130,49 @@ final averageAttendancePercentProvider = Provider<double?>((ref) {
   return sum / pastAttendances.length;
 });
 
+/// Provider for batch attendance percentages: Map<personId, percentage>
+///
+/// Watches [attendanceRefetchCounter] so realtime changes to
+/// person_attendances automatically trigger a refetch.
+final playerAttendancePercentagesProvider =
+    FutureProvider<Map<int, int>>((ref) async {
+  ref.watch(attendanceRefetchCounter);
+
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+  if (tenant == null || tenant.id == null) return {};
+
+  final now = DateTime.now().toIso8601String();
+  final response = await supabase
+      .from('person_attendances')
+      .select('person_id, status, attendance:attendance_id!inner(date, tenantId)')
+      .eq('attendance.tenantId', tenant.id!)
+      .lte('attendance.date', now);
+
+  final attendances = response as List;
+
+  // Group by person_id
+  final totals = <int, int>{};
+  final attended = <int, int>{};
+
+  for (final a in attendances) {
+    final personId = a['person_id'] as int?;
+    if (personId == null) continue;
+    totals[personId] = (totals[personId] ?? 0) + 1;
+    final status = a['status'] as int?;
+    // BL-003: Use centralized definition for which statuses count as attended
+    if (AttendanceStatus.fromValue(status ?? 0).countsAsPresent) {
+      attended[personId] = (attended[personId] ?? 0) + 1;
+    }
+  }
+
+  return totals.map((personId, total) {
+    final att = attended[personId] ?? 0;
+    final pct = total > 0 ? (att / total * 100).round() : 0;
+    return MapEntry(personId, pct);
+  });
+});
+
 /// Notifier for attendance mutations
 class AttendanceNotifier extends Notifier<AsyncValue<void>> {
   @override
@@ -170,6 +214,7 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       await _repo.deleteAttendance(id);
       state = const AsyncValue.data(null);
       ref.invalidate(attendancesProvider);
+      ref.invalidate(playerAttendancePercentagesProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
@@ -189,6 +234,7 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
           ref.invalidate(personAttendancesProvider(record.personId!));
         }
       }
+      ref.invalidate(playerAttendancePercentagesProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
@@ -206,6 +252,7 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       ref.invalidate(attendanceByIdProvider(attendanceId));
       ref.invalidate(personAttendancesProvider(personId));
+      ref.invalidate(playerAttendancePercentagesProvider);
       return result;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -237,6 +284,7 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       // Fire-and-forget: don't await so a recalculation failure doesn't
       // overwrite the successful batch update state
       recalculatePercentage(attendanceId);
+      ref.invalidate(playerAttendancePercentagesProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }

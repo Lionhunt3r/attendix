@@ -13,8 +13,8 @@ import 'song_providers.dart';
 import 'tenant_providers.dart';
 import 'group_providers.dart';
 
-// Keep alive counter: incrementing forces realtimeAttendanceListProvider to refetch.
-final _attendanceRefetchCounter = StateProvider<int>((ref) => 0);
+// Keep alive counter: incrementing forces providers watching it to refetch.
+final attendanceRefetchCounter = StateProvider<int>((ref) => 0);
 
 /// Provider for realtime player changes subscription
 ///
@@ -96,7 +96,7 @@ final realtimeAttendanceListProvider = FutureProvider.autoDispose<List<Attendanc
   // Watch the realtime subscription so it stays alive while this provider is active.
   ref.watch(_attendanceRealtimeSubscriptionProvider);
   // Watch the refetch counter so manual invalidation triggers a refetch.
-  ref.watch(_attendanceRefetchCounter);
+  ref.watch(attendanceRefetchCounter);
 
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
@@ -135,7 +135,7 @@ final _attendanceRealtimeSubscriptionProvider = Provider.autoDispose<void>((ref)
   if (tenant?.id == null) return;
 
   void onChanged(dynamic _) {
-    ref.read(_attendanceRefetchCounter.notifier).state++;
+    ref.read(attendanceRefetchCounter.notifier).state++;
   }
 
   final channel = supabase
