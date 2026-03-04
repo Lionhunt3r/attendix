@@ -82,11 +82,17 @@ final personAttendanceStatsProvider =
 
   final attendances = response as List;
   final now = DateTime.now();
+  final seasonStart = tenant?.seasonStart != null
+      ? DateTime.tryParse(tenant!.seasonStart!)
+      : null;
 
   final pastAttendances = attendances.where((a) {
     final attendance = a['attendance'] as Map<String, dynamic>?;
     final date = DateTime.tryParse(attendance?['date'] ?? '');
-    return date != null && date.isBefore(now);
+    if (date == null || !date.isBefore(now)) return false;
+    // Only count attendances from the current season
+    if (seasonStart != null && date.isBefore(seasonStart)) return false;
+    return true;
   }).toList();
 
   final total = pastAttendances.length;

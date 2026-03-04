@@ -144,6 +144,7 @@ final playerAttendancePercentagesProvider =
   if (tenant == null || tenant.id == null) return {};
 
   final now = DateTime.now().toIso8601String();
+  final seasonStart = tenant.seasonStart;
 
   // Fetch all records using pagination to avoid the PostgREST 1000-row default limit.
   // A tenant with 50+ members and 25+ events easily exceeds 1000 person_attendances.
@@ -152,12 +153,18 @@ final playerAttendancePercentagesProvider =
   int offset = 0;
 
   while (true) {
-    final batch = await supabase
+    var query = supabase
         .from('person_attendances')
         .select('person_id, status, attendance:attendance_id!inner(date, tenantId)')
         .eq('attendance.tenantId', tenant.id!)
-        .lte('attendance.date', now)
-        .range(offset, offset + batchSize - 1);
+        .lte('attendance.date', now);
+
+    // Only count attendances from the current season
+    if (seasonStart != null) {
+      query = query.gte('attendance.date', seasonStart);
+    }
+
+    final batch = await query.range(offset, offset + batchSize - 1);
 
     final rows = batch as List;
     allAttendances.addAll(rows);
