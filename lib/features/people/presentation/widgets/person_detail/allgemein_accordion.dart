@@ -386,7 +386,7 @@ class AllgemeinAccordion extends ConsumerWidget {
       error: (e, _) => Text('Fehler: $e'),
       data: (teachers) {
         final teacher = teachers.where((t) => t.id == teacherId).firstOrNull;
-        final teacherName = teacher?.fullName ?? 'Nicht ausgewählt';
+        final teacherName = teacher?.name ?? 'Nicht ausgewählt';
 
         return Padding(
           padding: const EdgeInsets.only(left: AppDimensions.paddingL),
@@ -397,7 +397,7 @@ class AllgemeinAccordion extends ConsumerWidget {
             editable: canEdit,
             onEdit: () async {
               final items = teachers
-                  .map((t) => SelectionItem(value: t.id!, label: t.fullName))
+                  .map((t) => SelectionItem(value: t.id!, label: t.name))
                   .toList();
 
               final result = await SelectionSheet.show<int>(

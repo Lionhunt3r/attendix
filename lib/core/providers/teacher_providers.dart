@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/models/person/person.dart';
 import '../../data/repositories/teacher_repository.dart';
 import 'tenant_providers.dart';
 
@@ -17,7 +16,7 @@ final teacherRepositoryWithTenantProvider = Provider<TeacherRepository>((ref) {
 });
 
 /// Provider for teachers list
-final teachersProvider = FutureProvider<List<Person>>((ref) async {
+final teachersProvider = FutureProvider<List<Teacher>>((ref) async {
   final repo = ref.watch(teacherRepositoryWithTenantProvider);
 
   if (!repo.hasTenantId) return [];
@@ -26,7 +25,7 @@ final teachersProvider = FutureProvider<List<Person>>((ref) async {
 });
 
 /// Provider for a single teacher by ID
-final teacherByIdProvider = FutureProvider.family<Person?, int>((ref, id) async {
+final teacherByIdProvider = FutureProvider.family<Teacher?, int>((ref, id) async {
   final repo = ref.watch(teacherRepositoryWithTenantProvider);
 
   if (!repo.hasTenantId) return null;
@@ -50,7 +49,7 @@ class TeacherNotifier extends Notifier<AsyncValue<void>> {
 
   TeacherRepository get _repo => ref.read(teacherRepositoryWithTenantProvider);
 
-  Future<Person?> createTeacher(Person teacher) async {
+  Future<Teacher?> createTeacher(Teacher teacher) async {
     state = const AsyncValue.loading();
     try {
       final result = await _repo.createTeacher(teacher);
@@ -63,7 +62,7 @@ class TeacherNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 
-  Future<Person?> updateTeacher(int id, Map<String, dynamic> updates) async {
+  Future<Teacher?> updateTeacher(int id, Map<String, dynamic> updates) async {
     state = const AsyncValue.loading();
     try {
       final result = await _repo.updateTeacher(id, updates);

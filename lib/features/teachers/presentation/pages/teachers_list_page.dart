@@ -1,95 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/supabase_config.dart';
-import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/providers/teacher_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
-
-/// Teacher model
-class Teacher {
-  final int? id;
-  final String name;
-  final List<int> instruments;
-  final String notes;
-  final String number;
-  final bool private_;
-  final int? tenantId;
-
-  const Teacher({
-    this.id,
-    required this.name,
-    required this.instruments,
-    this.notes = '',
-    this.number = '',
-    this.private_ = false,
-    this.tenantId,
-  });
-
-  factory Teacher.fromJson(Map<String, dynamic> json) {
-    return Teacher(
-      id: json['id'],
-      name: json['name'] ?? '',
-      instruments: (json['instruments'] as List<dynamic>?)
-              ?.map((e) => e is int ? e : int.tryParse(e.toString()) ?? 0)
-              .toList() ??
-          [],
-      notes: json['notes'] ?? '',
-      number: json['number'] ?? '',
-      private_: json['private'] ?? false,
-      tenantId: json['tenantId'],
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      if (id != null) 'id': id,
-      'name': name,
-      'instruments': instruments,
-      'notes': notes,
-      'number': number,
-      'private': private_,
-      if (tenantId != null) 'tenantId': tenantId,
-    };
-  }
-
-  Teacher copyWith({
-    int? id,
-    String? name,
-    List<int>? instruments,
-    String? notes,
-    String? number,
-    bool? private_,
-    int? tenantId,
-  }) {
-    return Teacher(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      instruments: instruments ?? this.instruments,
-      notes: notes ?? this.notes,
-      number: number ?? this.number,
-      private_: private_ ?? this.private_,
-      tenantId: tenantId ?? this.tenantId,
-    );
-  }
-}
-
-/// Provider for teachers list
-final teachersProvider = FutureProvider<List<Teacher>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenantId = ref.watch(currentTenantIdProvider);
-
-  if (tenantId == null) return [];
-
-  final response = await supabase
-      .from('teachers')
-      .select()
-      .eq('tenantId', tenantId)
-      .order('name', ascending: true);
-
-  return (response as List).map((e) => Teacher.fromJson(e)).toList();
-});
+import '../../../../data/repositories/teacher_repository.dart';
 
 /// Teacher List Page
 class TeachersListPage extends ConsumerWidget {
@@ -159,18 +75,8 @@ class TeachersListPage extends ConsumerWidget {
     );
 
     if (result != null) {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenantId = ref.read(currentTenantIdProvider);
-
-      if (tenantId == null) return;
-
       try {
-        await supabase.from('teachers').insert({
-          ...result.toJson(),
-          'tenantId': tenantId,
-        });
-
-        ref.invalidate(teachersProvider);
+        await ref.read(teacherNotifierProvider.notifier).createTeacher(result);
 
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Lehrer "${result.name}" erstellt');
@@ -193,16 +99,18 @@ class TeachersListPage extends ConsumerWidget {
       builder: (context) => _TeacherEditDialog(teacher: teacher),
     );
 
-    if (result != null) {
-      final supabase = ref.read(supabaseClientProvider);
-
+    if (result != null && teacher.id != null) {
       try {
-        await supabase
-            .from('teachers')
-            .update(result.toJson())
-            .eq('id', teacher.id!);
-
-        ref.invalidate(teachersProvider);
+        await ref.read(teacherNotifierProvider.notifier).updateTeacher(
+              teacher.id!,
+              {
+                'name': result.name,
+                'number': result.number,
+                'notes': result.notes,
+                'private': result.isPrivate,
+                'instruments': result.instruments,
+              },
+            );
 
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Änderungen gespeichert');
@@ -230,12 +138,10 @@ class TeachersListPage extends ConsumerWidget {
 
     if (!confirmed) return;
 
-    final supabase = ref.read(supabaseClientProvider);
+    if (teacher.id == null) return;
 
     try {
-      await supabase.from('teachers').delete().eq('id', teacher.id!);
-
-      ref.invalidate(teachersProvider);
+      await ref.read(teacherNotifierProvider.notifier).deleteTeacher(teacher.id!);
 
       if (context.mounted) {
         ToastHelper.showSuccess(context, 'Lehrer gelöscht');
@@ -289,7 +195,7 @@ class _TeacherTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   )
                 : null,
-        trailing: teacher.private_
+        trailing: teacher.isPrivate
             ? const Icon(Icons.lock_outline, size: 16, color: AppColors.medium)
             : const Icon(Icons.chevron_right),
         onTap: onTap,
@@ -321,7 +227,7 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
     _numberController =
         TextEditingController(text: widget.teacher?.number ?? '');
     _notesController = TextEditingController(text: widget.teacher?.notes ?? '');
-    _private = widget.teacher?.private_ ?? false;
+    _private = widget.teacher?.isPrivate ?? false;
   }
 
   @override
@@ -408,7 +314,7 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
       name: _nameController.text.trim(),
       number: _numberController.text.trim(),
       notes: _notesController.text.trim(),
-      private_: _private,
+      isPrivate: _private,
       instruments: widget.teacher?.instruments ?? [],
       tenantId: widget.teacher?.tenantId,
     );

@@ -1,87 +1,90 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/person/person.dart';
+import '../models/teacher/teacher.dart';
 import 'base_repository.dart';
 
+export '../models/teacher/teacher.dart';
+
 /// Repository for Teacher (Ausbilder/Dirigent) operations
+/// Uses the 'teachers' table (same as Ionic project)
 class TeacherRepository extends BaseRepository with TenantAwareRepository {
   TeacherRepository(super.ref);
 
   /// Get all teachers for current tenant
-  /// Teachers are stored in the 'ausbilder' table
-  Future<List<Person>> getTeachers() async {
+  Future<List<Teacher>> getTeachers() async {
     try {
       final response = await supabase
-          .from('ausbilder')
+          .from('teachers')
           .select()
-          .eq('tenant_id', currentTenantId)
-          .order('lastName', ascending: true);
+          .eq('tenantId', currentTenantId)
+          .order('name', ascending: true);
 
-      return (response as List).map((json) => Person.fromJson(json)).toList();
+      return (response as List)
+          .map((json) => Teacher.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e, stack) {
       handleError(e, stack, 'getTeachers');
-      return [];
+      rethrow;
     }
   }
 
   /// Get a single teacher by ID
-  Future<Person?> getTeacherById(int id) async {
+  Future<Teacher?> getTeacherById(int id) async {
     try {
       final response = await supabase
-          .from('ausbilder')
+          .from('teachers')
           .select()
           .eq('id', id)
-          .eq('tenant_id', currentTenantId)
+          .eq('tenantId', currentTenantId)
           .single();
 
-      return Person.fromJson(response);
+      return Teacher.fromJson(response);
     } catch (e, stack) {
       handleError(e, stack, 'getTeacherById');
-      return null;
+      rethrow;
     }
   }
 
   /// Create a new teacher
-  Future<Person?> createTeacher(Person teacher) async {
+  Future<Teacher?> createTeacher(Teacher teacher) async {
     try {
       final data = {
-        'firstName': teacher.firstName,
-        'lastName': teacher.lastName,
-        'email': teacher.email,
-        'phone': teacher.phone,
+        'name': teacher.name,
+        'instruments': teacher.instruments,
         'notes': teacher.notes,
-        'instrument': teacher.instrument,
-        'tenant_id': currentTenantId,
+        'number': teacher.number,
+        'private': teacher.isPrivate,
+        'tenantId': currentTenantId,
       };
 
       final response = await supabase
-          .from('ausbilder')
+          .from('teachers')
           .insert(data)
           .select()
           .single();
 
-      return Person.fromJson(response);
+      return Teacher.fromJson(response);
     } catch (e, stack) {
       handleError(e, stack, 'createTeacher');
-      return null;
+      rethrow;
     }
   }
 
   /// Update a teacher
-  Future<Person?> updateTeacher(int id, Map<String, dynamic> updates) async {
+  Future<Teacher?> updateTeacher(int id, Map<String, dynamic> updates) async {
     try {
       final response = await supabase
-          .from('ausbilder')
+          .from('teachers')
           .update(updates)
           .eq('id', id)
-          .eq('tenant_id', currentTenantId)
+          .eq('tenantId', currentTenantId)
           .select()
           .single();
 
-      return Person.fromJson(response);
+      return Teacher.fromJson(response);
     } catch (e, stack) {
       handleError(e, stack, 'updateTeacher');
-      return null;
+      rethrow;
     }
   }
 
@@ -89,15 +92,15 @@ class TeacherRepository extends BaseRepository with TenantAwareRepository {
   Future<bool> deleteTeacher(int id) async {
     try {
       await supabase
-          .from('ausbilder')
+          .from('teachers')
           .delete()
           .eq('id', id)
-          .eq('tenant_id', currentTenantId);
+          .eq('tenantId', currentTenantId);
 
       return true;
     } catch (e, stack) {
       handleError(e, stack, 'deleteTeacher');
-      return false;
+      rethrow;
     }
   }
 
@@ -107,7 +110,7 @@ class TeacherRepository extends BaseRepository with TenantAwareRepository {
       final response = await supabase
           .from('person')
           .select('teacher')
-          .eq('tenant_id', currentTenantId)
+          .eq('tenantId', currentTenantId)
           .not('teacher', 'is', null);
 
       final counts = <int, int>{};
@@ -120,7 +123,7 @@ class TeacherRepository extends BaseRepository with TenantAwareRepository {
       return counts;
     } catch (e, stack) {
       handleError(e, stack, 'getStudentCounts');
-      return {};
+      rethrow;
     }
   }
 }
