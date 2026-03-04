@@ -633,32 +633,32 @@ class _SelfServiceOverviewPageState
             const Divider(),
             _LegendItem(
               symbol: '✓',
-              color: AppColors.success,
+              color: AttendanceStatus.present.color,
               label: 'Anwesend',
             ),
             _LegendItem(
               symbol: 'E',
-              color: AppColors.info,
+              color: AttendanceStatus.excused.color,
               label: 'Entschuldigt',
             ),
             _LegendItem(
               symbol: 'A',
-              color: AppColors.danger,
+              color: AttendanceStatus.absent.color,
               label: 'Abwesend',
             ),
             _LegendItem(
               symbol: 'L',
-              color: Colors.deepOrange,
+              color: AttendanceStatus.late.color,
               label: 'Verspätet anwesend',
             ),
             _LegendItem(
               symbol: 'LE',
-              color: AppColors.warning,
+              color: AttendanceStatus.lateExcused.color,
               label: 'Verspätet entschuldigt',
             ),
             _LegendItem(
               symbol: 'N',
-              color: AppColors.medium,
+              color: AttendanceStatus.neutral.color,
               label: 'Neutral',
             ),
             const SizedBox(height: AppDimensions.paddingM),
@@ -1135,16 +1135,7 @@ class _StatusBadge extends StatelessWidget {
     );
   }
 
-  Color _getColor() {
-    return switch (status) {
-      AttendanceStatus.present => AppColors.success,
-      AttendanceStatus.absent => AppColors.danger,
-      AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => AppColors.warning,
-      AttendanceStatus.lateExcused => AppColors.warning,
-      AttendanceStatus.neutral => AppColors.medium,
-    };
-  }
+  Color _getColor() => status.color;
 
   IconData _getIcon() {
     return switch (status) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/statistics_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_helper.dart';
@@ -387,7 +388,7 @@ class _StatusPieChart extends ConsumerWidget {
                     sections: [
                       PieChartSectionData(
                         value: statistics.presentCount.toDouble(),
-                        color: AppColors.success,
+                        color: AttendanceStatus.present.color,
                         title: '$presentPct%',
                         radius: 50,
                         titleStyle: const TextStyle(
@@ -398,7 +399,7 @@ class _StatusPieChart extends ConsumerWidget {
                       ),
                       PieChartSectionData(
                         value: statistics.excusedCount.toDouble(),
-                        color: AppColors.info,
+                        color: AttendanceStatus.excused.color,
                         title: '$excusedPct%',
                         radius: 50,
                         titleStyle: const TextStyle(
@@ -409,7 +410,7 @@ class _StatusPieChart extends ConsumerWidget {
                       ),
                       PieChartSectionData(
                         value: statistics.lateCount.toDouble(),
-                        color: AppColors.warning,
+                        color: AttendanceStatus.late.color,
                         title: '$latePct%',
                         radius: 50,
                         titleStyle: const TextStyle(
@@ -420,7 +421,7 @@ class _StatusPieChart extends ConsumerWidget {
                       ),
                       PieChartSectionData(
                         value: statistics.absentCount.toDouble(),
-                        color: AppColors.danger,
+                        color: AttendanceStatus.absent.color,
                         title: '$absentPct%',
                         radius: 50,
                         titleStyle: const TextStyle(
@@ -439,10 +440,10 @@ class _StatusPieChart extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _LegendItem(color: AppColors.success, label: 'Anwesend'),
-                    _LegendItem(color: AppColors.info, label: 'Entschuldigt'),
-                    _LegendItem(color: AppColors.warning, label: 'Verspätet'),
-                    _LegendItem(color: AppColors.danger, label: 'Abwesend'),
+                    _LegendItem(color: AttendanceStatus.present.color, label: 'Anwesend'),
+                    _LegendItem(color: AttendanceStatus.excused.color, label: 'Entschuldigt'),
+                    _LegendItem(color: AttendanceStatus.late.color, label: 'Verspätet'),
+                    _LegendItem(color: AttendanceStatus.absent.color, label: 'Abwesend'),
                   ],
                 ),
               ),

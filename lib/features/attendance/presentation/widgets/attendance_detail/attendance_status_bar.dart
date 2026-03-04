@@ -58,22 +58,22 @@ class AttendanceStatusBar extends StatelessWidget {
             _StatItem(
               label: 'Anwesend',
               value: '$present',
-              color: AppColors.success,
+              color: AttendanceStatus.present.color,
             ),
             _StatItem(
               label: 'Entsch.',
               value: '$excused',
-              color: AppColors.info,
+              color: AttendanceStatus.excused.color,
             ),
             _StatItem(
               label: 'Abwesend',
               value: '$absent',
-              color: AppColors.danger,
+              color: AttendanceStatus.absent.color,
             ),
             _StatItem(
               label: 'Offen',
               value: '$unknown',
-              color: AppColors.medium,
+              color: AttendanceStatus.neutral.color,
             ),
             Container(
               padding: const EdgeInsets.symmetric(

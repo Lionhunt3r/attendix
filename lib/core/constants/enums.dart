@@ -168,13 +168,13 @@ enum AttendanceStatus {
       this == AttendanceStatus.late ||
       this == AttendanceStatus.lateExcused;
 
-  /// UI color for this status
+  /// UI color for this status — single source of truth for all attendance colors
   Color get color => switch (this) {
     AttendanceStatus.present => AppColors.success,
     AttendanceStatus.absent => AppColors.danger,
     AttendanceStatus.excused => AppColors.info,
-    AttendanceStatus.late => Colors.deepOrange,
-    AttendanceStatus.lateExcused => AppColors.warning,
+    AttendanceStatus.late => AppColors.statusLate,
+    AttendanceStatus.lateExcused => AppColors.statusLateExcused,
     AttendanceStatus.neutral => AppColors.medium,
   };
 

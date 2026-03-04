@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/enums.dart';
-import '../../../core/theme/app_colors.dart';
 
 /// Badge variant styles
 enum StatusBadgeVariant {
@@ -42,22 +41,7 @@ class StatusBadge extends StatelessWidget {
   @Deprecated('Use size instead')
   final bool compact;
 
-  Color get _color {
-    switch (status) {
-      case AttendanceStatus.present:
-        return AppColors.success;
-      case AttendanceStatus.absent:
-        return AppColors.danger;
-      case AttendanceStatus.excused:
-        return AppColors.warning;
-      case AttendanceStatus.late:
-        return AppColors.statusLate;
-      case AttendanceStatus.lateExcused:
-        return AppColors.statusLateExcused;
-      case AttendanceStatus.neutral:
-        return AppColors.medium;
-    }
-  }
+  Color get _color => status.color;
 
   String get _shortText {
     switch (status) {
@@ -268,22 +252,7 @@ class StatusChip extends StatelessWidget {
   final bool isSelected;
   final StatusBadgeSize size;
 
-  Color get _color {
-    switch (status) {
-      case AttendanceStatus.present:
-        return AppColors.success;
-      case AttendanceStatus.absent:
-        return AppColors.danger;
-      case AttendanceStatus.excused:
-        return AppColors.warning;
-      case AttendanceStatus.late:
-        return AppColors.statusLate;
-      case AttendanceStatus.lateExcused:
-        return AppColors.statusLateExcused;
-      case AttendanceStatus.neutral:
-        return AppColors.medium;
-    }
-  }
+  Color get _color => status.color;
 
   IconData get _icon {
     switch (status) {
