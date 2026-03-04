@@ -1,6 +1,13 @@
 {
   "versions": [
     {
+      "version": "0.1.15",
+      "date": "4.3.2026",
+      "changes": [
+        "🐛 Anwesenheit: Status-Änderungen werden jetzt zuverlässig gespeichert"
+      ]
+    },
+    {
       "version": "0.1.14",
       "date": "4.3.2026",
       "changes": [
