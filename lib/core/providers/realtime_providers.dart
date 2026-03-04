@@ -7,7 +7,7 @@ import '../config/supabase_config.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/models/person/person.dart';
 import '../../data/models/song/song.dart';
-import '../../data/repositories/attendance_repository.dart';
+import 'attendance_providers.dart';
 import 'player_providers.dart';
 import 'song_providers.dart';
 import 'tenant_providers.dart';
@@ -94,15 +94,12 @@ final realtimePlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) a
 final realtimeAttendancesProvider = StreamProvider.autoDispose<List<Attendance>>((ref) async* {
   final supabase = ref.watch(supabaseClientProvider);
   final tenantId = ref.watch(currentTenantIdProvider);
-  final attendanceRepo = ref.watch(attendanceRepositoryProvider);
+  final attendanceRepo = ref.watch(attendanceRepositoryWithTenantProvider);
 
   if (tenantId == null) {
     yield [];
     return;
   }
-
-  // Set tenant ID for repository
-  attendanceRepo.setTenantId(tenantId);
 
   // Initial data
   final initialData = await attendanceRepo.getAttendances();
@@ -212,15 +209,13 @@ final realtimeSongsProvider = StreamProvider.autoDispose<List<Song>>((ref) async
 final realtimeAttendanceDetailProvider = StreamProvider.autoDispose
     .family<Attendance?, int>((ref, attendanceId) async* {
   final supabase = ref.watch(supabaseClientProvider);
-  final attendanceRepo = ref.watch(attendanceRepositoryProvider);
+  final attendanceRepo = ref.watch(attendanceRepositoryWithTenantProvider);
   final tenantId = ref.watch(currentTenantIdProvider);
 
   if (tenantId == null) {
     yield null;
     return;
   }
-
-  attendanceRepo.setTenantId(tenantId);
 
   // Initial data
   final initialData = await attendanceRepo.getAttendanceById(attendanceId);
@@ -244,6 +239,64 @@ final realtimeAttendanceDetailProvider = StreamProvider.autoDispose
         callback: (payload) async {
           try {
             final freshData = await attendanceRepo.getAttendanceById(attendanceId);
+            if (!controller.isClosed) {
+              controller.add(freshData);
+            }
+          } catch (e) {
+            if (!controller.isClosed) {
+              controller.addError(e);
+            }
+          }
+        },
+      )
+      .subscribe();
+
+  ref.onDispose(() {
+    channel.unsubscribe();
+    controller.close();
+  });
+
+  await for (final data in controller.stream) {
+    yield data;
+  }
+});
+
+/// Provider for realtime pending player changes subscription
+///
+/// Subscribes to the player table filtered by pending=true and invalidates
+/// when changes occur (new registrations)
+final realtimePendingPlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) async* {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenantId = ref.watch(currentTenantIdProvider);
+  final playerRepo = ref.watch(playerRepositoryWithTenantProvider);
+
+  if (tenantId == null) {
+    yield [];
+    return;
+  }
+
+  // Initial data
+  final initialData = await playerRepo.getPendingPlayers();
+  yield initialData;
+
+  // Create a stream controller
+  final controller = StreamController<List<Person>>();
+
+  // Setup realtime channel — listen for all player changes (pending flag changes)
+  final channel = supabase
+      .channel('pending_player_changes_$tenantId')
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'player',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'tenantId',
+          value: tenantId,
+        ),
+        callback: (payload) async {
+          try {
+            final freshData = await playerRepo.getPendingPlayers();
             if (!controller.isClosed) {
               controller.add(freshData);
             }

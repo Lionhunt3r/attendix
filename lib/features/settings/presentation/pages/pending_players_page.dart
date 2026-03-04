@@ -2,33 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/player_providers.dart';
+import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/person/person.dart';
-import '../../../../core/providers/tenant_providers.dart';
-
-/// Provider for pending (unapproved) registrations
-final pendingPlayersProvider = FutureProvider<List<Person>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  // Safe tenant.id access (Issue #16 RT-005)
-  final tenantId = tenant.id;
-  if (tenantId == null) return [];
-
-  final response = await supabase
-      .from('player')
-      .select('*, instruments(id, name)')
-      .eq('tenantId', tenantId)
-      .eq('pending', true)
-      .order('created_at', ascending: false);
-
-  return (response as List).map((e) => Person.fromJson(e as Map<String, dynamic>)).toList();
-});
 
 /// Pending Players Page - shows self-registered members awaiting approval
 /// BL-006: Converted to StatefulWidget to track processing state
@@ -45,7 +24,7 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final playersAsync = ref.watch(pendingPlayersProvider);
+    final playersAsync = ref.watch(realtimePendingPlayersProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -66,7 +45,7 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
               Text('Fehler: $e'),
               const SizedBox(height: AppDimensions.paddingM),
               ElevatedButton(
-                onPressed: () => ref.invalidate(pendingPlayersProvider),
+                onPressed: () => ref.invalidate(realtimePendingPlayersProvider),
                 child: const Text('Erneut versuchen'),
               ),
             ],
@@ -78,7 +57,7 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.how_to_reg_outlined, size: 80, color: AppColors.medium),
+                  const Icon(Icons.people_outline, size: 80, color: AppColors.medium),
                   const SizedBox(height: AppDimensions.paddingL),
                   Text(
                     'Keine ausstehenden Registrierungen',
@@ -86,8 +65,10 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
                   ),
                   const SizedBox(height: AppDimensions.paddingS),
                   Text(
-                    'Neue Selbst-Registrierungen erscheinen hier',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
+                    'Neue Registrierungen erscheinen hier automatisch',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.medium,
+                        ),
                   ),
                 ],
               ),
@@ -95,10 +76,9 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
           }
 
           return RefreshIndicator(
-            // FN-009: await provider.future to show spinner until data loads
             onRefresh: () async {
-              ref.invalidate(pendingPlayersProvider);
-              await ref.read(pendingPlayersProvider.future);
+              ref.invalidate(realtimePendingPlayersProvider);
+              await ref.read(realtimePendingPlayersProvider.future);
             },
             child: ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
@@ -153,20 +133,7 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
     setState(() => _processingIds.add(playerId));
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenantId = ref.read(currentTenantIdProvider);
-      if (tenantId == null) {
-        ToastHelper.showError(context, 'Kein Tenant ausgewählt');
-        return;
-      }
-
-      await supabase
-          .from('player')
-          .update({'pending': false})
-          .eq('id', playerId)
-          .eq('tenantId', tenantId);
-
-      ref.invalidate(pendingPlayersProvider);
+      await ref.read(playerNotifierProvider.notifier).approvePlayer(player);
 
       if (mounted) {
         ToastHelper.showSuccess(context, '${player.fullName} wurde freigeschaltet');
@@ -216,20 +183,7 @@ class _PendingPlayersPageState extends ConsumerState<PendingPlayersPage> {
     setState(() => _processingIds.add(playerId));
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenantId = ref.read(currentTenantIdProvider);
-      if (tenantId == null) {
-        ToastHelper.showError(context, 'Kein Tenant ausgewählt');
-        return;
-      }
-
-      await supabase
-          .from('player')
-          .delete()
-          .eq('id', playerId)
-          .eq('tenantId', tenantId);
-
-      ref.invalidate(pendingPlayersProvider);
+      await ref.read(playerNotifierProvider.notifier).declinePlayer(player, 'Abgelehnt');
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Registrierung abgelehnt');

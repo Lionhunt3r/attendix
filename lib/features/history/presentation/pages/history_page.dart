@@ -3,106 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/conductor_providers.dart';
+import '../../../../core/providers/history_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/history/history_entry.dart';
 import '../../../../data/models/song/song.dart';
-import '../../../../core/providers/tenant_providers.dart';
-
-/// Song history entry
-class HistoryEntry {
-  final int? id;
-  final int songId;
-  final String? songName;
-  final String? songNumber;
-  final int? personId;
-  final String? conductorName;
-  final String? otherConductor;
-  final String date;
-  final int? attendanceId;
-  final int count;
-
-  HistoryEntry({
-    this.id,
-    required this.songId,
-    this.songName,
-    this.songNumber,
-    this.personId,
-    this.conductorName,
-    this.otherConductor,
-    required this.date,
-    this.attendanceId,
-    this.count = 0,
-  });
-
-  factory HistoryEntry.fromJson(Map<String, dynamic> json) => HistoryEntry(
-        id: json['id'] as int?,
-        songId: json['song_id'] as int,
-        songName: json['name'] as String?,
-        songNumber: json['number']?.toString(),
-        personId: json['person_id'] as int?,
-        conductorName: json['conductorName'] as String?,
-        otherConductor: json['otherConductor'] as String?,
-        date: json['date'] as String? ?? DateTime.now().toIso8601String(),
-        attendanceId: json['attendance_id'] as int?,
-        count: json['count'] as int? ?? 0,
-      );
-
-  String get displayConductor => conductorName ?? otherConductor ?? 'Unbekannt';
-
-  String get formattedDate {
-    final dateObj = DateTime.tryParse(date);
-    if (dateObj == null) return date;
-    return '${dateObj.day.toString().padLeft(2, '0')}.${dateObj.month.toString().padLeft(2, '0')}.${dateObj.year}';
-  }
-}
-
-/// Provider for song history
-final songHistoryProvider = FutureProvider<List<HistoryEntry>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('history')
-      .select('*, song:songs(name, number)')
-      .eq('tenantId', tenant.id!)
-      .order('date', ascending: false)
-      .limit(200);
-
-  return (response as List).map((e) {
-    final songData = e['song'] as Map<String, dynamic>?;
-    return HistoryEntry(
-      id: e['id'] as int?,
-      songId: e['song_id'] as int,
-      songName: songData?['name'] as String?,
-      songNumber: songData?['number']?.toString(),
-      personId: e['person_id'] as int?,
-      conductorName: e['conductorName'] as String?,
-      otherConductor: e['otherConductor'] as String?,
-      date: e['date'] as String? ?? DateTime.now().toIso8601String(),
-      attendanceId: e['attendance_id'] as int?,
-      count: e['count'] as int? ?? 1,
-    );
-  }).toList();
-});
-
-/// Provider for conductors (persons who can conduct)
-final conductorsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('persons')
-      .select('id, firstName, lastName, left')
-      .eq('tenantId', tenant.id!)
-      .eq('conductor', true);
-
-  return (response as List).cast<Map<String, dynamic>>();
-});
 
 /// History Page - Song performance history
 class HistoryPage extends ConsumerStatefulWidget {
@@ -124,7 +32,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final historyAsync = ref.watch(songHistoryProvider);
+    final historyAsync = ref.watch(performanceHistoryProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -167,7 +75,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                     Text('Fehler: $e'),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => ref.invalidate(songHistoryProvider),
+                      onPressed: () => ref.invalidate(performanceHistoryProvider),
                       child: const Text('Erneut versuchen'),
                     ),
                   ],
@@ -215,8 +123,8 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
 
                 return RefreshIndicator(
                   onRefresh: () async {
-                    ref.invalidate(songHistoryProvider);
-                    await ref.read(songHistoryProvider.future);
+                    ref.invalidate(performanceHistoryProvider);
+                    await ref.read(performanceHistoryProvider.future);
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM),
@@ -317,10 +225,10 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
                   decoration: const InputDecoration(labelText: 'Dirigent'),
                   items: [
                     ...conductors
-                        .where((c) => c['left'] != true)
+                        .where((c) => c.left == null)
                         .map((c) => DropdownMenuItem(
-                              value: c['id'] as int,
-                              child: Text('${c['firstName']} ${c['lastName']}'),
+                              value: c.id,
+                              child: Text('${c.firstName} ${c.lastName}'),
                             )),
                     const DropdownMenuItem(
                       value: -1,
@@ -434,15 +342,22 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       final supabase = ref.read(supabaseClientProvider);
       final tenant = ref.read(currentTenantProvider);
 
+      if (tenant?.id == null) {
+        if (mounted) {
+          ToastHelper.showError(context, 'Kein Tenant ausgewählt');
+        }
+        return;
+      }
+
       await supabase.from('history').insert({
-        'tenantId': tenant?.id,
+        'tenantId': tenant!.id!,
         'song_id': songId,
         'person_id': conductorId,
         'otherConductor': otherConductor,
         'date': date.toIso8601String().substring(0, 10),
       });
 
-      ref.invalidate(songHistoryProvider);
+      ref.invalidate(performanceHistoryProvider);
       if (mounted) {
         ToastHelper.showSuccess(context, 'Aufführung hinzugefügt');
       }
@@ -483,7 +398,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
           .eq('id', entry.id!)
           .eq('tenantId', tenant!.id!);
 
-      ref.invalidate(songHistoryProvider);
+      ref.invalidate(performanceHistoryProvider);
       if (mounted) {
         ToastHelper.showSuccess(context, 'Eintrag gelöscht');
       }
@@ -494,23 +409,6 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     }
   }
 }
-
-/// Provider for songs (for history page)
-final planSongsProviderHistory = FutureProvider<List<Song>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('songs')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .order('number')
-      .order('name');
-
-  return (response as List).map((e) => Song.fromJson(e as Map<String, dynamic>)).toList();
-});
 
 /// Grouped history helper
 class _GroupedHistory {

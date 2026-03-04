@@ -2,31 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/group_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/instrument/instrument.dart';
-import '../../../../data/repositories/group_repository.dart';
-import '../../../../core/providers/tenant_providers.dart';
-
-/// Provider for instruments list
-final instrumentsListProvider = FutureProvider<List<Instrument>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-  
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('instruments')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .order('name');
-
-  return (response as List)
-      .map((e) => Instrument.fromJson(e as Map<String, dynamic>))
-      .toList();
-});
 
 /// Instruments list page
 class InstrumentsListPage extends ConsumerWidget {
@@ -34,7 +14,7 @@ class InstrumentsListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final instrumentsAsync = ref.watch(instrumentsListProvider);
+    final groupsAsync = ref.watch(groupsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -44,7 +24,7 @@ class InstrumentsListPage extends ConsumerWidget {
           onPressed: () => context.go('/settings'),
         ),
       ),
-      body: instrumentsAsync.when(
+      body: groupsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
           child: Column(
@@ -55,14 +35,14 @@ class InstrumentsListPage extends ConsumerWidget {
               Text('Fehler: $error'),
               const SizedBox(height: AppDimensions.paddingM),
               ElevatedButton(
-                onPressed: () => ref.refresh(instrumentsListProvider),
+                onPressed: () => ref.invalidate(groupsProvider),
                 child: const Text('Erneut versuchen'),
               ),
             ],
           ),
         ),
-        data: (instruments) {
-          if (instruments.isEmpty) {
+        data: (groups) {
+          if (groups.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -80,31 +60,31 @@ class InstrumentsListPage extends ConsumerWidget {
             );
           }
 
-          // Separate sections and instruments
-          final sections = instruments.where((i) => i.isSection).toList();
-          final regularInstruments = instruments.where((i) => !i.isSection).toList();
+          // Separate maingroups and regular instruments
+          final mainGroups = groups.where((g) => g.maingroup == true).toList();
+          final regularGroups = groups.where((g) => g.maingroup != true).toList();
 
           return RefreshIndicator(
             // FN-004: invalidate + await for proper RefreshIndicator behavior
             onRefresh: () async {
-              ref.invalidate(instrumentsListProvider);
-              await ref.read(instrumentsListProvider.future);
+              ref.invalidate(groupsProvider);
+              await ref.read(groupsProvider.future);
             },
             child: ListView(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
               children: [
-                if (sections.isNotEmpty) ...[
+                if (mainGroups.isNotEmpty) ...[
                   Text(
-                    'Sektionen',
+                    'Hauptgruppen',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: AppColors.medium,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: AppDimensions.paddingS),
-                  ...sections.map((instrument) => _InstrumentListItem(
-                    instrument: instrument,
-                    onTap: () => _showEditDialog(context, ref, instrument),
+                  ...mainGroups.map((group) => _GroupListItem(
+                    group: group,
+                    onTap: () => _showEditDialog(context, ref, group),
                   )),
                   const SizedBox(height: AppDimensions.paddingL),
                 ],
@@ -116,9 +96,9 @@ class InstrumentsListPage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: AppDimensions.paddingS),
-                ...regularInstruments.map((instrument) => _InstrumentListItem(
-                  instrument: instrument,
-                  onTap: () => _showEditDialog(context, ref, instrument),
+                ...regularGroups.map((group) => _GroupListItem(
+                  group: group,
+                  onTap: () => _showEditDialog(context, ref, group),
                 )),
               ],
             ),
@@ -133,19 +113,19 @@ class InstrumentsListPage extends ConsumerWidget {
   }
 }
 
-class _InstrumentListItem extends StatelessWidget {
-  const _InstrumentListItem({
-    required this.instrument,
+class _GroupListItem extends StatelessWidget {
+  const _GroupListItem({
+    required this.group,
     required this.onTap,
   });
 
-  final Instrument instrument;
+  final Group group;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = instrument.color != null
-        ? Color(int.tryParse(instrument.color!.replaceFirst('#', '0xFF')) ?? 0xFF6366F1)
+    final color = group.color != null
+        ? Color(int.tryParse(group.color!.replaceFirst('#', '0xFF')) ?? 0xFF6366F1)
         : AppColors.primary;
 
     return Card(
@@ -160,16 +140,16 @@ class _InstrumentListItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
           ),
           child: Icon(
-            instrument.isSection ? Icons.folder : Icons.music_note,
+            group.maingroup == true ? Icons.folder : Icons.music_note,
             color: color,
           ),
         ),
         title: Text(
-          instrument.name,
+          group.name,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        subtitle: instrument.shortName != null && instrument.shortName != instrument.name
-            ? Text(instrument.shortName!)
+        subtitle: group.shortName != null && group.shortName != group.name
+            ? Text(group.shortName!)
             : null,
         trailing: const Icon(Icons.chevron_right, color: AppColors.medium),
       ),
@@ -186,9 +166,8 @@ Future<void> _showAddDialog(BuildContext context, WidgetRef ref) async {
 
   if (result != null && context.mounted) {
     try {
-      final repo = ref.read(groupRepositoryProvider);
-      await repo.createGroup(name: result['name'] as String);
-      ref.invalidate(instrumentsListProvider);
+      final notifier = ref.read(groupNotifierProvider.notifier);
+      await notifier.createGroup(result['name'] as String);
       if (context.mounted) {
         ToastHelper.showSuccess(context, 'Instrument erstellt');
       }
@@ -201,27 +180,23 @@ Future<void> _showAddDialog(BuildContext context, WidgetRef ref) async {
 }
 
 /// Show dialog to edit an existing instrument
-Future<void> _showEditDialog(BuildContext context, WidgetRef ref, Instrument instrument) async {
+Future<void> _showEditDialog(BuildContext context, WidgetRef ref, Group group) async {
   final result = await showDialog<Map<String, dynamic>?>(
     context: context,
-    builder: (context) => _InstrumentEditDialog(instrument: instrument),
+    builder: (context) => _InstrumentEditDialog(group: group),
   );
 
   if (result != null && context.mounted) {
     try {
-      final repo = ref.read(groupRepositoryProvider);
+      final notifier = ref.read(groupNotifierProvider.notifier);
 
       if (result['_delete'] == true) {
-        // Delete the instrument
-        await repo.deleteGroup(instrument.id!);
-        ref.invalidate(instrumentsListProvider);
+        await notifier.deleteGroup(group.id!);
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Instrument gelöscht');
         }
       } else {
-        // Update the instrument
-        await repo.updateGroup(instrument.id!, result);
-        ref.invalidate(instrumentsListProvider);
+        await notifier.updateGroup(group.id!, result);
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Instrument aktualisiert');
         }
@@ -236,9 +211,9 @@ Future<void> _showEditDialog(BuildContext context, WidgetRef ref, Instrument ins
 
 /// Dialog for editing/creating an instrument
 class _InstrumentEditDialog extends StatefulWidget {
-  const _InstrumentEditDialog({this.instrument});
+  const _InstrumentEditDialog({this.group});
 
-  final Instrument? instrument;
+  final Group? group;
 
   @override
   State<_InstrumentEditDialog> createState() => _InstrumentEditDialogState();
@@ -250,13 +225,13 @@ class _InstrumentEditDialogState extends State<_InstrumentEditDialog> {
   late final TextEditingController _notesController;
   final _formKey = GlobalKey<FormState>();
 
-  bool get isEditing => widget.instrument != null;
+  bool get isEditing => widget.group != null;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.instrument?.name ?? '');
-    _shortNameController = TextEditingController(text: widget.instrument?.shortName ?? '');
+    _nameController = TextEditingController(text: widget.group?.name ?? '');
+    _shortNameController = TextEditingController(text: widget.group?.shortName ?? '');
     _notesController = TextEditingController();
   }
 
@@ -356,7 +331,7 @@ class _InstrumentEditDialogState extends State<_InstrumentEditDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Instrument löschen?'),
-        content: Text('Möchtest du "${widget.instrument!.name}" wirklich löschen?'),
+        content: Text('Möchtest du "${widget.group!.name}" wirklich löschen?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),

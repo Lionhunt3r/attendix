@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/models/song/song.dart';
 import '../../data/models/song/song_filter.dart';
+import '../providers/realtime_providers.dart';
 import 'song_providers.dart';
 import 'tenant_providers.dart';
 
@@ -118,12 +119,13 @@ class SongFilterNotifier extends StateNotifier<SongFilter> {
 }
 
 /// Filtered and sorted songs provider
+/// Sources from realtimeSongsProvider for live updates, falls back to songsProvider
 final filteredSongsProvider = Provider<List<Song>>((ref) {
-  final songsAsync = ref.watch(songsProvider);
+  // Prefer realtime data if available, fallback to FutureProvider
+  final realtimeSongs = ref.watch(realtimeSongsProvider);
+  final songs = realtimeSongs.valueOrNull ?? ref.watch(songsProvider).valueOrNull ?? [];
   final filter = ref.watch(songFilterProvider);
   final searchQuery = ref.watch(songSearchQueryProvider);
-
-  final songs = songsAsync.valueOrNull ?? [];
 
   // Apply filters
   var filtered = songs.where((song) {

@@ -20,3 +20,4 @@ export 'church_providers.dart';
 export 'attendance_detail_providers.dart';
 export 'pwa_providers.dart';
 export 'teacher_providers.dart';
+export 'history_providers.dart';
