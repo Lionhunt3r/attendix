@@ -403,6 +403,34 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Update start_time/end_time on all future attendances of a given type
+  Future<void> updateFutureAttendanceTimes(
+    String typeId, {
+    String? startTime,
+    String? endTime,
+  }) async {
+    try {
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+
+      final updates = <String, dynamic>{};
+      if (startTime != null) updates['start_time'] = startTime;
+      if (endTime != null) updates['end_time'] = endTime;
+
+      if (updates.isEmpty) return;
+
+      await supabase
+          .from('attendance')
+          .update(updates)
+          .eq('tenantId', currentTenantId)
+          .eq('type_id', typeId)
+          .gte('date', startOfDay.toIso8601String());
+    } catch (e, stack) {
+      handleError(e, stack, 'updateFutureAttendanceTimes');
+      rethrow;
+    }
+  }
+
   /// Get attendances for a specific date
   Future<List<Attendance>> getAttendancesByDate(DateTime date) async {
     try {

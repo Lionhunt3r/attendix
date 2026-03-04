@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/attendance/attendance.dart';
 import '../../data/repositories/attendance_type_repository.dart';
+import 'attendance_providers.dart';
 import 'tenant_providers.dart';
 
 /// Initialized attendance type repository with tenant context
@@ -70,6 +71,20 @@ class AttendanceTypeNotifier extends Notifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       ref.invalidate(attendanceTypesProvider);
       ref.invalidate(attendanceTypeByIdProvider(id));
+
+      // If start_time or end_time changed, update future attendance records
+      final hasTimeChange = updates.containsKey('start_time') || updates.containsKey('end_time');
+      if (hasTimeChange) {
+        final attendanceRepo = ref.read(attendanceRepositoryWithTenantProvider);
+        await attendanceRepo.updateFutureAttendanceTimes(
+          id,
+          startTime: updates['start_time'] as String?,
+          endTime: updates['end_time'] as String?,
+        );
+        ref.invalidate(attendancesProvider);
+        ref.invalidate(upcomingAttendancesProvider);
+      }
+
       return result;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
