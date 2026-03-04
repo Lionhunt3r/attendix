@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/realtime_providers.dart';
@@ -68,44 +69,6 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
     }
     rethrow;
   }
-});
-
-/// Provider for batch attendance percentages: Map<personId, percentage>
-final playerAttendancePercentagesProvider =
-    FutureProvider<Map<int, int>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-  if (tenant == null || tenant.id == null) return {};
-
-  final now = DateTime.now().toIso8601String();
-  final response = await supabase
-      .from('person_attendances')
-      .select('person_id, status, attendance:attendance_id!inner(date, tenantId)')
-      .eq('attendance.tenantId', tenant.id!)
-      .lte('attendance.date', now);
-
-  final attendances = response as List;
-
-  // Group by person_id
-  final totals = <int, int>{};
-  final attended = <int, int>{};
-
-  for (final a in attendances) {
-    final personId = a['person_id'] as int?;
-    if (personId == null) continue;
-    totals[personId] = (totals[personId] ?? 0) + 1;
-    final status = a['status'] as int?;
-    // Status 1 = present, 3 = late, 5 = late (both count as attended)
-    if (status == 1 || status == 3 || status == 5) {
-      attended[personId] = (attended[personId] ?? 0) + 1;
-    }
-  }
-
-  return totals.map((personId, total) {
-    final att = attended[personId] ?? 0;
-    final pct = total > 0 ? (att / total * 100).round() : 0;
-    return MapEntry(personId, pct);
-  });
 });
 
 /// People list page
