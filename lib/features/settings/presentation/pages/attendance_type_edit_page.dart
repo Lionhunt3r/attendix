@@ -2,34 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
-import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
-
-/// Local provider for a single attendance type (with tenant filtering)
-final _attendanceTypeByIdProvider = FutureProvider.family<AttendanceType?, String>((ref, id) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenantId = ref.watch(currentTenantIdProvider);
-
-  if (tenantId == null) return null;
-
-  final response = await supabase
-      .from('attendance_types')
-      .select()
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-
-  if (response == null) return null;
-  return AttendanceType.fromJson(response);
-});
 
 /// Attendance Type Edit Page
 ///
@@ -79,7 +59,7 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   }
 
   Future<void> _loadType() async {
-    final type = await ref.read(_attendanceTypeByIdProvider(widget.typeId).future);
+    final type = await ref.read(attendanceTypeByIdProvider(widget.typeId).future);
 
     if (type != null && mounted) {
       setState(() {
@@ -462,13 +442,8 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final supabase = ref.read(supabaseClientProvider);
-    final tenantId = ref.read(currentTenantIdProvider);
-
-    if (tenantId == null) return;
-
     try {
-      await supabase.from('attendance_types').update({
+      final updates = {
         'name': _nameController.text.trim(),
         'start_time': _formatTime(_startTime ?? const TimeOfDay(hour: 19, minute: 0)),
         'end_time': _formatTime(_endTime ?? const TimeOfDay(hour: 20, minute: 30)),
@@ -480,10 +455,9 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         'hide_name': _hideName,
         'include_in_average': _includeInAverage,
         'color': _color,
-      }).eq('id', widget.typeId).eq('tenant_id', tenantId);
+      };
 
-      ref.invalidate(attendanceTypesProvider);
-      ref.invalidate(_attendanceTypeByIdProvider(widget.typeId));
+      await ref.read(attendanceTypeNotifierProvider.notifier).updateType(widget.typeId, updates);
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Änderungen gespeichert');
@@ -508,23 +482,14 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
 
     if (!confirmed) return;
 
-    final supabase = ref.read(supabaseClientProvider);
-    final tenantId = ref.read(currentTenantIdProvider);
-
-    if (tenantId == null) return;
-
     try {
-      await supabase
-          .from('attendance_types')
-          .delete()
-          .eq('id', widget.typeId)
-          .eq('tenant_id', tenantId);
+      final success = await ref.read(attendanceTypeNotifierProvider.notifier).deleteType(widget.typeId);
 
-      ref.invalidate(attendanceTypesProvider);
-
-      if (mounted) {
+      if (success && mounted) {
         ToastHelper.showSuccess(context, 'Typ gelöscht');
         context.pop();
+      } else if (!success && mounted) {
+        ToastHelper.showError(context, 'Fehler beim Löschen');
       }
     } catch (e) {
       if (mounted) {

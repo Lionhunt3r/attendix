@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
-import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
@@ -126,35 +124,28 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
   }
 
   Future<void> _saveOrder() async {
-    final supabase = ref.read(supabaseClientProvider);
-    final tenantId = ref.read(currentTenantIdProvider);
-    if (tenantId == null) return;
-
     try {
-      for (int i = 0; i < _localTypes.length; i++) {
-        final type = _localTypes[i];
-        // Safe access without force unwrap (Issue #16 RT-008)
-        final typeId = type.id;
-        if (typeId != null) {
-          await supabase
-              .from('attendance_types')
-              .update({'index': i})
-              .eq('id', typeId)
-              .eq('tenant_id', tenantId);
+      final orderedIds = _localTypes
+          .where((type) => type.id != null)
+          .map((type) => type.id!)
+          .toList();
+
+      final success = await ref.read(attendanceTypeNotifierProvider.notifier).reorderTypes(orderedIds);
+
+      if (success) {
+        // BL-008: Only reset state AFTER successful save
+        setState(() {
+          _isReordering = false;
+          _localTypes = [];
+        });
+
+        if (mounted) {
+          ToastHelper.showSuccess(context, 'Reihenfolge gespeichert');
         }
-      }
-
-      // BL-008: Only reset state AFTER successful save
-      // Exit reorder mode first, then invalidate provider
-      setState(() {
-        _isReordering = false;
-        _localTypes = [];
-      });
-
-      ref.invalidate(attendanceTypesProvider);
-
-      if (mounted) {
-        ToastHelper.showSuccess(context, 'Reihenfolge gespeichert');
+      } else {
+        if (mounted) {
+          ToastHelper.showError(context, 'Fehler beim Speichern. Bitte erneut versuchen.');
+        }
       }
     } catch (e) {
       // BL-008: Keep local changes on error - DO NOT reset _isReordering or _localTypes
@@ -202,39 +193,32 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
   }
 
   Future<void> _createType(String name) async {
-    final supabase = ref.read(supabaseClientProvider);
-    final tenantId = ref.read(currentTenantIdProvider);
-
-    if (tenantId == null) return;
-
     try {
       final currentTypes = ref.read(attendanceTypesProvider).valueOrNull ?? [];
 
-      await supabase.from('attendance_types').insert({
-        'name': name,
-        'tenant_id': tenantId,
-        // Use .name for consistency with edit page (Issue #15)
-        'default_status': AttendanceStatus.present.name,
-        'available_statuses': [
-          AttendanceStatus.neutral.name,
-          AttendanceStatus.present.name,
-          AttendanceStatus.absent.name,
-          AttendanceStatus.excused.name,
-          AttendanceStatus.late.name,
+      final newType = AttendanceType(
+        name: name,
+        defaultStatus: AttendanceStatus.present,
+        availableStatuses: [
+          AttendanceStatus.neutral,
+          AttendanceStatus.present,
+          AttendanceStatus.absent,
+          AttendanceStatus.excused,
+          AttendanceStatus.late,
         ],
-        'manage_songs': false,
-        'start_time': '19:00',
-        'end_time': '20:30',
-        'relevant_groups': [],
-        'index': currentTypes.length,
-        'visible': true,
-        'color': 'primary',
-        'highlight': false,
-        'hide_name': false,
-        'include_in_average': true,
-      });
+        manageSongs: false,
+        startTime: '19:00',
+        endTime: '20:30',
+        relevantGroups: [],
+        index: currentTypes.length,
+        visible: true,
+        color: 'primary',
+        highlight: false,
+        hideName: false,
+        includeInAverage: true,
+      );
 
-      ref.invalidate(attendanceTypesProvider);
+      await ref.read(attendanceTypeNotifierProvider.notifier).createType(newType);
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Anwesenheitstyp "$name" erstellt');

@@ -10,7 +10,7 @@ import '../../../../core/utils/toast_helper.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
-import '../../../instruments/presentation/pages/instruments_list_page.dart';
+import '../../../../core/providers/group_providers.dart';
 import 'people_list_page.dart';
 
 /// Page for creating a new person
@@ -77,7 +77,7 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    final instrumentsAsync = ref.watch(instrumentsListProvider);
+    final instrumentsAsync = ref.watch(groupsProvider);
     final tenant = ref.watch(currentTenantProvider);
     final extraFields = tenant?.additionalFields ?? [];
 

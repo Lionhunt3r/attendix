@@ -440,10 +440,12 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/settings/songs/new'),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: isConductor
+          ? FloatingActionButton(
+              onPressed: () => context.push('/settings/songs/new'),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }
