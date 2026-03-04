@@ -127,11 +127,16 @@ final realtimeAttendanceListProvider = FutureProvider.autoDispose<List<Attendanc
 });
 
 /// Internal: manages Supabase realtime subscription for the attendance table.
-/// Bumps the refetch counter when attendance rows change, triggering a refetch.
+/// Bumps the refetch counter when attendance or person_attendances rows change,
+/// triggering a refetch of the list with fresh percentages.
 final _attendanceRealtimeSubscriptionProvider = Provider.autoDispose<void>((ref) {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
   if (tenant?.id == null) return;
+
+  void onChanged(dynamic _) {
+    ref.read(_attendanceRefetchCounter.notifier).state++;
+  }
 
   final channel = supabase
       .channel('attendance_list_changes_${tenant!.id}')
@@ -144,11 +149,13 @@ final _attendanceRealtimeSubscriptionProvider = Provider.autoDispose<void>((ref)
           column: 'tenantId',
           value: tenant.id,
         ),
-        callback: (payload) {
-          // Bump the counter to trigger a refetch in the data provider.
-          // This does NOT tear down the realtime channel.
-          ref.read(_attendanceRefetchCounter.notifier).state++;
-        },
+        callback: onChanged,
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'person_attendances',
+        callback: onChanged,
       )
       .subscribe();
 
