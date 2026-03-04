@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/constants/enums.dart';
+import '../config/supabase_config.dart';
+import '../constants/enums.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/repositories/repositories.dart';
 import 'tenant_providers.dart';
@@ -51,6 +52,118 @@ final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, 
   if (!repo.hasTenantId) return [];
   
   return repo.getPersonAttendancesForPerson(personId);
+});
+
+/// Provider for attendance list with calculated percentages (used by list page)
+final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+
+  // Guard against null tenant or null tenant.id
+  if (tenant?.id == null) return [];
+
+  // Load attendances with person_attendances to calculate percentage
+  final response = await supabase
+      .from('attendance')
+      .select('*, person_attendances(status)')
+      .eq('tenantId', tenant!.id!)
+      .order('date', ascending: false)
+      .limit(50);
+
+  return (response as List).map((e) {
+    final attendance = Attendance.fromJson(e as Map<String, dynamic>);
+
+    // Calculate percentage from person_attendances if not already set
+    if (attendance.percentage == null || attendance.percentage == 0) {
+      final personAttendances = e['person_attendances'] as List?;
+      if (personAttendances != null && personAttendances.isNotEmpty) {
+        final total = personAttendances.length;
+        // BL-003: Use centralized countsAsPresent definition
+        final present = personAttendances.where((pa) {
+          final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
+          return status.countsAsPresent;
+        }).length;
+        final calculatedPercentage = (present / total * 100).roundToDouble();
+        return attendance.copyWith(percentage: calculatedPercentage);
+      }
+    }
+    return attendance;
+  }).toList();
+});
+
+/// Data class for categorized attendances (memoized)
+class CategorizedAttendances {
+  final Attendance? current;
+  final List<Attendance> upcoming;
+  final List<Attendance> past;
+
+  const CategorizedAttendances({
+    this.current,
+    required this.upcoming,
+    required this.past,
+  });
+}
+
+/// Provider that categorizes and sorts attendances (computed once per data change)
+final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
+  final attendances = ref.watch(attendanceListProvider).valueOrNull ?? [];
+
+  final now = DateTime.now();
+  final todayStart = DateTime(now.year, now.month, now.day);
+
+  final upcoming = <Attendance>[];
+  final past = <Attendance>[];
+
+  for (final attendance in attendances) {
+    final date = DateTime.tryParse(attendance.date);
+    if (date == null) {
+      past.add(attendance);
+      continue;
+    }
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    if (dateOnly.isBefore(todayStart)) {
+      past.add(attendance);
+    } else {
+      upcoming.add(attendance);
+    }
+  }
+
+  // Sort once
+  upcoming.sort((a, b) => a.date.compareTo(b.date));
+  past.sort((a, b) => b.date.compareTo(a.date));
+
+  // BL-013: Extract current without mutating the upcoming list
+  Attendance? current;
+  List<Attendance> remainingUpcoming;
+  if (upcoming.isNotEmpty) {
+    current = upcoming.first;
+    remainingUpcoming = upcoming.sublist(1);
+  } else {
+    remainingUpcoming = [];
+  }
+
+  return CategorizedAttendances(
+    current: current,
+    upcoming: remainingUpcoming,
+    past: past,
+  );
+});
+
+/// Provider for average attendance percentage of past attendances
+final averageAttendancePercentProvider = Provider<double?>((ref) {
+  final categorized = ref.watch(categorizedAttendancesProvider);
+  // BL-005: Include 0% attendances in average calculation (changed > 0 to != null)
+  final pastAttendances = categorized.past
+      .where((a) => a.percentage != null)
+      .toList();
+
+  if (pastAttendances.isEmpty) return null;
+
+  final sum = pastAttendances.fold<double>(
+    0,
+    (acc, a) => acc + (a.percentage ?? 0),
+  );
+  return sum / pastAttendances.length;
 });
 
 /// Notifier for attendance mutations
@@ -130,6 +243,7 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       ref.invalidate(attendanceByIdProvider(attendanceId));
       ref.invalidate(personAttendancesProvider(personId));
+      ref.invalidate(attendanceListProvider);
       return result;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -142,6 +256,7 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       await _repo.recalculatePercentage(attendanceId);
       ref.invalidate(attendanceByIdProvider(attendanceId));
       ref.invalidate(attendancesProvider);
+      ref.invalidate(attendanceListProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
@@ -158,6 +273,9 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       await _repo.batchUpdatePersonAttendances(personAttendanceIds, newStatus);
       state = const AsyncValue.data(null);
       ref.invalidate(attendanceByIdProvider(attendanceId));
+      // Fire-and-forget: don't await so a recalculation failure doesn't
+      // overwrite the successful batch update state
+      recalculatePercentage(attendanceId);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
