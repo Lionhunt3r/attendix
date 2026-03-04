@@ -1,6 +1,14 @@
 {
   "versions": [
     {
+      "version": "0.1.22",
+      "date": "4.3.2026",
+      "changes": [
+        "✨ Instanz-Details: Neue Seite mit Info und Gefahrenzone",
+        "♻️ 'Instanz löschen' von Einstellungen zu Instanz-Details verschoben"
+      ]
+    },
+    {
       "version": "0.1.21",
       "date": "4.3.2026",
       "changes": [
