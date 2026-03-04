@@ -442,6 +442,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                           onDeadlineToggle: _toggleDeadline,
                           onDeadlineSelect: _selectDeadline,
                           onExportExcel: _exportAttendanceToExcel,
+                          hasNeutralStatuses: _localStatuses.isEmpty || _localStatuses.values.any((s) => s.isNeutral),
                         ),
 
                         if (hasChecklist)

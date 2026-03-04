@@ -251,7 +251,7 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(DateHelper.getReadableDate(group.date ?? '')),
-                    if (group.deadlineText != null)
+                    if (group.deadlineText != null && !group.allChildrenResponded)
                       Text(
                         group.deadlineText!,
                         style: TextStyle(
@@ -663,7 +663,7 @@ class _AttendanceGroupCard extends StatelessWidget {
                     ),
                 ],
               ),
-              if (group.deadlineText != null && !isPast) ...[
+              if (group.deadlineText != null && !isPast && !group.allChildrenResponded) ...[
                 const SizedBox(height: 4),
                 Row(
                   children: [

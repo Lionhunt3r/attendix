@@ -186,6 +186,9 @@ class ParentAttendanceGroup {
     return 'Anmelden bis $day.$month.$year $hour:$minute Uhr';
   }
 
+  bool get allChildrenResponded =>
+      childAttendances.every((c) => !c.status.isNeutral);
+
   String get displayTitle {
     if (typeInfo != null && typeInfo!.isNotEmpty) {
       return typeInfo!;

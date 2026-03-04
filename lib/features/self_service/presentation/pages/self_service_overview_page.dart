@@ -410,7 +410,7 @@ class _SelfServiceOverviewPageState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(DateHelper.getReadableDate(attendance.date ?? '')),
-                  if (attendance.deadlineText != null)
+                  if (attendance.deadlineText != null && attendance.status.isNeutral)
                     Text(
                       attendance.deadlineText!,
                       style: TextStyle(
@@ -869,7 +869,7 @@ class _CurrentAttendanceCard extends StatelessWidget {
                 style: TextStyle(color: AppColors.medium, fontSize: 12),
               ),
             ],
-            if (attendance.deadlineText != null) ...[
+            if (attendance.deadlineText != null && attendance.status.isNeutral) ...[
               const SizedBox(height: 4),
               Row(
                 children: [
@@ -1075,7 +1075,7 @@ class _AttendanceListTile extends StatelessWidget {
               attendance.tenantName,
               style: TextStyle(fontSize: 12, color: AppColors.medium),
             ),
-          if (attendance.deadlineText != null && attendance.isUpcoming)
+          if (attendance.deadlineText != null && attendance.isUpcoming && attendance.status.isNeutral)
             Text(
               attendance.deadlineText!,
               style: TextStyle(

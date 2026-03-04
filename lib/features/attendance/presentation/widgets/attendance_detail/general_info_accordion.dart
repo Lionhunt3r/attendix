@@ -20,6 +20,7 @@ class GeneralInfoAccordion extends StatefulWidget {
     required this.onDeadlineToggle,
     required this.onDeadlineSelect,
     required this.onExportExcel,
+    this.hasNeutralStatuses = true,
   });
 
   final Attendance attendance;
@@ -31,6 +32,7 @@ class GeneralInfoAccordion extends StatefulWidget {
   final void Function(bool) onDeadlineToggle;
   final VoidCallback onDeadlineSelect;
   final VoidCallback onExportExcel;
+  final bool hasNeutralStatuses;
 
   @override
   State<GeneralInfoAccordion> createState() => _GeneralInfoAccordionState();
@@ -183,26 +185,28 @@ class _GeneralInfoAccordionState extends State<GeneralInfoAccordion> {
 
           const Divider(),
 
-          // Deadline toggle
-          SwitchListTile(
-            secondary: const Icon(Icons.event_busy),
-            title: const Text('Anmeldefrist'),
-            subtitle: hasDeadline && formattedDeadline != null
-                ? Text(formattedDeadline)
-                : const Text('Nicht gesetzt'),
-            value: hasDeadline,
-            onChanged: widget.onDeadlineToggle,
-          ),
-
-          // Deadline picker (if enabled)
-          if (hasDeadline)
-            ListTile(
-              leading: const Icon(Icons.edit_calendar),
-              title: const Text('Frist ändern'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: widget.onDeadlineSelect,
-              dense: true,
+          // Deadline toggle (only show when there are neutral statuses or deadline is already set)
+          if (widget.hasNeutralStatuses || hasDeadline) ...[
+            SwitchListTile(
+              secondary: const Icon(Icons.event_busy),
+              title: const Text('Anmeldefrist'),
+              subtitle: hasDeadline && formattedDeadline != null
+                  ? Text(formattedDeadline)
+                  : const Text('Nicht gesetzt'),
+              value: hasDeadline,
+              onChanged: widget.onDeadlineToggle,
             ),
+
+            // Deadline picker (if enabled)
+            if (hasDeadline)
+              ListTile(
+                leading: const Icon(Icons.edit_calendar),
+                title: const Text('Frist ändern'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: widget.onDeadlineSelect,
+                dense: true,
+              ),
+          ],
 
           const Divider(),
 
