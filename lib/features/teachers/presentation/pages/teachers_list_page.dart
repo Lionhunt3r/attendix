@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/teacher_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/instrument/instrument.dart';
 import '../../../../data/repositories/teacher_repository.dart';
 
-/// Teacher List Page
+/// Teacher List Page — with instrument names, student counts, role checks
 class TeachersListPage extends ConsumerWidget {
   const TeachersListPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final teachersAsync = ref.watch(teachersProvider);
+    final teachersAsync = ref.watch(enrichedTeachersProvider);
+    final currentRole = ref.watch(currentRoleProvider);
+    final isConductor = currentRole.isConductor;
 
     return Scaffold(
       appBar: AppBar(
@@ -21,7 +27,21 @@ class TeachersListPage extends ConsumerWidget {
       ),
       body: teachersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('Fehler: $error')),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: AppColors.danger),
+              const SizedBox(height: AppDimensions.paddingM),
+              Text('Fehler: $error'),
+              const SizedBox(height: AppDimensions.paddingM),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(enrichedTeachersProvider),
+                child: const Text('Erneut versuchen'),
+              ),
+            ],
+          ),
+        ),
         data: (teachers) {
           if (teachers.isEmpty) {
             return Center(
@@ -29,14 +49,16 @@ class TeachersListPage extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.school_outlined, size: 64, color: AppColors.medium),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppDimensions.paddingM),
                   const Text('Keine Lehrer vorhanden'),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () => _showCreateDialog(context, ref),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Lehrer hinzufügen'),
-                  ),
+                  if (isConductor) ...[
+                    const SizedBox(height: AppDimensions.paddingM),
+                    ElevatedButton.icon(
+                      onPressed: () => _showCreateDialog(context, ref),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Lehrer hinzufügen'),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -45,7 +67,9 @@ class TeachersListPage extends ConsumerWidget {
           return RefreshIndicator(
             onRefresh: () async {
               ref.invalidate(teachersProvider);
-              await ref.read(teachersProvider.future);
+              ref.invalidate(studentCountsProvider);
+              ref.invalidate(enrichedTeachersProvider);
+              await ref.read(enrichedTeachersProvider.future);
             },
             child: ListView.builder(
               itemCount: teachers.length,
@@ -53,30 +77,38 @@ class TeachersListPage extends ConsumerWidget {
                 final teacher = teachers[index];
                 return _TeacherTile(
                   teacher: teacher,
-                  onTap: () => _showEditDialog(context, ref, teacher),
-                  onDelete: () => _deleteTeacher(context, ref, teacher),
+                  onTap: isConductor
+                      ? () => _showEditDialog(context, ref, teacher)
+                      : null,
+                  onDelete: isConductor
+                      ? () => _deleteTeacher(context, ref, teacher)
+                      : null,
                 );
               },
             ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateDialog(context, ref),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: isConductor
+          ? FloatingActionButton(
+              onPressed: () => _showCreateDialog(context, ref),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
   Future<void> _showCreateDialog(BuildContext context, WidgetRef ref) async {
+    final groups = ref.read(groupsProvider).valueOrNull ?? [];
     final result = await showDialog<Teacher>(
       context: context,
-      builder: (context) => const _TeacherEditDialog(),
+      builder: (context) => _TeacherEditDialog(availableInstruments: groups),
     );
 
     if (result != null) {
       try {
         await ref.read(teacherNotifierProvider.notifier).createTeacher(result);
+        ref.invalidate(enrichedTeachersProvider);
 
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Lehrer "${result.name}" erstellt');
@@ -94,9 +126,13 @@ class TeachersListPage extends ConsumerWidget {
     WidgetRef ref,
     Teacher teacher,
   ) async {
+    final groups = ref.read(groupsProvider).valueOrNull ?? [];
     final result = await showDialog<Teacher>(
       context: context,
-      builder: (context) => _TeacherEditDialog(teacher: teacher),
+      builder: (context) => _TeacherEditDialog(
+        teacher: teacher,
+        availableInstruments: groups,
+      ),
     );
 
     if (result != null && teacher.id != null) {
@@ -111,6 +147,7 @@ class TeachersListPage extends ConsumerWidget {
                 'instruments': result.instruments,
               },
             );
+        ref.invalidate(enrichedTeachersProvider);
 
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Änderungen gespeichert');
@@ -142,6 +179,7 @@ class TeachersListPage extends ConsumerWidget {
 
     try {
       await ref.read(teacherNotifierProvider.notifier).deleteTeacher(teacher.id!);
+      ref.invalidate(enrichedTeachersProvider);
 
       if (context.mounted) {
         ToastHelper.showSuccess(context, 'Lehrer gelöscht');
@@ -156,8 +194,8 @@ class TeachersListPage extends ConsumerWidget {
 
 class _TeacherTile extends StatelessWidget {
   final Teacher teacher;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
   const _TeacherTile({
     required this.teacher,
@@ -169,9 +207,11 @@ class _TeacherTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dismissible(
       key: ValueKey(teacher.id),
-      direction: DismissDirection.endToStart,
+      direction: onDelete != null
+          ? DismissDirection.endToStart
+          : DismissDirection.none,
       confirmDismiss: (_) async {
-        onDelete();
+        onDelete?.call();
         return false;
       },
       background: Container(
@@ -186,19 +226,83 @@ class _TeacherTile extends StatelessWidget {
           child: const Icon(Icons.person, color: AppColors.primary),
         ),
         title: Text(teacher.name),
-        subtitle: teacher.number.isNotEmpty
-            ? Text('Tel: ${teacher.number}')
-            : teacher.notes.isNotEmpty
-                ? Text(
-                    teacher.notes,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                : null,
-        trailing: teacher.isPrivate
-            ? const Icon(Icons.lock_outline, size: 16, color: AppColors.medium)
-            : const Icon(Icons.chevron_right),
+        subtitle: _buildSubtitle(),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (teacher.playerCount != null && teacher.playerCount! > 0)
+              _StudentCountBadge(count: teacher.playerCount!),
+            if (teacher.isPrivate)
+              const Icon(Icons.lock_outline, size: 16, color: AppColors.medium),
+            if (onTap != null)
+              const Icon(Icons.chevron_right, color: AppColors.medium),
+          ],
+        ),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Widget? _buildSubtitle() {
+    final parts = <String>[];
+
+    // Instrument names first
+    if (teacher.insNames != null && teacher.insNames!.isNotEmpty) {
+      parts.add(teacher.insNames!);
+    }
+
+    // Phone number
+    if (teacher.number.isNotEmpty) {
+      parts.add('Tel: ${teacher.number}');
+    }
+
+    if (parts.isEmpty && teacher.notes.isNotEmpty) {
+      return Text(
+        teacher.notes,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    if (parts.isEmpty) return null;
+
+    return Text(
+      parts.join(' · '),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// Student count badge
+class _StudentCountBadge extends StatelessWidget {
+  const _StudentCountBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.only(right: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.school, size: 14, color: AppColors.primary),
+          const SizedBox(width: 4),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -206,8 +310,12 @@ class _TeacherTile extends StatelessWidget {
 
 class _TeacherEditDialog extends StatefulWidget {
   final Teacher? teacher;
+  final List<Group> availableInstruments;
 
-  const _TeacherEditDialog({this.teacher});
+  const _TeacherEditDialog({
+    this.teacher,
+    required this.availableInstruments,
+  });
 
   @override
   State<_TeacherEditDialog> createState() => _TeacherEditDialogState();
@@ -219,6 +327,7 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
   late final TextEditingController _numberController;
   late final TextEditingController _notesController;
   late bool _private;
+  late Set<int> _selectedInstruments;
 
   @override
   void initState() {
@@ -228,6 +337,7 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
         TextEditingController(text: widget.teacher?.number ?? '');
     _notesController = TextEditingController(text: widget.teacher?.notes ?? '');
     _private = widget.teacher?.isPrivate ?? false;
+    _selectedInstruments = Set<int>.from(widget.teacher?.instruments ?? []);
   }
 
   @override
@@ -241,55 +351,96 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
   @override
   Widget build(BuildContext context) {
     final isNew = widget.teacher == null;
+    final instruments = widget.availableInstruments
+        .where((g) => g.maingroup != true)
+        .toList();
 
     return AlertDialog(
       title: Text(isNew ? 'Neuer Lehrer' : 'Lehrer bearbeiten'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name *',
-                  hintText: 'z.B. Max Mustermann',
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Name *',
+                    hintText: 'z.B. Max Mustermann',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Bitte einen Namen eingeben';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Bitte einen Namen eingeben';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _numberController,
-                decoration: const InputDecoration(
-                  labelText: 'Telefon',
-                  hintText: 'z.B. +49 123 456789',
+                const SizedBox(height: AppDimensions.paddingM),
+                TextFormField(
+                  controller: _numberController,
+                  decoration: const InputDecoration(
+                    labelText: 'Telefon',
+                    hintText: 'z.B. +49 123 456789',
+                  ),
+                  keyboardType: TextInputType.phone,
                 ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notizen',
-                  hintText: 'Zusätzliche Informationen...',
+                const SizedBox(height: AppDimensions.paddingM),
+
+                // Instruments multi-select
+                if (instruments.isNotEmpty) ...[
+                  Text(
+                    'Instrumente',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.medium,
+                        ),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingXS),
+                  Wrap(
+                    spacing: AppDimensions.paddingXS,
+                    runSpacing: AppDimensions.paddingXS,
+                    children: instruments.map((instrument) {
+                      final isSelected =
+                          _selectedInstruments.contains(instrument.id);
+                      return FilterChip(
+                        label: Text(instrument.displayName),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected && instrument.id != null) {
+                              _selectedInstruments.add(instrument.id!);
+                            } else if (instrument.id != null) {
+                              _selectedInstruments.remove(instrument.id!);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: AppDimensions.paddingM),
+                ],
+
+                TextFormField(
+                  controller: _notesController,
+                  decoration: const InputDecoration(
+                    labelText: 'Notizen',
+                    hintText: 'Zusätzliche Informationen...',
+                  ),
+                  maxLines: 3,
                 ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                title: const Text('Privat'),
-                subtitle: const Text('Nur für Admins sichtbar'),
-                value: _private,
-                onChanged: (value) => setState(() => _private = value),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
+                const SizedBox(height: AppDimensions.paddingM),
+                SwitchListTile(
+                  title: const Text('Privat'),
+                  subtitle: const Text('Nur für Admins sichtbar'),
+                  value: _private,
+                  onChanged: (value) => setState(() => _private = value),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -315,7 +466,7 @@ class _TeacherEditDialogState extends State<_TeacherEditDialog> {
       number: _numberController.text.trim(),
       notes: _notesController.text.trim(),
       isPrivate: _private,
-      instruments: widget.teacher?.instruments ?? [],
+      instruments: _selectedInstruments.toList(),
       tenantId: widget.teacher?.tenantId,
     );
 

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/repositories/teacher_repository.dart';
+import 'group_providers.dart';
 import 'tenant_providers.dart';
 
 /// Initialized teacher repository with tenant context
@@ -40,6 +41,26 @@ final studentCountsProvider = FutureProvider<Map<int, int>>((ref) async {
   if (!repo.hasTenantId) return {};
 
   return repo.getStudentCounts();
+});
+
+/// Enriched teachers with instrument names and student counts
+final enrichedTeachersProvider = FutureProvider<List<Teacher>>((ref) async {
+  final teachers = await ref.watch(teachersProvider.future);
+  final groupsMap = await ref.watch(groupsMapProvider.future);
+  final studentCounts = await ref.watch(studentCountsProvider.future);
+
+  return teachers.map((teacher) {
+    // Resolve instrument IDs to names
+    final names = teacher.instruments
+        .map((id) => groupsMap[id])
+        .where((name) => name != null)
+        .join(', ');
+
+    return teacher.copyWith(
+      insNames: names.isNotEmpty ? names : null,
+      playerCount: studentCounts[teacher.id] ?? 0,
+    );
+  }).toList();
 });
 
 /// Notifier for teacher mutations
