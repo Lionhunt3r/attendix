@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "0.1.19",
+      "date": "4.3.2026",
+      "changes": [
+        "🐛 Besprechungen: Teilnehmer & Notizen speichern repariert (DB-Spaltenname)",
+        "🐛 Besprechungen: Notizen löschen jetzt möglich",
+        "🐛 Besprechungen: Vorschau zeigt lesbaren Text statt JSON",
+        "🔒 Besprechungen: Löschen-Button nur für berechtigte Rollen"
+      ]
+    },
+    {
       "version": "0.1.18",
       "date": "4.3.2026",
       "changes": [

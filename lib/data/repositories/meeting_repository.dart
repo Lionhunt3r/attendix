@@ -68,7 +68,7 @@ class MeetingRepository extends BaseRepository with TenantAwareRepository {
         'tenantId': currentTenantId,
         'date': meeting.date,
         'notes': meeting.notes,
-        'attendee_ids': meeting.attendeeIds,
+        'attendees': meeting.attendeeIds,
       };
 
       final response = await supabase
@@ -110,7 +110,7 @@ class MeetingRepository extends BaseRepository with TenantAwareRepository {
       final updates = <String, dynamic>{};
       if (date != null) updates['date'] = date;
       if (notes != null) updates['notes'] = notes;
-      if (attendeeIds != null) updates['attendee_ids'] = attendeeIds;
+      if (attendeeIds != null) updates['attendees'] = attendeeIds;
 
       final response = await supabase
           .from('meetings')

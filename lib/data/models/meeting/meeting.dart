@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'meeting.freezed.dart';
@@ -12,7 +14,7 @@ class Meeting with _$Meeting {
     required int tenantId,
     required String date,
     String? notes,
-    @JsonKey(name: 'attendee_ids') List<int>? attendeeIds,
+    @JsonKey(name: 'attendees') List<int>? attendeeIds,
   }) = _Meeting;
 
   factory Meeting.fromJson(Map<String, dynamic> json) => _$MeetingFromJson(json);
@@ -33,5 +35,27 @@ extension MeetingExtension on Meeting {
     if (d == null) return '';
     const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
     return weekdays[d.weekday - 1];
+  }
+
+  /// Extract plain text from Quill Delta JSON notes for list preview
+  String? get plainTextPreview {
+    if (notes == null || notes!.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(notes!.trim());
+      List? ops;
+      if (decoded is List) {
+        ops = decoded;
+      } else if (decoded is Map) {
+        ops = decoded['ops'] as List?;
+      }
+      if (ops != null) {
+        final text = ops
+            .map((op) => (op as Map)['insert']?.toString() ?? '')
+            .join('')
+            .trim();
+        return text.isEmpty ? null : text;
+      }
+    } catch (_) {}
+    return notes!.trim();
   }
 }

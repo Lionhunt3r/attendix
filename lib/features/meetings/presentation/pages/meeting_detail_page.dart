@@ -65,7 +65,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   Future<void> _save() async {
     final notifier = ref.read(meetingNotifierProvider.notifier);
     final notesJson = _quillController != null
-        ? QuillUtils.notesStringFromDocument(_quillController!.document)
+        ? (QuillUtils.notesStringFromDocument(_quillController!.document) ?? '')
         : null;
 
     final result = await notifier.updateMeeting(

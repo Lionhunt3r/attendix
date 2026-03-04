@@ -17,7 +17,7 @@ _$MeetingImpl _$$MeetingImplFromJson(Map<String, dynamic> json) =>
       date: json['date'] as String,
       notes: json['notes'] as String?,
       attendeeIds:
-          (json['attendee_ids'] as List<dynamic>?)
+          (json['attendees'] as List<dynamic>?)
               ?.map((e) => (e as num).toInt())
               .toList(),
     );
@@ -29,5 +29,5 @@ Map<String, dynamic> _$$MeetingImplToJson(_$MeetingImpl instance) =>
       'tenantId': instance.tenantId,
       'date': instance.date,
       'notes': instance.notes,
-      'attendee_ids': instance.attendeeIds,
+      'attendees': instance.attendeeIds,
     };
