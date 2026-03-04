@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../core/utils/quill_utils.dart';
+
 part 'meeting.freezed.dart';
 part 'meeting.g.dart';
 
@@ -37,7 +39,8 @@ extension MeetingExtension on Meeting {
     return weekdays[d.weekday - 1];
   }
 
-  /// Extract plain text from Quill Delta JSON notes for list preview
+  /// Extract plain text from notes for list preview.
+  /// Handles Quill Delta JSON, HTML (legacy Ionic), and plain text.
   String? get plainTextPreview {
     if (notes == null || notes!.isEmpty) return null;
     try {
@@ -56,6 +59,12 @@ extension MeetingExtension on Meeting {
         return text.isEmpty ? null : text;
       }
     } catch (_) {}
-    return notes!.trim();
+    // HTML fallback (legacy Ionic data)
+    final trimmed = notes!.trim();
+    if (trimmed.startsWith('<')) {
+      final text = QuillUtils.stripHtml(trimmed);
+      return text.isEmpty ? null : text;
+    }
+    return trimmed;
   }
 }
