@@ -27,7 +27,7 @@ mixin _$Meeting {
   int get tenantId => throw _privateConstructorUsedError;
   String get date => throw _privateConstructorUsedError;
   String? get notes => throw _privateConstructorUsedError;
-  @JsonKey(name: 'attendee_ids')
+  @JsonKey(name: 'attendees')
   List<int>? get attendeeIds => throw _privateConstructorUsedError;
 
   /// Serializes this Meeting to a JSON map.
@@ -50,7 +50,7 @@ abstract class $MeetingCopyWith<$Res> {
     int tenantId,
     String date,
     String? notes,
-    @JsonKey(name: 'attendee_ids') List<int>? attendeeIds,
+    @JsonKey(name: 'attendees') List<int>? attendeeIds,
   });
 }
 
@@ -128,7 +128,7 @@ abstract class _$$MeetingImplCopyWith<$Res> implements $MeetingCopyWith<$Res> {
     int tenantId,
     String date,
     String? notes,
-    @JsonKey(name: 'attendee_ids') List<int>? attendeeIds,
+    @JsonKey(name: 'attendees') List<int>? attendeeIds,
   });
 }
 
@@ -199,7 +199,7 @@ class _$MeetingImpl implements _Meeting {
     required this.tenantId,
     required this.date,
     this.notes,
-    @JsonKey(name: 'attendee_ids') final List<int>? attendeeIds,
+    @JsonKey(name: 'attendees') final List<int>? attendeeIds,
   }) : _attendeeIds = attendeeIds;
 
   factory _$MeetingImpl.fromJson(Map<String, dynamic> json) =>
@@ -218,7 +218,7 @@ class _$MeetingImpl implements _Meeting {
   final String? notes;
   final List<int>? _attendeeIds;
   @override
-  @JsonKey(name: 'attendee_ids')
+  @JsonKey(name: 'attendees')
   List<int>? get attendeeIds {
     final value = _attendeeIds;
     if (value == null) return null;
@@ -283,7 +283,7 @@ abstract class _Meeting implements Meeting {
     required final int tenantId,
     required final String date,
     final String? notes,
-    @JsonKey(name: 'attendee_ids') final List<int>? attendeeIds,
+    @JsonKey(name: 'attendees') final List<int>? attendeeIds,
   }) = _$MeetingImpl;
 
   factory _Meeting.fromJson(Map<String, dynamic> json) = _$MeetingImpl.fromJson;
@@ -300,7 +300,7 @@ abstract class _Meeting implements Meeting {
   @override
   String? get notes;
   @override
-  @JsonKey(name: 'attendee_ids')
+  @JsonKey(name: 'attendees')
   List<int>? get attendeeIds;
 
   /// Create a copy of Meeting

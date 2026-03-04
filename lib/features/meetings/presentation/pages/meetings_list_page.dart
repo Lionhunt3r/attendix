@@ -89,7 +89,9 @@ class MeetingsListPage extends ConsumerWidget {
                 return _MeetingListItem(
                   meeting: meeting,
                   onTap: () => context.push('/settings/meetings/${meeting.id}'),
-                  onDelete: () => _deleteMeeting(context, ref, meeting),
+                  onDelete: role.canEdit
+                      ? () => _deleteMeeting(context, ref, meeting)
+                      : null,
                 );
               },
             ),
@@ -171,12 +173,12 @@ class _MeetingListItem extends StatelessWidget {
   const _MeetingListItem({
     required this.meeting,
     required this.onTap,
-    required this.onDelete,
+    this.onDelete,
   });
 
   final Meeting meeting;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -220,16 +222,19 @@ class _MeetingListItem extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
         subtitle: _buildSubtitle(),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: AppColors.danger),
-          onPressed: onDelete,
-        ),
+        trailing: onDelete != null
+            ? IconButton(
+                icon: const Icon(Icons.delete_outline, color: AppColors.danger),
+                onPressed: onDelete,
+              )
+            : null,
       ),
     );
   }
 
   Widget? _buildSubtitle() {
-    final hasNotes = meeting.notes != null && meeting.notes!.isNotEmpty;
+    final preview = meeting.plainTextPreview;
+    final hasNotes = preview != null && preview.isNotEmpty;
     final hasAttendees = meeting.attendeeIds != null && meeting.attendeeIds!.isNotEmpty;
 
     if (!hasNotes && !hasAttendees) return null;
@@ -245,7 +250,7 @@ class _MeetingListItem extends StatelessWidget {
           ),
         if (hasNotes)
           Text(
-            meeting.notes!,
+            preview,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             // FN-011: Use const for better performance
