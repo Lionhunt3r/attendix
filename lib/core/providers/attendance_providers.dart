@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../config/supabase_config.dart';
 import '../constants/enums.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/repositories/repositories.dart';
@@ -53,43 +52,6 @@ final personAttendancesProvider = FutureProvider.family<List<PersonAttendance>, 
   if (!repo.hasTenantId) return [];
   
   return repo.getPersonAttendancesForPerson(personId);
-});
-
-/// Provider for attendance list with calculated percentages (used by list page)
-final attendanceListProvider = FutureProvider<List<Attendance>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  // Guard against null tenant or null tenant.id
-  if (tenant?.id == null) return [];
-
-  // Load attendances with person_attendances to calculate percentage
-  final response = await supabase
-      .from('attendance')
-      .select('*, person_attendances(status)')
-      .eq('tenantId', tenant!.id!)
-      .order('date', ascending: false)
-      .limit(50);
-
-  return (response as List).map((e) {
-    final attendance = Attendance.fromJson(e as Map<String, dynamic>);
-
-    // Always calculate percentage client-side from fresh person_attendances data.
-    // The DB's attendance.percentage may be stale (recalculatePercentage is fire-and-forget),
-    // but person_attendances writes are awaited, so join data is always fresh.
-    final personAttendances = e['person_attendances'] as List?;
-    if (personAttendances != null && personAttendances.isNotEmpty) {
-      final total = personAttendances.length;
-      // BL-003: Use centralized countsAsPresent definition
-      final present = personAttendances.where((pa) {
-        final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
-        return status.countsAsPresent;
-      }).length;
-      final calculatedPercentage = (present / total * 100).roundToDouble();
-      return attendance.copyWith(percentage: calculatedPercentage);
-    }
-    return attendance;
-  }).toList();
 });
 
 /// Data class for categorized attendances (memoized)
@@ -256,7 +218,6 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       await _repo.recalculatePercentage(attendanceId);
       ref.invalidate(attendanceByIdProvider(attendanceId));
       ref.invalidate(attendancesProvider);
-      ref.invalidate(realtimeAttendanceListProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
