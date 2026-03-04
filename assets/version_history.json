@@ -1,6 +1,14 @@
 {
   "versions": [
     {
+      "version": "0.1.14",
+      "date": "4.3.2026",
+      "changes": [
+        "🐛 Aktuelle Werke: Doppelte Werke am gleichen Datum behoben",
+        "🔒 Historie: tenant_id Inkonsistenz korrigiert"
+      ]
+    },
+    {
       "version": "0.1.13",
       "date": "4.3.2026",
       "changes": [
