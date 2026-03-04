@@ -59,7 +59,7 @@ class AppColors {
   // Attendance status colors
   static const Color statusPresent = success;
   static const Color statusAbsent = danger;
-  static const Color statusExcused = warning;
+  static const Color statusExcused = info;
   static const Color statusLate = Color(0xFFFF9500);
   static const Color statusNeutral = medium;
   static const Color statusLateExcused = Color(0xFFFFB347);

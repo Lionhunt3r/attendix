@@ -311,18 +311,19 @@ class ExportService {
   }
 
   /// Get cell decoration based on status code
+  /// Colors match AttendanceStatus.color from enums.dart
   pw.BoxDecoration _getStatusCellDecoration(String code) {
     switch (code) {
       case 'X':
-        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFF32CD32)); // Green
+        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFF2DD36F)); // success
       case 'A':
-        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFFB22222)); // Red
+        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFFEB445A)); // danger
       case 'E':
-        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFC409)); // Yellow
+        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFF3DC2FF)); // info (cyan)
       case 'L':
-        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFF00BFFF)); // Blue
+        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFF9500)); // statusLate (orange)
       case 'N':
-        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFFDCDCDC)); // Gray
+        return const pw.BoxDecoration(color: PdfColor.fromInt(0xFF92949C)); // medium
       default:
         return const pw.BoxDecoration();
     }

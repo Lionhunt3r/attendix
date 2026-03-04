@@ -199,11 +199,11 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
               ),
             ),
             const Divider(),
-            _legendItem(Icons.check, AppColors.success, 'Anwesend'),
-            _legendItem(Icons.event_busy, AppColors.info, 'Entschuldigt'),
-            _legendItem(Icons.close, AppColors.danger, 'Abwesend'),
-            _legendItem(Icons.schedule, AppColors.warning, 'Verspätet'),
-            _legendItem(Icons.remove, AppColors.medium, 'Neutral'),
+            _legendItem(Icons.check, AttendanceStatus.present.color, 'Anwesend'),
+            _legendItem(Icons.event_busy, AttendanceStatus.excused.color, 'Entschuldigt'),
+            _legendItem(Icons.close, AttendanceStatus.absent.color, 'Abwesend'),
+            _legendItem(Icons.schedule, AttendanceStatus.late.color, 'Verspätet'),
+            _legendItem(Icons.remove, AttendanceStatus.neutral.color, 'Neutral'),
             const SizedBox(height: AppDimensions.paddingM),
           ],
         ),
@@ -742,16 +742,7 @@ class _ChildStatusBadge extends StatelessWidget {
     );
   }
 
-  Color _getColor() {
-    return switch (status) {
-      AttendanceStatus.present => AppColors.success,
-      AttendanceStatus.absent => AppColors.danger,
-      AttendanceStatus.excused => AppColors.info,
-      AttendanceStatus.late => AppColors.warning,
-      AttendanceStatus.lateExcused => AppColors.warning,
-      AttendanceStatus.neutral => AppColors.medium,
-    };
-  }
+  Color _getColor() => status.color;
 
   IconData _getIcon() {
     return switch (status) {
