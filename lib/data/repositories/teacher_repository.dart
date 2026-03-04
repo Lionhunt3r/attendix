@@ -73,6 +73,10 @@ class TeacherRepository extends BaseRepository with TenantAwareRepository {
   /// Update a teacher
   Future<Teacher?> updateTeacher(int id, Map<String, dynamic> updates) async {
     try {
+      updates.remove('id');
+      updates.remove('created_at');
+      updates.remove('tenantId');
+
       final response = await supabase
           .from('teachers')
           .update(updates)
@@ -108,7 +112,7 @@ class TeacherRepository extends BaseRepository with TenantAwareRepository {
   Future<Map<int, int>> getStudentCounts() async {
     try {
       final response = await supabase
-          .from('person')
+          .from('player')
           .select('teacher')
           .eq('tenantId', currentTenantId)
           .not('teacher', 'is', null);

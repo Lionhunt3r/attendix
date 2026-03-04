@@ -46,6 +46,8 @@ final studentCountsProvider = FutureProvider<Map<int, int>>((ref) async {
 /// Enriched teachers with instrument names and student counts
 final enrichedTeachersProvider = FutureProvider<List<Teacher>>((ref) async {
   final teachers = await ref.watch(teachersProvider.future);
+  if (teachers.isEmpty) return [];
+
   final groupsMap = await ref.watch(groupsMapProvider.future);
   final studentCounts = await ref.watch(studentCountsProvider.future);
 

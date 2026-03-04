@@ -108,7 +108,6 @@ class TeachersListPage extends ConsumerWidget {
     if (result != null) {
       try {
         await ref.read(teacherNotifierProvider.notifier).createTeacher(result);
-        ref.invalidate(enrichedTeachersProvider);
 
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Lehrer "${result.name}" erstellt');
@@ -147,7 +146,6 @@ class TeachersListPage extends ConsumerWidget {
                 'instruments': result.instruments,
               },
             );
-        ref.invalidate(enrichedTeachersProvider);
 
         if (context.mounted) {
           ToastHelper.showSuccess(context, 'Änderungen gespeichert');
@@ -179,7 +177,6 @@ class TeachersListPage extends ConsumerWidget {
 
     try {
       await ref.read(teacherNotifierProvider.notifier).deleteTeacher(teacher.id!);
-      ref.invalidate(enrichedTeachersProvider);
 
       if (context.mounted) {
         ToastHelper.showSuccess(context, 'Lehrer gelöscht');
@@ -292,11 +289,11 @@ class _StudentCountBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.school, size: 14, color: AppColors.primary),
+          const Icon(Icons.school, size: 14, color: AppColors.primary),
           const SizedBox(width: 4),
           Text(
             '$count',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.primary,
