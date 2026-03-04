@@ -112,18 +112,19 @@ final realtimeAttendanceListProvider = StreamProvider.autoDispose<List<Attendanc
     return (response as List).map((e) {
       final attendance = Attendance.fromJson(e as Map<String, dynamic>);
 
-      if (attendance.percentage == null || attendance.percentage == 0) {
-        final personAttendances = e['person_attendances'] as List?;
-        if (personAttendances != null && personAttendances.isNotEmpty) {
-          final total = personAttendances.length;
-          // BL-003: Use centralized countsAsPresent definition
-          final present = personAttendances.where((pa) {
-            final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
-            return status.countsAsPresent;
-          }).length;
-          final calculatedPercentage = (present / total * 100).roundToDouble();
-          return attendance.copyWith(percentage: calculatedPercentage);
-        }
+      // Always calculate percentage client-side from fresh person_attendances data.
+      // The DB's attendance.percentage may be stale (recalculatePercentage is fire-and-forget),
+      // but person_attendances writes are awaited, so join data is always fresh.
+      final personAttendances = e['person_attendances'] as List?;
+      if (personAttendances != null && personAttendances.isNotEmpty) {
+        final total = personAttendances.length;
+        // BL-003: Use centralized countsAsPresent definition
+        final present = personAttendances.where((pa) {
+          final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
+          return status.countsAsPresent;
+        }).length;
+        final calculatedPercentage = (present / total * 100).roundToDouble();
+        return attendance.copyWith(percentage: calculatedPercentage);
       }
       return attendance;
     }).toList();
