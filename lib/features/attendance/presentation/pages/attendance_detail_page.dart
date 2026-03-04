@@ -514,6 +514,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
           bottomNavigationBar: AttendanceStatusBar(
             persons: personsAsync.valueOrNull ?? [],
             localStatuses: _localStatuses,
+            availableStatuses: availableStatuses,
           ),
         );
       },

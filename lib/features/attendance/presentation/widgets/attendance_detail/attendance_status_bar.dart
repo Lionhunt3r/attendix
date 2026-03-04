@@ -11,10 +11,12 @@ class AttendanceStatusBar extends StatelessWidget {
     super.key,
     required this.persons,
     required this.localStatuses,
+    this.availableStatuses,
   });
 
   final List<Person> persons;
   final Map<int, AttendanceStatus> localStatuses;
+  final List<AttendanceStatus>? availableStatuses;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +38,11 @@ class AttendanceStatusBar extends StatelessWidget {
     final excused = relevantStatuses.where((s) => s == AttendanceStatus.excused).length;
     final absent = relevantStatuses.where((s) => s == AttendanceStatus.absent).length;
     // Unknown = neutral status (not yet recorded)
-    final unknown = relevantStatuses.where((s) => s == AttendanceStatus.neutral).length;
+    final showNeutral = availableStatuses == null ||
+        availableStatuses!.contains(AttendanceStatus.neutral);
+    final unknown = showNeutral
+        ? relevantStatuses.where((s) => s == AttendanceStatus.neutral).length
+        : 0;
     final percentage = total > 0 ? (present / total * 100) : 0.0;
 
     return Container(
@@ -70,11 +76,12 @@ class AttendanceStatusBar extends StatelessWidget {
               value: '$absent',
               color: AppColors.danger,
             ),
-            _StatItem(
-              label: 'Offen',
-              value: '$unknown',
-              color: AppColors.medium,
-            ),
+            if (showNeutral)
+              _StatItem(
+                label: 'Offen',
+                value: '$unknown',
+                color: AppColors.medium,
+              ),
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppDimensions.paddingM,

@@ -163,6 +163,71 @@ void main() {
       });
     });
 
+    group('availableStatuses filtering', () {
+      widgetTest('hides Offen when neutral is not in availableStatuses', (tester) async {
+        final persons = [
+          TestFactories.createPerson(id: 1, firstName: 'A', lastName: 'One'),
+          TestFactories.createPerson(id: 2, firstName: 'B', lastName: 'Two'),
+          TestFactories.createPerson(id: 3, firstName: 'C', lastName: 'Three'),
+        ];
+
+        final localStatuses = <int, AttendanceStatus>{
+          1: AttendanceStatus.present,
+          2: AttendanceStatus.absent,
+          3: AttendanceStatus.neutral, // would normally count as "Offen"
+        };
+
+        // neutral is NOT in availableStatuses
+        final availableStatuses = [
+          AttendanceStatus.present,
+          AttendanceStatus.absent,
+          AttendanceStatus.excused,
+        ];
+
+        await tester.pumpApp(
+          AttendanceStatusBar(
+            persons: persons,
+            localStatuses: localStatuses,
+            availableStatuses: availableStatuses,
+          ),
+        );
+
+        // "Offen" should NOT be displayed since neutral is not available
+        expect(find.text('Offen'), findsNothing);
+      });
+
+      widgetTest('shows Offen when neutral is in availableStatuses', (tester) async {
+        final persons = [
+          TestFactories.createPerson(id: 1, firstName: 'A', lastName: 'One'),
+          TestFactories.createPerson(id: 2, firstName: 'B', lastName: 'Two'),
+        ];
+
+        final localStatuses = <int, AttendanceStatus>{
+          1: AttendanceStatus.present,
+          2: AttendanceStatus.neutral,
+        };
+
+        // neutral IS in availableStatuses
+        final availableStatuses = [
+          AttendanceStatus.neutral,
+          AttendanceStatus.present,
+          AttendanceStatus.absent,
+        ];
+
+        await tester.pumpApp(
+          AttendanceStatusBar(
+            persons: persons,
+            localStatuses: localStatuses,
+            availableStatuses: availableStatuses,
+          ),
+        );
+
+        // "Offen" should be displayed with count 1
+        expect(find.text('Offen'), findsOneWidget);
+        expect(find.text('1'), findsNWidgets(2)); // present=1, open=1
+      });
+    });
+
     group('UI display', () {
       widgetTest('displays all status labels', (tester) async {
         await tester.pumpApp(
