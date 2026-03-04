@@ -169,6 +169,27 @@ void main() {
           reason: 'getCurrentSongs should exist in repository',
         );
       });
+
+      test('getCurrentSongs normalizes date to YYYY-MM-DD before grouping', () {
+        // Dates from Supabase can have different formats (e.g. "2026-04-03"
+        // vs "2026-04-03T00:00:00") which would create duplicate date groups.
+        // The grouping key must be normalized to just the date portion.
+        //
+        // Find the grouping logic (between "Group by date" and "grouped.entries")
+        final groupByStart = songRepoSource.indexOf('Group by date');
+        final groupedEntriesEnd = songRepoSource.indexOf('grouped.entries');
+        expect(groupByStart, isNot(-1), reason: 'Should find "Group by date" comment');
+        expect(groupedEntriesEnd, isNot(-1), reason: 'Should find "grouped.entries"');
+
+        final groupingSection = songRepoSource.substring(groupByStart, groupedEntriesEnd);
+        expect(
+          groupingSection,
+          contains('substring(0, 10)'),
+          reason:
+              'getCurrentSongs must normalize date strings to YYYY-MM-DD '
+              'in the grouping logic to prevent duplicate date sections',
+        );
+      });
     });
 
     group('Summary Statistics', () {
