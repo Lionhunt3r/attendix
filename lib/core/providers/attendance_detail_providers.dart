@@ -5,8 +5,7 @@ import '../../data/models/person/person.dart';
 import '../config/supabase_config.dart';
 import 'tenant_providers.dart';
 
-/// Provider for attendance detail with realtime updates
-/// Watches realtimeAttendanceDetailProvider to auto-refresh on person_attendances changes
+/// Provider for attendance detail with tenant-scoped query
 final attendanceDetailProvider = FutureProvider.autoDispose.family<Attendance?, int>((ref, attendanceId) async {
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
