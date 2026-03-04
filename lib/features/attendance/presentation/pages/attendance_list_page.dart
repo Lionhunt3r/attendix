@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/debug_providers.dart';
+import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/dialog_helper.dart';
@@ -30,56 +29,6 @@ class AttendanceListPage extends ConsumerStatefulWidget {
 }
 
 class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
-  RealtimeChannel? _channel;
-  bool _isDisposed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Setup will be done in didChangeDependencies to access ref
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _setupRealtimeChannel();
-  }
-
-  void _setupRealtimeChannel() {
-    // Avoid setting up multiple times
-    if (_channel != null) return;
-
-    final supabase = ref.read(supabaseClientProvider);
-    final tenant = ref.read(currentTenantProvider);
-
-    // Only setup if we have a tenant
-    if (tenant?.id == null) return;
-
-    _channel = supabase.channel('attendance-list-changes')
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'attendance',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'tenantId',
-          value: tenant!.id,
-        ),
-        callback: (payload) {
-          if (_isDisposed) return;
-          // Refresh the attendance list on any change
-          ref.invalidate(attendanceListProvider);
-        },
-      )
-      .subscribe();
-  }
-
-  @override
-  void dispose() {
-    _isDisposed = true;
-    _channel?.unsubscribe();
-    super.dispose();
-  }
 
   Future<void> _confirmDelete(BuildContext context, Attendance attendance) async {
     final dateFormatted = _formatDateForDialog(attendance.date);
@@ -92,7 +41,6 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
     );
     if (confirmed && context.mounted) {
       await ref.read(attendanceNotifierProvider.notifier).deleteAttendance(attendance.id!);
-      ref.invalidate(attendanceListProvider);
     }
   }
 
@@ -106,7 +54,7 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
   Widget build(BuildContext context) {
     final ref = this.ref;
     final tenant = ref.watch(currentTenantProvider);
-    final attendanceAsync = ref.watch(attendanceListProvider);
+    final attendanceAsync = ref.watch(realtimeAttendanceListProvider);
     // Use effectiveRoleProvider to support debug role override
     final role = ref.watch(effectiveRoleProvider);
 
@@ -147,7 +95,7 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
           title: 'Fehler beim Laden',
           subtitle: 'Die Anwesenheitsliste konnte nicht geladen werden.',
           actionLabel: 'Erneut versuchen',
-          onAction: () => ref.refresh(attendanceListProvider),
+          onAction: () => ref.invalidate(realtimeAttendanceListProvider),
         ),
         data: (attendances) {
           if (attendances.isEmpty) {
@@ -174,9 +122,8 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
 
           return RefreshIndicator(
             onRefresh: () async {
-              // FN-008: invalidate + await for proper RefreshIndicator behavior
-              ref.invalidate(attendanceListProvider);
-              await ref.read(attendanceListProvider.future);
+              // FN-008: invalidate to trigger fresh fetch from realtime provider
+              ref.invalidate(realtimeAttendanceListProvider);
             },
             child: ListView(
               padding: const EdgeInsets.all(AppDimensions.paddingM),
@@ -530,7 +477,7 @@ class _AttendanceListItem extends StatelessWidget {
 
 /// Show calendar view modal
 void _showCalendarView(BuildContext context, WidgetRef ref) {
-  final attendances = ref.read(attendanceListProvider).valueOrNull ?? [];
+  final attendances = ref.read(realtimeAttendanceListProvider).valueOrNull ?? [];
 
   // Build a map of dates to attendances
   final Map<DateTime, List<Attendance>> attendanceMap = {};

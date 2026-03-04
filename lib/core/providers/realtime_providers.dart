@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/supabase_config.dart';
+import '../constants/enums.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/models/person/person.dart';
 import '../../data/models/song/song.dart';
-import 'attendance_providers.dart';
 import 'player_providers.dart';
 import 'song_providers.dart';
 import 'tenant_providers.dart';
@@ -87,30 +87,57 @@ final realtimePlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) a
   }
 });
 
-/// Provider for realtime attendance changes subscription
+/// Provider for realtime attendance list with calculated percentages
 ///
-/// Subscribes to the attendance table and invalidates the list
-/// when changes occur
-final realtimeAttendancesProvider = StreamProvider.autoDispose<List<Attendance>>((ref) async* {
+/// Subscribes to the attendance table and refetches with person_attendances
+/// to calculate percentages client-side. autoDispose ensures fresh data on remount.
+final realtimeAttendanceListProvider = StreamProvider.autoDispose<List<Attendance>>((ref) async* {
   final supabase = ref.watch(supabaseClientProvider);
-  final tenantId = ref.watch(currentTenantIdProvider);
-  final attendanceRepo = ref.watch(attendanceRepositoryWithTenantProvider);
+  final tenant = ref.watch(currentTenantProvider);
 
-  if (tenantId == null) {
+  if (tenant?.id == null) {
     yield [];
     return;
   }
 
-  // Initial data
-  final initialData = await attendanceRepo.getAttendances();
-  yield initialData;
+  // Helper: fetch attendances with person_attendances and calculate percentages
+  Future<List<Attendance>> fetchWithPercentages() async {
+    final response = await supabase
+        .from('attendance')
+        .select('*, person_attendances(status)')
+        .eq('tenantId', tenant!.id!)
+        .order('date', ascending: false)
+        .limit(50);
 
-  // Create a stream controller
+    return (response as List).map((e) {
+      final attendance = Attendance.fromJson(e as Map<String, dynamic>);
+
+      if (attendance.percentage == null || attendance.percentage == 0) {
+        final personAttendances = e['person_attendances'] as List?;
+        if (personAttendances != null && personAttendances.isNotEmpty) {
+          final total = personAttendances.length;
+          // BL-003: Use centralized countsAsPresent definition
+          final present = personAttendances.where((pa) {
+            final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
+            return status.countsAsPresent;
+          }).length;
+          final calculatedPercentage = (present / total * 100).roundToDouble();
+          return attendance.copyWith(percentage: calculatedPercentage);
+        }
+      }
+      return attendance;
+    }).toList();
+  }
+
+  // Initial data
+  yield await fetchWithPercentages();
+
+  // Create a stream controller to manage updates
   final controller = StreamController<List<Attendance>>();
 
   // Setup realtime channel
   final channel = supabase
-      .channel('attendance_changes_$tenantId')
+      .channel('attendance_list_changes_${tenant!.id}')
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
@@ -118,11 +145,11 @@ final realtimeAttendancesProvider = StreamProvider.autoDispose<List<Attendance>>
         filter: PostgresChangeFilter(
           type: PostgresChangeFilterType.eq,
           column: 'tenantId',
-          value: tenantId,
+          value: tenant.id,
         ),
         callback: (payload) async {
           try {
-            final freshData = await attendanceRepo.getAttendances();
+            final freshData = await fetchWithPercentages();
             if (!controller.isClosed) {
               controller.add(freshData);
             }
@@ -135,11 +162,13 @@ final realtimeAttendancesProvider = StreamProvider.autoDispose<List<Attendance>>
       )
       .subscribe();
 
+  // Cleanup on dispose
   ref.onDispose(() {
     channel.unsubscribe();
     controller.close();
   });
 
+  // Yield updates from the controller
   await for (final data in controller.stream) {
     yield data;
   }
@@ -181,64 +210,6 @@ final realtimeSongsProvider = StreamProvider.autoDispose<List<Song>>((ref) async
         callback: (payload) async {
           try {
             final freshData = await songRepo.getSongs();
-            if (!controller.isClosed) {
-              controller.add(freshData);
-            }
-          } catch (e) {
-            if (!controller.isClosed) {
-              controller.addError(e);
-            }
-          }
-        },
-      )
-      .subscribe();
-
-  ref.onDispose(() {
-    channel.unsubscribe();
-    controller.close();
-  });
-
-  await for (final data in controller.stream) {
-    yield data;
-  }
-});
-
-/// Provider for realtime person attendance changes for a specific attendance
-///
-/// Subscribes to person_attendances table filtered by attendance_id
-final realtimeAttendanceDetailProvider = StreamProvider.autoDispose
-    .family<Attendance?, int>((ref, attendanceId) async* {
-  final supabase = ref.watch(supabaseClientProvider);
-  final attendanceRepo = ref.watch(attendanceRepositoryWithTenantProvider);
-  final tenantId = ref.watch(currentTenantIdProvider);
-
-  if (tenantId == null) {
-    yield null;
-    return;
-  }
-
-  // Initial data
-  final initialData = await attendanceRepo.getAttendanceById(attendanceId);
-  yield initialData;
-
-  // Create a stream controller
-  final controller = StreamController<Attendance?>();
-
-  // Setup realtime channel for person_attendances changes
-  final channel = supabase
-      .channel('person_attendance_changes_$attendanceId')
-      .onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'person_attendances',
-        filter: PostgresChangeFilter(
-          type: PostgresChangeFilterType.eq,
-          column: 'attendance_id',
-          value: attendanceId,
-        ),
-        callback: (payload) async {
-          try {
-            final freshData = await attendanceRepo.getAttendanceById(attendanceId);
             if (!controller.isClosed) {
               controller.add(freshData);
             }

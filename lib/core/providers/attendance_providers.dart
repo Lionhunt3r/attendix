@@ -4,6 +4,7 @@ import '../config/supabase_config.dart';
 import '../constants/enums.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/repositories/repositories.dart';
+import 'realtime_providers.dart';
 import 'tenant_providers.dart';
 
 /// Initialized attendance repository with tenant context
@@ -105,8 +106,8 @@ class CategorizedAttendances {
 }
 
 /// Provider that categorizes and sorts attendances (computed once per data change)
-final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
-  final attendances = ref.watch(attendanceListProvider).valueOrNull ?? [];
+final categorizedAttendancesProvider = Provider.autoDispose<CategorizedAttendances>((ref) {
+  final attendances = ref.watch(realtimeAttendanceListProvider).valueOrNull ?? [];
 
   final now = DateTime.now();
   final todayStart = DateTime(now.year, now.month, now.day);
@@ -150,7 +151,7 @@ final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
 });
 
 /// Provider for average attendance percentage of past attendances
-final averageAttendancePercentProvider = Provider<double?>((ref) {
+final averageAttendancePercentProvider = Provider.autoDispose<double?>((ref) {
   final categorized = ref.watch(categorizedAttendancesProvider);
   // BL-005: Include 0% attendances in average calculation (changed > 0 to != null)
   final pastAttendances = categorized.past
@@ -243,7 +244,6 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       ref.invalidate(attendanceByIdProvider(attendanceId));
       ref.invalidate(personAttendancesProvider(personId));
-      ref.invalidate(attendanceListProvider);
       return result;
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -256,7 +256,6 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       await _repo.recalculatePercentage(attendanceId);
       ref.invalidate(attendanceByIdProvider(attendanceId));
       ref.invalidate(attendancesProvider);
-      ref.invalidate(attendanceListProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
