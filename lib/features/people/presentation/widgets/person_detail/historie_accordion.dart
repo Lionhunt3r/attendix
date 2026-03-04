@@ -11,6 +11,9 @@ import '../../../../../core/providers/tenant_providers.dart';
 import '../../../../../core/theme/app_colors.dart';
 import '../../pages/person_detail_page.dart';
 
+/// Toggle to show all history entries (including before season start).
+final showAllHistoryProvider = StateProvider.autoDispose<bool>((ref) => false);
+
 /// Accordion section displaying person history (attendance + changes).
 class HistorieAccordion extends ConsumerWidget {
   const HistorieAccordion({
@@ -87,13 +90,55 @@ class HistorieAccordion extends ConsumerWidget {
           );
         }
 
+        final tenant = ref.watch(currentTenantProvider);
+        final showAll = ref.watch(showAllHistoryProvider);
+        final seasonStart = tenant?.seasonStart != null
+            ? DateTime.tryParse(tenant!.seasonStart!)
+            : null;
+
+        // Filter to current season unless "show all" is active
+        final filteredHistory = (seasonStart != null && !showAll)
+            ? history.where((item) {
+                final date = DateTime.tryParse(item['date'] ?? '');
+                return date == null || !date.isBefore(seasonStart);
+              }).toList()
+            : history;
+
         return Column(
           children: [
             // Stats summary row
             _buildStatsRow(),
 
+            // Season filter toggle
+            if (seasonStart != null)
+              Padding(
+                padding: const EdgeInsets.only(top: AppDimensions.paddingS),
+                child: Row(
+                  children: [
+                    Text(
+                      showAll
+                          ? 'Alle Einträge'
+                          : 'Ab Saisonstart (${DateFormat('dd.MM.yyyy').format(seasonStart)})',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => ref.read(showAllHistoryProvider.notifier).state = !showAll,
+                      child: Text(
+                        showAll ? 'Nur Saison' : 'Alle anzeigen',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // History items
-            ...history.take(20).map(
+            ...filteredHistory.take(20).map(
                   (item) => _buildHistoryItem(context, ref, item),
                 ),
           ],
