@@ -19,7 +19,6 @@ import '../../../../shared/widgets/loading/loading.dart';
 import '../../../../shared/widgets/common/empty_state.dart';
 import '../../../../shared/widgets/display/percentage_badge.dart';
 import '../../../../shared/widgets/animations/animated_list_item.dart';
-import '../widgets/attendance_legend_sheet.dart';
 
 
 /// Provider for attendance list
@@ -241,11 +240,6 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            tooltip: 'Legende',
-            onPressed: () => showAttendanceLegendSheet(context),
-          ),
           IconButton(
             icon: const Icon(Icons.calendar_today),
             tooltip: 'Kalender',

@@ -26,6 +26,7 @@ import '../../../../data/models/attendance/attendance.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/song/song.dart';
 import '../widgets/attendance_detail/attendance_detail_widgets.dart';
+import '../widgets/attendance_legend_sheet.dart';
 import '../widgets/attendance_status_overview_sheet.dart';
 import '../widgets/songs_selection_sheet.dart';
 
@@ -372,6 +373,11 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
               ],
             ),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.help_outline),
+                tooltip: 'Legende',
+                onPressed: () => showAttendanceLegendSheet(context),
+              ),
               if (_hasChanges)
                 TextButton.icon(
                   onPressed: _saveChanges,
