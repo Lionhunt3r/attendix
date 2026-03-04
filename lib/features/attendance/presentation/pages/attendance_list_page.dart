@@ -93,6 +93,7 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
         ],
       ),
       body: attendanceAsync.when(
+        skipLoadingOnReload: true,
         loading: () => const ListSkeleton(
           itemCount: 8,
           showAvatar: true,
