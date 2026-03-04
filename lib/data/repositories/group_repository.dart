@@ -232,7 +232,7 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
           .from('group_categories')
           .select('*')
           .eq('tenant_id', currentTenantId)
-          .order('index');
+          .order('name');
 
       return (response as List)
           .map((e) => GroupCategory.fromJson(e as Map<String, dynamic>))
@@ -246,7 +246,6 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
   /// Create a group category
   Future<GroupCategory> createGroupCategory({
     required String name,
-    int? index,
   }) async {
     try {
       // RT-008: Use maybeSingle() to avoid StateError
@@ -254,7 +253,6 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
           .from('group_categories')
           .insert({
             'name': name,
-            'index': index,
             'tenant_id': currentTenantId,
           })
           .select()

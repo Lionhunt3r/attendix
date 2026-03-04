@@ -101,7 +101,6 @@ _$GroupCategoryImpl _$$GroupCategoryImplFromJson(Map<String, dynamic> json) =>
       id: (json['id'] as num?)?.toInt(),
       tenantId: (json['tenantId'] as num?)?.toInt(),
       name: json['name'] as String,
-      index: (json['index'] as num?)?.toInt(),
       createdAt:
           json['created_at'] == null
               ? null
@@ -113,6 +112,5 @@ Map<String, dynamic> _$$GroupCategoryImplToJson(_$GroupCategoryImpl instance) =>
       'id': instance.id,
       'tenantId': instance.tenantId,
       'name': instance.name,
-      'index': instance.index,
       'created_at': instance.createdAt?.toIso8601String(),
     };

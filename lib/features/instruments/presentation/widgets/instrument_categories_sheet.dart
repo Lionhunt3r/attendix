@@ -6,7 +6,7 @@ import '../../../../core/providers/group_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/instrument/instrument.dart';
 
-/// Bottom sheet for managing instrument categories (CRUD + reorder)
+/// Bottom sheet for managing instrument categories (CRUD)
 class InstrumentCategoriesSheet extends ConsumerStatefulWidget {
   const InstrumentCategoriesSheet({super.key});
 
@@ -17,8 +17,6 @@ class InstrumentCategoriesSheet extends ConsumerStatefulWidget {
 
 class _InstrumentCategoriesSheetState
     extends ConsumerState<InstrumentCategoriesSheet> {
-  List<GroupCategory>? _reorderedCategories;
-
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(groupCategoriesProvider);
@@ -104,10 +102,7 @@ class _InstrumentCategoriesSheetState
                     ),
                   ),
                   data: (categories) {
-                    final displayCategories =
-                        _reorderedCategories ?? categories;
-
-                    if (displayCategories.isEmpty) {
+                    if (categories.isEmpty) {
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -132,23 +127,12 @@ class _InstrumentCategoriesSheetState
                       );
                     }
 
-                    return ReorderableListView.builder(
-                      scrollController: scrollController,
+                    return ListView.builder(
+                      controller: scrollController,
                       padding: const EdgeInsets.all(AppDimensions.paddingM),
-                      itemCount: displayCategories.length,
-                      onReorder: (oldIndex, newIndex) {
-                        setState(() {
-                          if (newIndex > oldIndex) newIndex--;
-                          final items =
-                              List<GroupCategory>.from(displayCategories);
-                          final item = items.removeAt(oldIndex);
-                          items.insert(newIndex, item);
-                          _reorderedCategories = items;
-                        });
-                        _saveReorder();
-                      },
+                      itemCount: categories.length,
                       itemBuilder: (context, index) {
-                        final category = displayCategories[index];
+                        final category = categories[index];
                         return _CategoryTile(
                           key: ValueKey(category.id ?? index),
                           category: category,
@@ -162,29 +146,11 @@ class _InstrumentCategoriesSheetState
                   },
                 ),
               ),
-              // Hint
-              Padding(
-                padding: const EdgeInsets.all(AppDimensions.paddingM),
-                child: Text(
-                  'Ziehe Kategorien um sie neu zu sortieren',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.medium,
-                      ),
-                ),
-              ),
             ],
           ),
         );
       },
     );
-  }
-
-  Future<void> _saveReorder() async {
-    if (_reorderedCategories == null) return;
-    await ref
-        .read(groupNotifierProvider.notifier)
-        .reorderGroupCategories(_reorderedCategories!);
-    _reorderedCategories = null;
   }
 
   Future<void> _showAddCategoryDialog(BuildContext context) async {
@@ -316,7 +282,7 @@ class _CategoryTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
       child: ListTile(
-        leading: const Icon(Icons.drag_handle),
+        leading: const Icon(Icons.category, size: 20),
         title: Text(category.name),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,

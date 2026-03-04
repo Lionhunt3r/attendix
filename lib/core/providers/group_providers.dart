@@ -118,10 +118,10 @@ class GroupNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 
-  Future<GroupCategory?> createGroupCategory(String name, {int? index}) async {
+  Future<GroupCategory?> createGroupCategory(String name) async {
     state = const AsyncValue.loading();
     try {
-      final result = await _repo.createGroupCategory(name: name, index: index);
+      final result = await _repo.createGroupCategory(name: name);
       state = const AsyncValue.data(null);
       ref.invalidate(groupCategoriesProvider);
       return result;
@@ -150,22 +150,6 @@ class GroupNotifier extends Notifier<AsyncValue<void>> {
       await _repo.deleteGroupCategory(id);
       state = const AsyncValue.data(null);
       ref.invalidate(groupCategoriesProvider);
-    } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
-    }
-  }
-
-  Future<void> reorderGroupCategories(List<GroupCategory> reordered) async {
-    state = const AsyncValue.loading();
-    try {
-      for (int i = 0; i < reordered.length; i++) {
-        if (reordered[i].id != null && reordered[i].index != i) {
-          await _repo.updateGroupCategory(reordered[i].id!, {'index': i});
-        }
-      }
-      state = const AsyncValue.data(null);
-      ref.invalidate(groupCategoriesProvider);
-      ref.invalidate(groupsProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
