@@ -14,6 +14,7 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_detail_providers.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/conductor_providers.dart';
+import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/export_service.dart';
@@ -1614,8 +1615,11 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
           })
           .eq('id', personAttendanceId);
 
-      // Recalculate percentage so list page updates via realtime
-      // (fire-and-forget: recalculatePercentage invalidates attendanceListProvider after DB update)
+      // Invalidate providers so caches are consistent with DB
+      ref.invalidate(realtimeAttendanceListProvider);
+      ref.invalidate(filteredPersonAttendancesForAttendanceProvider(widget.attendanceId));
+
+      // Fire-and-forget: update stored percentage for consistency
       ref.read(attendanceNotifierProvider.notifier)
           .recalculatePercentage(widget.attendanceId);
     } catch (e) {

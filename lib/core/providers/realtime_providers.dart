@@ -13,6 +13,9 @@ import 'song_providers.dart';
 import 'tenant_providers.dart';
 import 'group_providers.dart';
 
+// Keep alive counter: incrementing forces realtimeAttendanceListProvider to refetch.
+final _attendanceRefetchCounter = StateProvider<int>((ref) => 0);
+
 /// Provider for realtime player changes subscription
 ///
 /// Subscribes to the player table and invalidates the player list
@@ -87,56 +90,49 @@ final realtimePlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) a
   }
 });
 
-/// Provider for realtime attendance list with calculated percentages
-///
-/// Subscribes to the attendance table and refetches with person_attendances
-/// to calculate percentages client-side. autoDispose ensures fresh data on remount.
-final realtimeAttendanceListProvider = StreamProvider.autoDispose<List<Attendance>>((ref) async* {
+/// Attendance list with client-side calculated percentages.
+/// Watches the realtime subscription to auto-refresh on DB changes.
+final realtimeAttendanceListProvider = FutureProvider.autoDispose<List<Attendance>>((ref) async {
+  // Watch the realtime subscription so it stays alive while this provider is active.
+  ref.watch(_attendanceRealtimeSubscriptionProvider);
+  // Watch the refetch counter so manual invalidation triggers a refetch.
+  ref.watch(_attendanceRefetchCounter);
+
   final supabase = ref.watch(supabaseClientProvider);
   final tenant = ref.watch(currentTenantProvider);
+  if (tenant?.id == null) return [];
 
-  if (tenant?.id == null) {
-    yield [];
-    return;
-  }
+  final response = await supabase
+      .from('attendance')
+      .select('*, person_attendances(status)')
+      .eq('tenantId', tenant!.id!)
+      .order('date', ascending: false)
+      .limit(50);
 
-  // Helper: fetch attendances with person_attendances and calculate percentages
-  Future<List<Attendance>> fetchWithPercentages() async {
-    final response = await supabase
-        .from('attendance')
-        .select('*, person_attendances(status)')
-        .eq('tenantId', tenant!.id!)
-        .order('date', ascending: false)
-        .limit(50);
+  return (response as List).map((e) {
+    final attendance = Attendance.fromJson(e as Map<String, dynamic>);
+    final personAttendances = e['person_attendances'] as List?;
+    if (personAttendances != null && personAttendances.isNotEmpty) {
+      final total = personAttendances.length;
+      final present = personAttendances.where((pa) {
+        final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
+        return status.countsAsPresent;
+      }).length;
+      return attendance.copyWith(
+        percentage: (present / total * 100).roundToDouble(),
+      );
+    }
+    return attendance;
+  }).toList();
+});
 
-    return (response as List).map((e) {
-      final attendance = Attendance.fromJson(e as Map<String, dynamic>);
+/// Internal: manages Supabase realtime subscription for the attendance table.
+/// Bumps the refetch counter when attendance rows change, triggering a refetch.
+final _attendanceRealtimeSubscriptionProvider = Provider.autoDispose<void>((ref) {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+  if (tenant?.id == null) return;
 
-      // Always calculate percentage client-side from fresh person_attendances data.
-      // The DB's attendance.percentage may be stale (recalculatePercentage is fire-and-forget),
-      // but person_attendances writes are awaited, so join data is always fresh.
-      final personAttendances = e['person_attendances'] as List?;
-      if (personAttendances != null && personAttendances.isNotEmpty) {
-        final total = personAttendances.length;
-        // BL-003: Use centralized countsAsPresent definition
-        final present = personAttendances.where((pa) {
-          final status = AttendanceStatus.fromValue(pa['status'] as int? ?? 0);
-          return status.countsAsPresent;
-        }).length;
-        final calculatedPercentage = (present / total * 100).roundToDouble();
-        return attendance.copyWith(percentage: calculatedPercentage);
-      }
-      return attendance;
-    }).toList();
-  }
-
-  // Initial data
-  yield await fetchWithPercentages();
-
-  // Create a stream controller to manage updates
-  final controller = StreamController<List<Attendance>>();
-
-  // Setup realtime channel
   final channel = supabase
       .channel('attendance_list_changes_${tenant!.id}')
       .onPostgresChanges(
@@ -148,31 +144,15 @@ final realtimeAttendanceListProvider = StreamProvider.autoDispose<List<Attendanc
           column: 'tenantId',
           value: tenant.id,
         ),
-        callback: (payload) async {
-          try {
-            final freshData = await fetchWithPercentages();
-            if (!controller.isClosed) {
-              controller.add(freshData);
-            }
-          } catch (e) {
-            if (!controller.isClosed) {
-              controller.addError(e);
-            }
-          }
+        callback: (payload) {
+          // Bump the counter to trigger a refetch in the data provider.
+          // This does NOT tear down the realtime channel.
+          ref.read(_attendanceRefetchCounter.notifier).state++;
         },
       )
       .subscribe();
 
-  // Cleanup on dispose
-  ref.onDispose(() {
-    channel.unsubscribe();
-    controller.close();
-  });
-
-  // Yield updates from the controller
-  await for (final data in controller.stream) {
-    yield data;
-  }
+  ref.onDispose(() => channel.unsubscribe());
 });
 
 /// Provider for realtime song changes subscription
