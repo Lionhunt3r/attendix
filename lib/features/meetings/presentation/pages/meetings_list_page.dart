@@ -23,7 +23,7 @@ class MeetingsListPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sitzungen'),
+        title: const Text('Besprechungen'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -55,19 +55,19 @@ class MeetingsListPage extends ConsumerWidget {
                   const Icon(Icons.event_note_outlined, size: 80, color: AppColors.medium),
                   const SizedBox(height: AppDimensions.paddingL),
                   Text(
-                    'Keine Sitzungen',
+                    'Keine Besprechungen',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: AppDimensions.paddingS),
                   // FN-012: Show role-appropriate empty state text
                   if (role.canEdit)
                     Text(
-                      'Erstelle die erste Sitzung',
+                      'Erstelle die erste Besprechung',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
                     )
                   else
                     Text(
-                      'Noch keine Sitzungen vorhanden',
+                      'Noch keine Besprechungen vorhanden',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
                     ),
                 ],
@@ -101,7 +101,7 @@ class MeetingsListPage extends ConsumerWidget {
           ? FloatingActionButton.extended(
               onPressed: () => _showCreateMeetingDialog(context, ref),
               icon: const Icon(Icons.add),
-              label: const Text('Neue Sitzung'),
+              label: const Text('Neue Besprechung'),
             )
           : null,
     );
@@ -128,7 +128,7 @@ class MeetingsListPage extends ConsumerWidget {
 
       final created = await notifier.createMeeting(newMeeting);
       if (created != null && context.mounted) {
-        ToastHelper.showSuccess(context, 'Sitzung erstellt');
+        ToastHelper.showSuccess(context, 'Besprechung erstellt');
         // Navigate to detail page to edit
         context.push('/settings/meetings/${created.id}');
       } else if (context.mounted) {
@@ -141,8 +141,8 @@ class MeetingsListPage extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sitzung löschen?'),
-        content: Text('Möchtest du die Sitzung vom ${meeting.formattedDate} wirklich löschen?'),
+        title: const Text('Besprechung löschen?'),
+        content: Text('Möchtest du die Besprechung vom ${meeting.formattedDate} wirklich löschen?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -161,7 +161,7 @@ class MeetingsListPage extends ConsumerWidget {
       final notifier = ref.read(meetingNotifierProvider.notifier);
       await notifier.deleteMeeting(meeting.id!);
       if (context.mounted) {
-        ToastHelper.showSuccess(context, 'Sitzung gelöscht');
+        ToastHelper.showSuccess(context, 'Besprechung gelöscht');
       }
     }
   }
@@ -282,7 +282,7 @@ class _MeetingCreateDialogState extends State<_MeetingCreateDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Neue Sitzung'),
+      title: const Text('Neue Besprechung'),
       content: ListTile(
         contentPadding: EdgeInsets.zero,
         title: const Text('Datum'),

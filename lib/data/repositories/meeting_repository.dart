@@ -61,7 +61,7 @@ class MeetingRepository extends BaseRepository with TenantAwareRepository {
           .maybeSingle();
 
       if (existing != null) {
-        throw Exception('Eine Sitzung an diesem Datum existiert bereits');
+        throw Exception('Eine Besprechung an diesem Datum existiert bereits');
       }
 
       final data = {
@@ -103,7 +103,7 @@ class MeetingRepository extends BaseRepository with TenantAwareRepository {
             .maybeSingle();
 
         if (existing != null) {
-          throw Exception('Eine Sitzung an diesem Datum existiert bereits');
+          throw Exception('Eine Besprechung an diesem Datum existiert bereits');
         }
       }
 

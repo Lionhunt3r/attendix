@@ -1,6 +1,14 @@
 {
   "versions": [
     {
+      "version": "0.1.17",
+      "date": "4.3.2026",
+      "changes": [
+        "📝 Besprechungen: Rich-Text-Editor für Notizen (Quill)",
+        "🏷️ Sitzungen → Besprechungen: Einheitliche Benennung"
+      ]
+    },
+    {
       "version": "0.1.16",
       "date": "4.3.2026",
       "changes": [

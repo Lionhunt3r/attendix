@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,7 @@ import '../../../../core/providers/conductor_providers.dart';
 import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/quill_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../shared/widgets/loading/list_skeleton.dart';
@@ -25,13 +27,13 @@ class MeetingDetailPage extends ConsumerStatefulWidget {
 
 class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   bool _isEditMode = false;
-  final _notesController = TextEditingController();
+  QuillController? _quillController;
   List<int> _selectedAttendeeIds = [];
   bool _hasChanges = false;
 
   @override
   void dispose() {
-    _notesController.dispose();
+    _quillController?.dispose();
     super.dispose();
   }
 
@@ -39,29 +41,45 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
     final meetingAsync = ref.read(meetingByIdProvider(widget.meetingId));
     meetingAsync.whenData((meeting) {
       if (meeting != null && !_hasChanges) {
-        _notesController.text = meeting.notes ?? '';
+        final doc = QuillUtils.documentFromNotesString(meeting.notes);
+        _quillController?.dispose();
+        _quillController = QuillController(
+          document: doc,
+          selection: const TextSelection.collapsed(offset: 0),
+          readOnly: !_isEditMode,
+        );
+        _quillController!.document.changes.listen((_) {
+          if (!_hasChanges) setState(() => _hasChanges = true);
+        });
         _selectedAttendeeIds = List.from(meeting.attendeeIds ?? []);
         // Auto-enable edit mode if no notes yet
         if (meeting.notes == null || meeting.notes!.isEmpty) {
-          setState(() => _isEditMode = true);
+          _isEditMode = true;
+          _quillController!.readOnly = false;
         }
+        setState(() {});
       }
     });
   }
 
   Future<void> _save() async {
     final notifier = ref.read(meetingNotifierProvider.notifier);
+    final notesJson = _quillController != null
+        ? QuillUtils.notesStringFromDocument(_quillController!.document)
+        : null;
+
     final result = await notifier.updateMeeting(
       widget.meetingId,
-      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      notes: notesJson,
       attendeeIds: _selectedAttendeeIds,
     );
 
     if (result != null && mounted) {
-      ToastHelper.showSuccess(context, 'Sitzung gespeichert');
+      ToastHelper.showSuccess(context, 'Besprechung gespeichert');
       setState(() {
         _isEditMode = false;
         _hasChanges = false;
+        _quillController?.readOnly = true;
       });
     } else if (mounted) {
       ToastHelper.showError(context, 'Fehler beim Speichern');
@@ -89,8 +107,8 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
         title: meetingAsync.whenOrNull(
           data: (meeting) => meeting != null
               ? Text(DateFormat('dd.MM.yyyy').format(DateTime.parse(meeting.date)))
-              : const Text('Sitzung'),
-        ) ?? const Text('Sitzung'),
+              : const Text('Besprechung'),
+        ) ?? const Text('Besprechung'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -99,7 +117,10 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
           if (!_isEditMode)
             IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () => setState(() => _isEditMode = true),
+              onPressed: () => setState(() {
+                _isEditMode = true;
+                _quillController?.readOnly = false;
+              }),
               tooltip: 'Bearbeiten',
             ),
         ],
@@ -113,12 +134,22 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
           }
 
           // Initialize on first load
-          if (!_hasChanges && _selectedAttendeeIds.isEmpty && (meeting.attendeeIds?.isNotEmpty ?? false)) {
+          if (_quillController == null) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
+                final doc = QuillUtils.documentFromNotesString(meeting.notes);
+                final isEmpty = meeting.notes == null || meeting.notes!.isEmpty;
                 setState(() {
-                  _notesController.text = meeting.notes ?? '';
+                  _quillController = QuillController(
+                    document: doc,
+                    selection: const TextSelection.collapsed(offset: 0),
+                    readOnly: !isEmpty,
+                  );
+                  _quillController!.document.changes.listen((_) {
+                    if (!_hasChanges) setState(() => _hasChanges = true);
+                  });
                   _selectedAttendeeIds = List.from(meeting.attendeeIds ?? []);
+                  if (isEmpty) _isEditMode = true;
                 });
               }
             });
@@ -160,6 +191,9 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   }
 
   Widget _buildViewMode(String attendeeNames) {
+    final controller = _quillController;
+    final hasNotes = controller != null && !QuillUtils.isDocumentEmpty(controller.document);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppDimensions.paddingM),
       child: Column(
@@ -217,14 +251,21 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                     ],
                   ),
                   const SizedBox(height: AppDimensions.paddingS),
-                  Text(
-                    _notesController.text.isNotEmpty
-                        ? _notesController.text
-                        : 'Keine Notizen vorhanden',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: _notesController.text.isEmpty ? AppColors.medium : null,
-                        ),
-                  ),
+                  if (hasNotes)
+                    QuillEditor.basic(
+                      controller: controller,
+                      config: const QuillEditorConfig(
+                        showCursor: false,
+                        scrollable: false,
+                      ),
+                    )
+                  else
+                    Text(
+                      'Keine Notizen vorhanden',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppColors.medium,
+                          ),
+                    ),
                 ],
               ),
             ),
@@ -319,16 +360,64 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                     ],
                   ),
                   const SizedBox(height: AppDimensions.paddingM),
-                  TextField(
-                    controller: _notesController,
-                    decoration: const InputDecoration(
-                      hintText: 'Notizen eingeben...',
-                      border: OutlineInputBorder(),
+                  if (_quillController != null) ...[
+                    QuillSimpleToolbar(
+                      controller: _quillController!,
+                      config: const QuillSimpleToolbarConfig(
+                        showBoldButton: true,
+                        showItalicButton: true,
+                        showUnderLineButton: true,
+                        showStrikeThrough: false,
+                        showColorButton: false,
+                        showBackgroundColorButton: false,
+                        showInlineCode: false,
+                        showCodeBlock: false,
+                        showLink: false,
+                        showSearchButton: false,
+                        showSubscript: false,
+                        showSuperscript: false,
+                        showFontFamily: false,
+                        showFontSize: false,
+                        showHeaderStyle: true,
+                        showListNumbers: true,
+                        showListBullets: true,
+                        showListCheck: true,
+                        showQuote: false,
+                        showIndent: false,
+                        showAlignmentButtons: false,
+                        showDirection: false,
+                        showUndo: true,
+                        showRedo: true,
+                        showClearFormat: true,
+                        showDividers: true,
+                        showSmallButton: false,
+                        showLineHeightButton: false,
+                        showClipboardCut: false,
+                        showClipboardCopy: false,
+                        showClipboardPaste: false,
+                      ),
                     ),
-                    maxLines: 10,
-                    minLines: 5,
-                    onChanged: (_) => setState(() => _hasChanges = true),
-                  ),
+                    const SizedBox(height: AppDimensions.paddingS),
+                    Container(
+                      height: 250,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).dividerColor),
+                        borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
+                      ),
+                      child: QuillEditor.basic(
+                        controller: _quillController!,
+                        config: QuillEditorConfig(
+                          scrollable: true,
+                          expands: true,
+                          placeholder: 'Notizen eingeben...',
+                          padding: const EdgeInsets.all(AppDimensions.paddingM),
+                          onTapOutside: (_, __) {
+                            // Don't unfocus on tap outside
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -364,7 +453,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
           const Icon(Icons.event_busy, size: 64, color: AppColors.medium),
           const SizedBox(height: AppDimensions.paddingM),
           Text(
-            'Sitzung nicht gefunden',
+            'Besprechung nicht gefunden',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppDimensions.paddingM),
