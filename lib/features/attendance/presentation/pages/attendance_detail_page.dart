@@ -1445,13 +1445,16 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   }
 
   void _showStatsDialog() {
-    final persons = ref.read(allPersonsForAttendanceProvider).valueOrNull ?? [];
+    final persons = ref.read(filteredPersonsForAttendanceProvider(widget.attendanceId)).valueOrNull ?? [];
     final total = persons.length;
 
-    // Build status counts map for the new sheet
+    // Only count statuses for persons in the filtered list (consistent with status bar)
+    final personIds = persons.map((p) => p.id).whereType<int>().toSet();
     final statusCounts = <AttendanceStatus, int>{};
     for (final status in AttendanceStatus.values) {
-      statusCounts[status] = _localStatuses.values.where((s) => s == status).length;
+      statusCounts[status] = _localStatuses.entries
+          .where((e) => personIds.contains(e.key) && e.value == status)
+          .length;
     }
 
     showStatusOverviewSheet(
