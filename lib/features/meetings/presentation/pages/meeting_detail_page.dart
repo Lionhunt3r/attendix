@@ -308,6 +308,31 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                               fontWeight: FontWeight.w600,
                             ),
                       ),
+                      const Spacer(),
+                      if (availableAttendees.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            final validIds = availableAttendees
+                                .where((p) => p.id != null)
+                                .map((p) => p.id!)
+                                .toSet();
+                            setState(() {
+                              _hasChanges = true;
+                              if (_selectedAttendeeIds.length == validIds.length) {
+                                _selectedAttendeeIds.clear();
+                              } else {
+                                _selectedAttendeeIds = validIds.toList();
+                              }
+                            });
+                          },
+                          child: Text(
+                            _selectedAttendeeIds.length ==
+                                    availableAttendees.where((p) => p.id != null).length
+                                ? 'Alle abwählen'
+                                : 'Alle auswählen',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: AppDimensions.paddingM),
