@@ -71,6 +71,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     super.initState();
     // Subscribe to realtime changes and ensure PersonAttendances exist after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Force fresh data from DB (handles cross-device changes and stale autoDispose cache)
+      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
       _subscribeToRealtimeChanges();
       _ensurePersonAttendancesExist();
       _setupProviderListener();
@@ -1622,8 +1624,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
       // Invalidate list provider so percentage updates when navigating back
       ref.invalidate(realtimeAttendanceListProvider);
-      // Invalidate the data provider so re-entry gets fresh statuses from DB
-      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
 
       // Fire-and-forget: update stored percentage for consistency
       ref.read(attendanceNotifierProvider.notifier)
