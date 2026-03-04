@@ -1003,43 +1003,91 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
     }
   }
 
-  /// Show archive confirmation dialog
+  /// Show archive dialog with date picker and note
   Future<void> _showArchiveDialog(Person person) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('${person.firstName} archivieren?'),
-        content: const Text(
-          'Die Person wird als "ausgetreten" markiert und erscheint nicht mehr in der aktiven Liste.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Archivieren'),
-          ),
-        ],
-      ),
-    );
+    final noteController = TextEditingController();
+    DateTime archiveDate = DateTime.now();
 
-    if (confirmed == true && mounted) {
-      await _archivePerson(person);
+    try {
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text('${person.firstName} archivieren?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Die Person wird als "ausgetreten" markiert und erscheint nicht mehr in der aktiven Liste.',
+                ),
+                const SizedBox(height: AppDimensions.paddingM),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Austrittsdatum'),
+                  subtitle: Text(DateFormat('dd.MM.yyyy').format(archiveDate)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: archiveDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setDialogState(() => archiveDate = date);
+                    }
+                  },
+                ),
+                const SizedBox(height: AppDimensions.paddingS),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Grund (optional)',
+                    hintText: 'Warum verlässt die Person?',
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+                onPressed: () {
+                  Navigator.pop(context, {
+                    'date': archiveDate.toIso8601String(),
+                    'note': noteController.text,
+                  });
+                },
+                child: const Text('Archivieren'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (result != null && mounted) {
+        await _archivePerson(person,
+            date: result['date'] as String,
+            note: result['note'] as String);
+      }
+    } finally {
+      noteController.dispose();
     }
   }
 
   /// Archive a person
-  Future<void> _archivePerson(Person person) async {
+  Future<void> _archivePerson(Person person, {String? date, String? note}) async {
     final repository = ref.read(playerRepositoryWithTenantProvider);
 
     try {
       await repository.archivePlayer(
         person,
-        DateTime.now().toIso8601String(),
-        null,
+        date ?? DateTime.now().toIso8601String(),
+        note?.isEmpty == true ? null : note,
       );
       // Realtime handles the refresh automatically
 

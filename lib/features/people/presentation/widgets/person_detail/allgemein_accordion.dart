@@ -155,6 +155,10 @@ class AllgemeinAccordion extends ConsumerWidget {
                   if (tenant != null && tenant.type == 'choir')
                     _buildRangeField(context),
 
+                  // Choir-specific: Instrumente
+                  if (tenant != null && tenant.type == 'choir')
+                    _buildInstrumentsField(context),
+
                   // Non-general: Prüfling (examinee)
                   if (tenant != null && tenant.type != 'general')
                     _buildExamineeField(context),
@@ -716,6 +720,25 @@ class AllgemeinAccordion extends ConsumerWidget {
         initialValue: rangeValue ?? '',
         fieldKey: 'range',
         hint: 'z.B. C3 - C5',
+      ),
+    );
+  }
+
+  Widget _buildInstrumentsField(BuildContext context) {
+    final instrumentsValue = person.instruments;
+    if (instrumentsValue == null && !canEdit) return const SizedBox.shrink();
+
+    return EditableInfoRow(
+      icon: Icons.piano_outlined,
+      label: 'Instrumente',
+      value: instrumentsValue ?? 'Nicht angegeben',
+      editable: canEdit,
+      onEdit: () => _editTextField(
+        context,
+        title: 'Instrumente',
+        initialValue: instrumentsValue ?? '',
+        fieldKey: 'instruments',
+        hint: 'z.B. Klavier, Gitarre',
       ),
     );
   }
