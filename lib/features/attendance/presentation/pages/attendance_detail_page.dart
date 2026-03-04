@@ -158,20 +158,21 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
         final value = next.value;
         if (value != null) {
-          final isFirstLoad = _localStatuses.isEmpty;
-          if (isFirstLoad) {
-            setState(() {
-              for (final pa in value) {
-                if (pa.personId != null) {
+          setState(() {
+            for (final pa in value) {
+              if (pa.personId != null) {
+                // IDs und Metadaten IMMER aktualisieren
+                _personAttendanceIds[pa.personId!] = pa.id;
+                _personNotes[pa.personId!] = pa.notes;
+                _changedBy[pa.personId!] = pa.changedBy;
+                _changedAt[pa.personId!] = pa.changedAt;
+                // Status nur setzen wenn nicht gerade lokal geändert
+                if (!_savingPersonIds.contains(pa.personId!)) {
                   _localStatuses[pa.personId!] = pa.status;
-                  _personAttendanceIds[pa.personId!] = pa.id;
-                  _personNotes[pa.personId!] = pa.notes;
-                  _changedBy[pa.personId!] = pa.changedBy;
-                  _changedAt[pa.personId!] = pa.changedAt;
                 }
               }
-            });
-          }
+            }
+          });
         }
       },
       fireImmediately: true,
@@ -274,9 +275,11 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
       if (_isDisposed || !mounted) return;
 
+      final recordId = newRecord['id']?.toString();
       try {
         setState(() {
           _localStatuses[personId] = status;
+          if (recordId != null) _personAttendanceIds[personId] = recordId;
           _personNotes[personId] = notes;
           _changedBy[personId] = changedBy;
           _changedAt[personId] = changedAt;
@@ -1588,7 +1591,14 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     AttendanceStatus? previousStatus,
   }) async {
     final personAttendanceId = _personAttendanceIds[personId];
-    if (personAttendanceId == null) return;
+    if (personAttendanceId == null) {
+      if (mounted && previousStatus != null) {
+        setState(() {
+          _localStatuses[personId] = previousStatus;
+        });
+      }
+      return;
+    }
 
     _savingPersonIds.add(personId);
     try {
