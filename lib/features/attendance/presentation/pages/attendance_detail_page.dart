@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -521,7 +523,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                             }
                           },
                           onExportPdf: _exportPlanPdf,
-                          onSendViaTelegram: _sendPlanViaTelegram,
+                          onSendViaTelegram: _showTelegramFormatOptions,
                           onSharePlanChanged: _toggleSharePlan,
                         ),
 
@@ -1069,7 +1071,40 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     }
   }
 
-  Future<void> _sendPlanViaTelegram() async {
+  Future<void> _showTelegramFormatOptions() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('PDF (A4)'),
+              subtitle: const Text('Standard-Format'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.content_cut),
+              title: const Text('PDF (2x A5)'),
+              subtitle: const Text('Zwei Pläne auf einer Seite'),
+              onTap: () => Navigator.pop(ctx, '2xa5'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.image),
+              title: const Text('Als Bild'),
+              subtitle: const Text('Für schnelle Vorschau'),
+              onTap: () => Navigator.pop(ctx, 'image'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (result != null && mounted) await _sendPlanViaTelegram(format: result);
+  }
+
+  Future<void> _sendPlanViaTelegram({String format = 'pdf'}) async {
     final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
     final plan = attendance?.plan;
 
@@ -1112,20 +1147,31 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
     try {
       final exportService = ExportService();
-      final pdfBytes = await exportService.generatePlanPdfBytes(
-        tenantName: tenant.shortName,
-        date: dateStr,
-        startTime: startTime,
-        endTime: endTime,
-        fields: fields.cast<Map<String, dynamic>>(),
-      );
+      late final Uint8List pdfBytes;
+      if (format == '2xa5') {
+        pdfBytes = await exportService.generatePlan2xA5PdfBytes(
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: startTime,
+          endTime: endTime,
+          fields: fields.cast<Map<String, dynamic>>(),
+        );
+      } else {
+        pdfBytes = await exportService.generatePlanPdfBytes(
+          tenantName: tenant.shortName,
+          date: dateStr,
+          startTime: startTime,
+          endTime: endTime,
+          fields: fields.cast<Map<String, dynamic>>(),
+        );
+      }
 
       final telegramService = ref.read(telegramServiceProvider);
       await telegramService.sendPlanPerTelegram(
         fileBytes: pdfBytes,
         name: '${tenant.shortName}_Plan_$dateStr',
         chatId: chatId,
-        asImage: false,
+        asImage: format == 'image',
       );
 
       if (mounted) {
