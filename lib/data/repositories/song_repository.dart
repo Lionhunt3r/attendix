@@ -349,7 +349,11 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
         grouped.putIfAbsent(date, () => []).add(history);
       }
 
-      return grouped.entries
+      // Sort by date ascending (nearest date first)
+      final sortedEntries = grouped.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+
+      return sortedEntries
           .map((e) => (date: e.key, history: e.value))
           .toList();
     } catch (e, stack) {
