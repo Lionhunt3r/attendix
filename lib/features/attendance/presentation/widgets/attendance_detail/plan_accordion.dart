@@ -91,37 +91,15 @@ class _PlanAccordionState extends State<PlanAccordion> {
                 ),
               ),
             const Spacer(),
-            // Compact share plan toggle
-            Tooltip(
-              message: widget.attendance.sharePlan
-                  ? 'Plan wird mit Mitgliedern geteilt'
-                  : 'Plan ist nur für Dirigenten sichtbar',
-              child: GestureDetector(
-                onTap: () {}, // absorb tap to prevent ExpansionTile toggle
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.share,
-                      size: 14,
-                      color: widget.attendance.sharePlan
-                          ? AppColors.success
-                          : AppColors.medium,
-                    ),
-                    SizedBox(
-                      height: 24,
-                      width: 40,
-                      child: FittedBox(
-                        child: Switch(
-                          value: widget.attendance.sharePlan,
-                          onChanged: widget.onSharePlanChanged,
-                        ),
-                      ),
-                    ),
-                  ],
+            if (widget.attendance.sharePlan)
+              Tooltip(
+                message: 'Plan wird mit Mitgliedern geteilt',
+                child: Icon(
+                  Icons.share,
+                  size: 16,
+                  color: AppColors.success,
                 ),
               ),
-            ),
           ],
         ),
         children: [
@@ -194,6 +172,20 @@ class _PlanAccordionState extends State<PlanAccordion> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                TextButton.icon(
+                  onPressed: () => widget.onSharePlanChanged(!widget.attendance.sharePlan),
+                  icon: Icon(
+                    widget.attendance.sharePlan ? Icons.share : Icons.share_outlined,
+                    size: 18,
+                    color: widget.attendance.sharePlan ? AppColors.success : null,
+                  ),
+                  label: Text(
+                    widget.attendance.sharePlan ? 'Geteilt' : 'Teilen',
+                    style: widget.attendance.sharePlan
+                        ? TextStyle(color: AppColors.success)
+                        : null,
+                  ),
+                ),
                 TextButton.icon(
                   onPressed: widget.onEdit,
                   icon: const Icon(Icons.edit, size: 18),
