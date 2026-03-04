@@ -283,3 +283,15 @@ Future<void> deleteTenant(WidgetRef ref, int tenantId) async {
 
   ref.invalidate(userTenantsProvider);
 }
+
+/// Provider for member count of a specific tenant
+final tenantMemberCountProvider = FutureProvider.family<int, int>((ref, tenantId) async {
+  final supabase = ref.watch(supabaseClientProvider);
+
+  final response = await supabase
+      .from('tenantUsers')
+      .select('id')
+      .eq('tenantId', tenantId);
+
+  return (response as List).length;
+});
