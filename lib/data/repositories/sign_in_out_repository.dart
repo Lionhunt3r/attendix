@@ -354,11 +354,7 @@ class CrossTenantPersonAttendance {
   }
 
   /// Check if the person was present (attended)
-  bool get attended {
-    return status == AttendanceStatus.present ||
-        status == AttendanceStatus.late ||
-        status == AttendanceStatus.lateExcused;
-  }
+  bool get attended => status.countsAsPresent;
 
   /// Check if plan is available for viewing
   bool get hasPlan {
