@@ -372,13 +372,11 @@ class TestFactories {
     int? id,
     int? tenantId,
     required String name,
-    int? index,
   }) {
     return GroupCategory(
       id: id,
       tenantId: tenantId,
       name: name,
-      index: index,
     );
   }
 

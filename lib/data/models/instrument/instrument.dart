@@ -62,7 +62,6 @@ class GroupCategory with _$GroupCategory {
     int? id,
     int? tenantId,
     required String name,
-    int? index,
     @JsonKey(name: 'created_at') DateTime? createdAt,
   }) = _GroupCategory;
 

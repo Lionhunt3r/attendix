@@ -1113,7 +1113,6 @@ mixin _$GroupCategory {
   int? get id => throw _privateConstructorUsedError;
   int? get tenantId => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  int? get index => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
   DateTime? get createdAt => throw _privateConstructorUsedError;
 
@@ -1138,7 +1137,6 @@ abstract class $GroupCategoryCopyWith<$Res> {
     int? id,
     int? tenantId,
     String name,
-    int? index,
     @JsonKey(name: 'created_at') DateTime? createdAt,
   });
 }
@@ -1161,7 +1159,6 @@ class _$GroupCategoryCopyWithImpl<$Res, $Val extends GroupCategory>
     Object? id = freezed,
     Object? tenantId = freezed,
     Object? name = null,
-    Object? index = freezed,
     Object? createdAt = freezed,
   }) {
     return _then(
@@ -1181,11 +1178,6 @@ class _$GroupCategoryCopyWithImpl<$Res, $Val extends GroupCategory>
                     ? _value.name
                     : name // ignore: cast_nullable_to_non_nullable
                         as String,
-            index:
-                freezed == index
-                    ? _value.index
-                    : index // ignore: cast_nullable_to_non_nullable
-                        as int?,
             createdAt:
                 freezed == createdAt
                     ? _value.createdAt
@@ -1210,7 +1202,6 @@ abstract class _$$GroupCategoryImplCopyWith<$Res>
     int? id,
     int? tenantId,
     String name,
-    int? index,
     @JsonKey(name: 'created_at') DateTime? createdAt,
   });
 }
@@ -1232,7 +1223,6 @@ class __$$GroupCategoryImplCopyWithImpl<$Res>
     Object? id = freezed,
     Object? tenantId = freezed,
     Object? name = null,
-    Object? index = freezed,
     Object? createdAt = freezed,
   }) {
     return _then(
@@ -1252,11 +1242,6 @@ class __$$GroupCategoryImplCopyWithImpl<$Res>
                 ? _value.name
                 : name // ignore: cast_nullable_to_non_nullable
                     as String,
-        index:
-            freezed == index
-                ? _value.index
-                : index // ignore: cast_nullable_to_non_nullable
-                    as int?,
         createdAt:
             freezed == createdAt
                 ? _value.createdAt
@@ -1274,7 +1259,6 @@ class _$GroupCategoryImpl implements _GroupCategory {
     this.id,
     this.tenantId,
     required this.name,
-    this.index,
     @JsonKey(name: 'created_at') this.createdAt,
   });
 
@@ -1288,14 +1272,12 @@ class _$GroupCategoryImpl implements _GroupCategory {
   @override
   final String name;
   @override
-  final int? index;
-  @override
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
 
   @override
   String toString() {
-    return 'GroupCategory(id: $id, tenantId: $tenantId, name: $name, index: $index, createdAt: $createdAt)';
+    return 'GroupCategory(id: $id, tenantId: $tenantId, name: $name, createdAt: $createdAt)';
   }
 
   @override
@@ -1307,15 +1289,13 @@ class _$GroupCategoryImpl implements _GroupCategory {
             (identical(other.tenantId, tenantId) ||
                 other.tenantId == tenantId) &&
             (identical(other.name, name) || other.name == name) &&
-            (identical(other.index, index) || other.index == index) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, tenantId, name, index, createdAt);
+  int get hashCode => Object.hash(runtimeType, id, tenantId, name, createdAt);
 
   /// Create a copy of GroupCategory
   /// with the given fields replaced by the non-null parameter values.
@@ -1336,7 +1316,6 @@ abstract class _GroupCategory implements GroupCategory {
     final int? id,
     final int? tenantId,
     required final String name,
-    final int? index,
     @JsonKey(name: 'created_at') final DateTime? createdAt,
   }) = _$GroupCategoryImpl;
 
@@ -1349,8 +1328,6 @@ abstract class _GroupCategory implements GroupCategory {
   int? get tenantId;
   @override
   String get name;
-  @override
-  int? get index;
   @override
   @JsonKey(name: 'created_at')
   DateTime? get createdAt;
