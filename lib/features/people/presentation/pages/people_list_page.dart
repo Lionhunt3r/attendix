@@ -445,11 +445,6 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                   tooltip: 'Ansicht',
                   onPressed: _showViewOptionsDialog,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.swap_horiz),
-                  tooltip: 'Gruppe wechseln',
-                  onPressed: () => context.go('/tenants'),
-                ),
               ],
       ),
       body: Column(

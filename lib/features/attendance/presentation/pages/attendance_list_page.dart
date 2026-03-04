@@ -245,11 +245,6 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
             tooltip: 'Kalender',
             onPressed: () => _showCalendarView(context, ref),
           ),
-          IconButton(
-            icon: const Icon(Icons.swap_horiz),
-            tooltip: 'Gruppe wechseln',
-            onPressed: () => context.go('/tenants'),
-          ),
         ],
       ),
       body: attendanceAsync.when(
