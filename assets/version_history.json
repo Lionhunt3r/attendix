@@ -1,6 +1,17 @@
 {
   "versions": [
     {
+      "version": "0.1.18",
+      "date": "4.3.2026",
+      "changes": [
+        "✨ Benachrichtigungen: Per-Instanz-Toggle für Gruppen",
+        "✨ Gruppenauswahl: Favoriten-Stern + Sortierung",
+        "✨ Instanz löschen: Sicherheitsabfrage mit Namenseingabe",
+        "✨ Accounts: Batch-Erstellung für Spieler ohne Login",
+        "🧹 Doppelte Benachrichtigungs-Seite entfernt"
+      ]
+    },
+    {
       "version": "0.1.17",
       "date": "4.3.2026",
       "changes": [

@@ -10,6 +10,8 @@ import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/pwa_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/string_utils.dart';
+import '../../../../core/utils/toast_helper.dart';
+import '../../../../data/models/tenant/tenant.dart';
 import '../../../../shared/widgets/sheets/feedback_sheet.dart';
 import '../../../../shared/widgets/sheets/version_history_sheet.dart';
 
@@ -62,6 +64,18 @@ class SettingsPage extends ConsumerWidget {
                     child: const Text('Wechseln'),
                   ),
                 ),
+                // Delete instance — Admin only
+                if (role.isAdmin)
+                  _SettingsTile(
+                    leading: _SettingsIcon(
+                      icon: Icons.delete_forever,
+                      color: AppColors.danger,
+                    ),
+                    title: 'Instanz löschen',
+                    titleColor: AppColors.danger,
+                    subtitle: 'Diese Gruppe unwiderruflich löschen',
+                    onTap: () => _showDeleteTenantDialog(context, ref, tenant),
+                  ),
               ],
             ),
             const SizedBox(height: AppDimensions.paddingM),
@@ -194,6 +208,13 @@ class SettingsPage extends ConsumerWidget {
                   subtitle: 'Neue Selbst-Registrierungen prüfen',
                   onTap: () => context.push('/settings/pending'),
                 ),
+                if (role.isAdmin)
+                  _SettingsTile(
+                    leading: const _SettingsIcon(icon: Icons.person_add),
+                    title: 'Fehlende Accounts anlegen',
+                    subtitle: 'Accounts für Spieler ohne Login erstellen',
+                    onTap: () => context.push('/settings/batch-accounts'),
+                  ),
                 _SettingsTile(
                   leading: const _SettingsIcon(icon: Icons.history),
                   title: 'Ehemalige Mitglieder',
@@ -391,6 +412,92 @@ class SettingsPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// Show safety dialog for deleting a tenant instance
+Future<void> _showDeleteTenantDialog(
+  BuildContext context,
+  WidgetRef ref,
+  Tenant tenant,
+) async {
+  final tenantName = tenant.shortName.isNotEmpty ? tenant.shortName : tenant.longName;
+  final controller = TextEditingController();
+
+  try {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final matches = controller.text.trim() == tenantName;
+            return AlertDialog(
+              title: const Text('Instanz löschen'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Diese Aktion kann nicht rückgängig gemacht werden! '
+                    'Alle Daten dieser Instanz werden unwiderruflich gelöscht.',
+                    style: TextStyle(color: AppColors.danger),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Bitte gib den Namen der Instanz ein, um das Löschen zu bestätigen:',
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tenantName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      hintText: 'Name eingeben...',
+                    ),
+                    autofocus: true,
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Abbrechen'),
+                ),
+                ElevatedButton(
+                  onPressed: matches ? () => Navigator.of(context).pop(true) : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.danger,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Endgültig löschen'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    try {
+      await deleteTenant(ref, tenant.id!);
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Instanz gelöscht');
+        context.go('/tenants');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Löschen: $e');
+      }
+    }
+  } finally {
+    controller.dispose();
   }
 }
 
