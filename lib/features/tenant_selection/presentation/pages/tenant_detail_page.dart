@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/string_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/tenant/tenant.dart';
 
@@ -26,7 +27,7 @@ class TenantDetailPage extends ConsumerWidget {
       ),
       error: (error, _) => Scaffold(
         appBar: AppBar(title: const Text('Instanz-Details')),
-        body: Center(child: Text('Fehler: $error')),
+        body: const Center(child: Text('Fehler beim Laden der Instanz-Details')),
       ),
       data: (tenants) {
         final tenant = tenants.where((t) => t.id == tenantId).firstOrNull;
@@ -69,9 +70,7 @@ class _TenantHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayName = tenant.name;
-    final initials = displayName.length >= 2
-        ? displayName.substring(0, 2).toUpperCase()
-        : displayName.toUpperCase();
+    final initials = StringUtils.getTenantInitials(tenant.shortName, tenant.longName);
 
     final typeLabel = switch (tenant.type) {
       'choir' => 'Chor',
@@ -357,14 +356,16 @@ Future<void> _showDeleteTenantDialog(
     if (!context.mounted) return;
 
     try {
-      await deleteTenant(ref, tenant.id!);
+      final id = tenant.id;
+      if (id == null) return;
+      await deleteTenant(ref, id);
       if (context.mounted) {
         ToastHelper.showSuccess(context, 'Instanz gelöscht');
         context.go('/tenants');
       }
     } catch (e) {
       if (context.mounted) {
-        ToastHelper.showError(context, 'Fehler beim Löschen: $e');
+        ToastHelper.showError(context, 'Fehler beim Löschen');
       }
     }
   } finally {

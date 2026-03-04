@@ -7,6 +7,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/providers/user_preferences_provider.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/tenant/tenant.dart';
 
@@ -347,7 +348,10 @@ class _TenantCard extends ConsumerWidget {
                 ),
                 onPressed: () {
                   if (tenant.id != null) {
-                    context.push('/tenants/${tenant.id}');
+                    context.pushNamed(
+                      AppRoutes.tenantDetail,
+                      pathParameters: {'id': '${tenant.id}'},
+                    );
                   }
                 },
               ),
