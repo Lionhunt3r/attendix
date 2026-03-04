@@ -148,9 +148,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     _isDisposed = true;
     _providerSubscription?.close();
     _unsubscribeFromRealtimeChanges();
-    // Clear provider cache so re-entry gets fresh data from DB.
-    // Done here (not in _savePersonStatus) to avoid flicker from mid-use refetch.
-    ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
     super.dispose();
   }
 
@@ -160,6 +157,11 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       filteredPersonAttendancesForAttendanceProvider(widget.attendanceId),
       (previous, next) {
         if (!mounted || _isDisposed) return;
+
+        // Only process completed data. Skip AsyncLoading which carries stale
+        // previous data and would cause a flicker (unnecessary setState with
+        // unchanged values). The fresh AsyncData arrives once the refetch completes.
+        if (next is! AsyncData) return;
 
         final value = next.value;
         if (value != null) {
@@ -1620,6 +1622,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
       // Invalidate list provider so percentage updates when navigating back
       ref.invalidate(realtimeAttendanceListProvider);
+      // Invalidate the data provider so re-entry gets fresh statuses from DB
+      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
 
       // Fire-and-forget: update stored percentage for consistency
       ref.read(attendanceNotifierProvider.notifier)
