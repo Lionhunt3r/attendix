@@ -123,45 +123,37 @@ class AttendancePersonTile extends StatelessWidget {
                 ),
                 const SizedBox(width: AppDimensions.paddingM),
 
-                // Name and info
+                // Name and notes
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            person.fullName,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          if (hasNotes) ...[
-                            const SizedBox(width: 4),
+                      Text(
+                        person.fullName,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      if (hasNotes)
+                        Row(
+                          children: [
                             Icon(
                               Icons.sticky_note_2,
-                              size: 14,
-                              color: AppColors.info,
+                              size: 12,
+                              color: AppColors.medium,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                notes!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: AppColors.medium,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
-                        ],
-                      ),
-                      if (person.groupName != null)
-                        Text(
-                          person.groupName!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.medium,
-                          ),
-                        ),
-                      if (hasNotes)
-                        Text(
-                          notes!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                            color: AppColors.medium,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                     ],
                   ),
