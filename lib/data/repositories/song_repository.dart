@@ -340,7 +340,7 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
         final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
 
         // Deduplicate: only keep first occurrence of each songId per date
-        final songId = history.songId;
+        final songId = history.songId ?? history.song?.id;
         if (songId != null) {
           final seen = seenSongIds.putIfAbsent(date, () => <int>{});
           if (!seen.add(songId)) continue;
