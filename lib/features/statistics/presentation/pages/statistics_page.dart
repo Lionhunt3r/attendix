@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/organisation_providers.dart';
 import '../../../../core/providers/statistics_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_helper.dart';
+import '../../../../data/models/attendance/attendance.dart';
 import '../../../../data/models/organisation/organisation.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
@@ -81,6 +83,18 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
 
                   // Summary cards
                   _SummaryCards(statistics: statistics),
+                  const SizedBox(height: AppDimensions.paddingL),
+
+                  // Members overview
+                  _buildSectionTitle('Mitglieder-Übersicht'),
+                  const SizedBox(height: AppDimensions.paddingS),
+                  const _MembersOverview(),
+                  const SizedBox(height: AppDimensions.paddingL),
+
+                  // Events per type
+                  _buildSectionTitle('Termine pro Veranstaltungstyp'),
+                  const SizedBox(height: AppDimensions.paddingS),
+                  const _EventTypeOverview(),
                   const SizedBox(height: AppDimensions.paddingL),
 
                   // Trend chart
@@ -211,25 +225,56 @@ class _SummaryCards extends StatelessWidget {
             ? AppColors.warning
             : AppColors.danger;
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _StatCard(
-            title: 'Ø Anwesenheit',
-            value: '${statistics.averagePercentage}%',
-            color: avgColor,
-            icon: Icons.trending_up,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                title: 'Ø Anwesenheit',
+                value: '${statistics.averagePercentage}%',
+                color: avgColor,
+                icon: Icons.trending_up,
+              ),
+            ),
+            const SizedBox(width: AppDimensions.paddingM),
+            Expanded(
+              child: _StatCard(
+                title: 'Termine',
+                value: '${statistics.totalAttendances}',
+                color: AppColors.primary,
+                icon: Icons.event,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: AppDimensions.paddingM),
-        Expanded(
-          child: _StatCard(
-            title: 'Termine',
-            value: '${statistics.totalAttendances}',
-            color: AppColors.primary,
-            icon: Icons.event,
+        if (statistics.bestAttendance != null ||
+            statistics.worstAttendance != null) ...[
+          const SizedBox(height: AppDimensions.paddingM),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  title: 'Beste Probe',
+                  value: '${statistics.bestAttendance?.percentage?.round() ?? 0}%',
+                  color: AppColors.success,
+                  icon: Icons.emoji_events,
+                  subtitle: statistics.bestAttendance?.formattedDate,
+                ),
+              ),
+              const SizedBox(width: AppDimensions.paddingM),
+              Expanded(
+                child: _StatCard(
+                  title: 'Schlechteste Probe',
+                  value: '${statistics.worstAttendance?.percentage?.round() ?? 0}%',
+                  color: AppColors.danger,
+                  icon: Icons.trending_down,
+                  subtitle: statistics.worstAttendance?.formattedDate,
+                ),
+              ),
+            ],
           ),
-        ),
+        ],
       ],
     );
   }
@@ -240,12 +285,14 @@ class _StatCard extends StatelessWidget {
   final String value;
   final Color color;
   final IconData icon;
+  final String? subtitle;
 
   const _StatCard({
     required this.title,
     required this.value,
     required this.color,
     required this.icon,
+    this.subtitle,
   });
 
   @override
@@ -276,7 +323,165 @@ class _StatCard extends StatelessWidget {
                     color: AppColors.medium,
                   ),
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.medium,
+                      fontSize: 10,
+                    ),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MembersOverview extends ConsumerWidget {
+  const _MembersOverview();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playersAsync = ref.watch(activePlayersForStatsProvider);
+
+    return playersAsync.when(
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(AppDimensions.paddingM),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (players) {
+        if (players.isEmpty) return const _EmptyChartPlaceholder();
+
+        // Count per group
+        final Map<String, int> groupCounts = {};
+        for (final p in players) {
+          final group = p.groupName ?? 'Ohne Gruppe';
+          groupCounts[group] = (groupCounts[group] ?? 0) + 1;
+        }
+        final sorted = groupCounts.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.paddingM),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.people, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${players.length} aktive Mitglieder',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+                if (sorted.isNotEmpty) ...[
+                  const SizedBox(height: AppDimensions.paddingS),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: sorted.map((e) {
+                      return Chip(
+                        label: Text('${e.key} (${e.value})'),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EventTypeOverview extends ConsumerWidget {
+  const _EventTypeOverview();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final attendancesAsync = ref.watch(filteredAttendancesForStatsProvider);
+    final typesAsync = ref.watch(attendanceTypesProvider);
+
+    final attendances = attendancesAsync.valueOrNull ?? [];
+    final types = typesAsync.valueOrNull ?? [];
+
+    if (attendances.isEmpty) return const _EmptyChartPlaceholder();
+
+    // Group by typeId
+    final Map<String, int> typeCounts = {};
+    for (final a in attendances) {
+      final typeId = a.typeId;
+      if (typeId != null) {
+        typeCounts[typeId] = (typeCounts[typeId] ?? 0) + 1;
+      }
+    }
+
+    if (typeCounts.isEmpty) return const _EmptyChartPlaceholder();
+
+    // Map typeId to name
+    final typeNameMap = {for (final t in types) if (t.id != null) t.id!: t.name};
+    final sorted = typeCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.paddingM),
+        child: Column(
+          children: sorted.map((e) {
+            final name = typeNameMap[e.key] ?? 'Unbekannt';
+            final count = e.value;
+            final fraction = count / attendances.length;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 100,
+                    child: Text(
+                      name,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: fraction,
+                      backgroundColor: AppColors.light,
+                      color: AppColors.primary,
+                      minHeight: 14,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 24,
+                    child: Text(
+                      '$count',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      textAlign: TextAlign.end,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
         ),
       ),
     );

@@ -1,6 +1,22 @@
 {
   "versions": [
     {
+      "version": "0.1.23",
+      "date": "4.3.2026",
+      "changes": [
+        "✨ Statistiken: Beste/Schlechteste Probe mit Datum anzeigen",
+        "✨ Statistiken: Mitglieder-Übersicht mit Gruppen-Chips",
+        "✨ Statistiken: Termine pro Veranstaltungstyp (Balkendiagramm)",
+        "✨ Probenplan: Plan teilen/verbergen Toggle",
+        "✨ Historie: Mehrere Werke gleichzeitig hinzufügen (Multi-Select)",
+        "✨ Instanz erstellen: Willkommens- und Hinweis-Karten",
+        "✨ Instanz erstellen: Zusammenfassungs-Vorschau vor Erstellung",
+        "✨ Login: Demo-Zugang für Testumgebungen",
+        "✨ Registrierung: Prüfung ob bereits in Instanz registriert",
+        "✨ Registrierung: Inline-Anmeldung ohne Seitenwechsel"
+      ]
+    },
+    {
       "version": "0.1.22",
       "date": "4.3.2026",
       "changes": [

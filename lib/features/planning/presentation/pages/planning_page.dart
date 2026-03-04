@@ -109,6 +109,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   ];
   bool _hasChanges = false;
   bool _initialLoadDone = false;
+  bool _sharePlan = false;
 
   @override
   void initState() {
@@ -141,6 +142,14 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
       appBar: AppBar(
         title: const Text('Probenplan'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _sharePlan ? Icons.visibility : Icons.visibility_off_outlined,
+              color: _sharePlan ? AppColors.success : null,
+            ),
+            onPressed: _selectedAttendanceId != null ? _toggleSharePlan : null,
+            tooltip: _sharePlan ? 'Plan wird geteilt' : 'Plan teilen',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => _resetToDefault(attendancesAsync.valueOrNull ?? []),
@@ -586,6 +595,7 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   }
 
   void _loadPlanFromAttendance(Attendance attendance) {
+    setState(() => _sharePlan = attendance.sharePlan);
     if (attendance.plan != null && (attendance.plan as Map).isNotEmpty) {
       _loadExistingPlan(attendance.plan!);
     } else if (attendance.typeId != null) {
@@ -858,6 +868,28 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
       });
       _calculateEnd();
       _savePlan();
+    }
+  }
+
+  Future<void> _toggleSharePlan() async {
+    if (_selectedAttendanceId == null) return;
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant?.id == null) return;
+
+    final newValue = !_sharePlan;
+    setState(() => _sharePlan = newValue);
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      await supabase
+          .from('attendance')
+          .update({'share_plan': newValue})
+          .eq('id', _selectedAttendanceId!)
+          .eq('tenantId', tenant!.id!);
+      _hasChanges = true;
+    } catch (e) {
+      // Rollback on failure
+      if (mounted) setState(() => _sharePlan = !newValue);
     }
   }
 

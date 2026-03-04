@@ -188,143 +188,190 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       return;
     }
 
-    int? selectedSongId;
+    final selectedSongIds = <int>{};
     int? selectedConductorId;
     String? otherConductor;
     DateTime selectedDate = DateTime.now();
+    String songFilter = '';
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Aufführung hinzufügen'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Song selector
-                DropdownButtonFormField<int>(
-                  value: selectedSongId,
-                  decoration: const InputDecoration(labelText: 'Werk *'),
-                  items: songs.map((song) {
-                    return DropdownMenuItem(
-                      value: song.id,
-                      child: Text(
-                        song.displayName,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setDialogState(() => selectedSongId = v),
-                ),
-                const SizedBox(height: 16),
+        builder: (context, setDialogState) {
+          final filteredSongs = songFilter.isEmpty
+              ? songs
+              : songs.where((s) =>
+                  s.displayName.toLowerCase().contains(songFilter.toLowerCase())).toList();
 
-                // Conductor selector
-                DropdownButtonFormField<int>(
-                  value: selectedConductorId,
-                  decoration: const InputDecoration(labelText: 'Dirigent'),
-                  items: [
-                    ...conductors
-                        .where((c) => c.left == null)
-                        .map((c) => DropdownMenuItem(
-                              value: c.id,
-                              child: Text('${c.firstName} ${c.lastName}'),
-                            )),
-                    const DropdownMenuItem(
-                      value: -1,
-                      child: Text('Andere...'),
+          return AlertDialog(
+            title: Text(
+              selectedSongIds.isEmpty
+                  ? 'Aufführung hinzufügen'
+                  : 'Aufführung hinzufügen (${selectedSongIds.length})',
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Song search
+                    TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Werk suchen...',
+                        prefixIcon: Icon(Icons.search),
+                        isDense: true,
+                      ),
+                      onChanged: (v) => setDialogState(() => songFilter = v),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Song multi-select list
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: filteredSongs.length,
+                        itemBuilder: (context, index) {
+                          final song = filteredSongs[index];
+                          final isSelected = selectedSongIds.contains(song.id);
+                          return CheckboxListTile(
+                            value: isSelected,
+                            title: Text(
+                              song.displayName,
+                              style: const TextStyle(fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            dense: true,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            onChanged: (v) {
+                              setDialogState(() {
+                                if (v == true && song.id != null) {
+                                  selectedSongIds.add(song.id!);
+                                } else if (song.id != null) {
+                                  selectedSongIds.remove(song.id!);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Conductor selector
+                    DropdownButtonFormField<int>(
+                      value: selectedConductorId,
+                      decoration: const InputDecoration(labelText: 'Dirigent'),
+                      items: [
+                        ...conductors
+                            .where((c) => c.left == null)
+                            .map((c) => DropdownMenuItem(
+                                  value: c.id,
+                                  child: Text('${c.firstName} ${c.lastName}'),
+                                )),
+                        const DropdownMenuItem(
+                          value: -1,
+                          child: Text('Andere...'),
+                        ),
+                      ],
+                      onChanged: (v) async {
+                        if (v == -1) {
+                          final controller = TextEditingController();
+                          try {
+                            final result = await showDialog<String>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Dirigent eingeben'),
+                                content: TextField(
+                                  controller: controller,
+                                  decoration: const InputDecoration(labelText: 'Name'),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Abbrechen'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(context, controller.text),
+                                    child: const Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (result != null && result.isNotEmpty) {
+                              setDialogState(() {
+                                selectedConductorId = null;
+                                otherConductor = result;
+                              });
+                            }
+                          } finally {
+                            controller.dispose();
+                          }
+                        } else {
+                          setDialogState(() {
+                            selectedConductorId = v;
+                            otherConductor = null;
+                          });
+                        }
+                      },
+                    ),
+                    if (otherConductor != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text('Dirigent: $otherConductor'),
+                      ),
+                    const SizedBox(height: 16),
+
+                    // Date selector
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Datum'),
+                      subtitle: Text(
+                        '${selectedDate.day.toString().padLeft(2, '0')}.${selectedDate.month.toString().padLeft(2, '0')}.${selectedDate.year}',
+                      ),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          setDialogState(() => selectedDate = date);
+                        }
+                      },
                     ),
                   ],
-                  onChanged: (v) async {
-                    if (v == -1) {
-                      final controller = TextEditingController();
-                      final result = await showDialog<String>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Dirigent eingeben'),
-                          content: TextField(
-                            controller: controller,
-                            decoration: const InputDecoration(labelText: 'Name'),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Abbrechen'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, controller.text),
-                              child: const Text('OK'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (result != null && result.isNotEmpty) {
-                        setDialogState(() {
-                          selectedConductorId = null;
-                          otherConductor = result;
-                        });
-                      }
-                    } else {
-                      setDialogState(() {
-                        selectedConductorId = v;
-                        otherConductor = null;
-                      });
-                    }
-                  },
                 ),
-                if (otherConductor != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text('Dirigent: $otherConductor'),
-                  ),
-                const SizedBox(height: 16),
-
-                // Date selector
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Datum'),
-                  subtitle: Text(
-                    '${selectedDate.day.toString().padLeft(2, '0')}.${selectedDate.month.toString().padLeft(2, '0')}.${selectedDate.year}',
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (date != null) {
-                      setDialogState(() => selectedDate = date);
-                    }
-                  },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              ElevatedButton(
+                onPressed: selectedSongIds.isEmpty
+                    ? null
+                    : () => Navigator.pop(context, true),
+                child: Text(
+                  selectedSongIds.isEmpty
+                      ? 'Hinzufügen'
+                      : 'Hinzufügen (${selectedSongIds.length})',
                 ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Abbrechen'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (selectedSongId == null) {
-                  ToastHelper.showWarning(context, 'Bitte ein Werk auswählen');
-                  return;
-                }
-                Navigator.pop(context, true);
-              },
-              child: const Text('Hinzufügen'),
-            ),
-          ],
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
 
-    if (result == true && selectedSongId != null) {
-      await _addEntry(
-        songId: selectedSongId!,
+    if (result == true && selectedSongIds.isNotEmpty) {
+      await _addEntries(
+        songIds: selectedSongIds,
         conductorId: selectedConductorId,
         otherConductor: otherConductor,
         date: selectedDate,
@@ -332,8 +379,8 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     }
   }
 
-  Future<void> _addEntry({
-    required int songId,
+  Future<void> _addEntries({
+    required Set<int> songIds,
     int? conductorId,
     String? otherConductor,
     required DateTime date,
@@ -349,17 +396,24 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
         return;
       }
 
-      await supabase.from('history').insert({
-        'tenantId': tenant!.id!,
-        'song_id': songId,
-        'person_id': conductorId,
-        'otherConductor': otherConductor,
-        'date': date.toIso8601String().substring(0, 10),
-      });
+      final dateStr = date.toIso8601String().substring(0, 10);
+      await supabase.from('history').insert(
+        songIds.map((songId) => {
+          'tenantId': tenant!.id!,
+          'song_id': songId,
+          'person_id': conductorId,
+          'otherConductor': otherConductor,
+          'date': dateStr,
+        }).toList(),
+      );
 
       ref.invalidate(performanceHistoryProvider);
       if (mounted) {
-        ToastHelper.showSuccess(context, 'Aufführung hinzugefügt');
+        final count = songIds.length;
+        ToastHelper.showSuccess(
+          context,
+          count == 1 ? 'Aufführung hinzugefügt' : '$count Aufführungen hinzugefügt',
+        );
       }
     } catch (e) {
       if (mounted) {

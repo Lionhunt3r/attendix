@@ -26,7 +26,20 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _shortNameController.addListener(_onFieldChanged);
+    _longNameController.addListener(_onFieldChanged);
+    _mainGroupNameController.addListener(_onFieldChanged);
+  }
+
+  void _onFieldChanged() => setState(() {});
+
+  @override
   void dispose() {
+    _shortNameController.removeListener(_onFieldChanged);
+    _longNameController.removeListener(_onFieldChanged);
+    _mainGroupNameController.removeListener(_onFieldChanged);
     _shortNameController.dispose();
     _longNameController.dispose();
     _mainGroupNameController.dispose();
@@ -48,6 +61,73 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
         child: ListView(
           padding: const EdgeInsets.all(AppDimensions.paddingM),
           children: [
+            // Welcome card
+            Card(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.rocket_launch_outlined, color: AppColors.primary),
+                    const SizedBox(width: AppDimensions.paddingM),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Willkommen!',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Eine Instanz ist dein eigener Bereich für dein Orchester, deinen Chor oder deine Gruppe. Hier verwaltest du Mitglieder, Termine und Anwesenheiten.',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Hint card
+            Card(
+              color: AppColors.warning.withValues(alpha: 0.1),
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.lightbulb_outline, color: AppColors.warning),
+                    const SizedBox(width: AppDimensions.paddingM),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Du möchtest einer bestehenden Instanz beitreten?',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Bitte deinen Verantwortlichen, dich per E-Mail einzuladen. Eine neue Instanz ist nur nötig, wenn du selbst Administrator sein möchtest.',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+
             // Info card
             Card(
               color: AppColors.info.withValues(alpha: 0.1),
@@ -147,11 +227,60 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
 
             const SizedBox(height: AppDimensions.paddingXL),
 
+            // Summary section
+            if (_isSummaryComplete) ...[
+              Row(
+                children: [
+                  const Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Zusammenfassung',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppDimensions.paddingS),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.paddingM),
+                  child: Column(
+                    children: [
+                      _summaryRow('Name', _longNameController.text.trim().isNotEmpty
+                          ? _longNameController.text.trim()
+                          : _shortNameController.text.trim()),
+                      _summaryRow('Kurzname', _shortNameController.text.trim()),
+                      _summaryRow('Typ', _typeLabel),
+                      if (_mainGroupNameController.text.trim().isNotEmpty)
+                        _summaryRow('Erste $_groupLabel', _mainGroupNameController.text.trim()),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
+            ] else ...[
+              Card(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                child: const Padding(
+                  padding: EdgeInsets.all(AppDimensions.paddingM),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
+                      SizedBox(width: 8),
+                      Text('Bitte fülle alle Pflichtfelder aus'),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
+            ],
+
             // Submit button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _createTenant,
+                onPressed: (_isLoading || !_isSummaryComplete) ? null : _createTenant,
                 child: _isLoading
                     ? const SizedBox(
                         width: 20,
@@ -178,6 +307,37 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
     'choir' => 'z.B. Sopran',
     _ => 'z.B. Gruppe 1',
   };
+
+  String get _typeLabel => switch (_selectedType) {
+    'orchestra' => 'Orchester',
+    'choir' => 'Chor',
+    _ => 'Allgemein',
+  };
+
+  bool get _isSummaryComplete => _shortNameController.text.trim().length >= 2;
+
+  Widget _summaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(color: AppColors.medium, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildTypeOption({
     required String value,

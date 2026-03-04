@@ -33,6 +33,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  void _startDemo() {
+    _emailController.text = AppConstants.demoMail;
+    _passwordController.text = AppConstants.demoPassword;
+    _login();  // Fire-and-forget OK — _login has its own try-catch + mounted checks
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -326,12 +332,37 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ],
                     ),
                     const SizedBox(height: AppDimensions.paddingL),
-                    Text(
-                      'v${AppConstants.appVersion}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.medium,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'v${AppConstants.appVersion}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.medium,
+                          ),
+                        ),
+                        if (AppConstants.demoMail.isNotEmpty && AppConstants.demoPassword.isNotEmpty) ...[
+                          Text(
+                            ' | ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.medium,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: _startDemo,
+                            child: Text(
+                              'Demo starten',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

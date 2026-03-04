@@ -38,6 +38,7 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   Uint8List? _profileImageBytes;
+  bool _hasCheckedRegistration = false;
 
   bool get _isLoggedIn => ref.read(supabaseClientProvider).auth.currentUser != null;
 
@@ -108,6 +109,14 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
   }
 
   Widget _buildForm(Tenant tenant) {
+    // Check if logged-in user is already registered in this tenant
+    if (!_hasCheckedRegistration && _isLoggedIn) {
+      _hasCheckedRegistration = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _checkExistingRegistration(tenant);
+      });
+    }
+
     final groupsAsync = ref.watch(registrationGroupsProvider(tenant.id!));
     final registrationFields = tenant.registrationFields ?? [];
     final additionalFields = tenant.additionalFields ?? [];
@@ -359,11 +368,11 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
 
           const SizedBox(height: AppDimensions.paddingM),
 
-          // Login link
+          // Login link — inline dialog instead of navigating away
           Center(
             child: TextButton(
-              onPressed: () => context.go('/login'),
-              child: const Text('Bereits registriert? Anmelden'),
+              onPressed: () => _showLoginDialog(tenant),
+              child: const Text('Account bereits vorhanden? Hier anmelden'),
             ),
           ),
 
@@ -738,6 +747,108 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
         );
       },
     );
+  }
+
+  Future<void> _checkExistingRegistration(Tenant tenant) async {
+    if (!_isLoggedIn || tenant.id == null) return;
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final existing = await supabase
+          .from('tenantUsers')
+          .select('id')
+          .eq('tenantId', tenant.id!)
+          .eq('userId', userId)
+          .maybeSingle();
+
+      if (existing != null && mounted) {
+        ToastHelper.showWarning(context, 'Du bist bereits in dieser Gruppe registriert.');
+        context.go('/tenants');
+      }
+    } catch (e) {
+      debugPrint('Check existing registration failed: $e');
+    }
+  }
+
+  Future<void> _showLoginDialog(Tenant tenant) async {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    var loginError = '';
+
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Anmelden'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Melde dich mit deinem bestehenden Account an.'),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'E-Mail',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Passwort',
+                      prefixIcon: Icon(Icons.lock_outlined),
+                    ),
+                    obscureText: true,
+                  ),
+                  if (loginError.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(loginError, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Abbrechen'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final supabase = ref.read(supabaseClientProvider);
+                      await supabase.auth.signInWithPassword(
+                        email: emailController.text.trim(),
+                        password: passwordController.text,
+                      );
+                      if (context.mounted) Navigator.pop(context, true);
+                    } catch (e) {
+                      setDialogState(() {
+                        loginError = 'Anmeldung fehlgeschlagen. Bitte prüfe deine Daten.';
+                      });
+                    }
+                  },
+                  child: const Text('Anmelden'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      if (result == true && mounted) {
+        // Rebuild page to show logged-in state
+        setState(() => _hasCheckedRegistration = false);
+      }
+    } finally {
+      emailController.dispose();
+      passwordController.dispose();
+    }
   }
 
   Future<void> _submit(Tenant tenant) async {
