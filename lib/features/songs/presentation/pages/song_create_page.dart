@@ -249,6 +249,24 @@ class _SongCreatePageState extends ConsumerState<SongCreatePage> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // B4-005: Check for duplicate song number
+    final number = int.tryParse(_numberController.text.trim());
+    final prefix = _prefixController.text.trim().isNotEmpty
+        ? _prefixController.text.trim()
+        : null;
+    if (number != null) {
+      final existingSongs = ref.read(songsProvider).valueOrNull ?? [];
+      final duplicate = existingSongs.any((s) =>
+          s.number == number && s.prefix == prefix);
+      if (duplicate) {
+        ToastHelper.showWarning(
+          context,
+          'Lied mit Nummer ${prefix != null ? "$prefix " : ""}$number existiert bereits.',
+        );
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {

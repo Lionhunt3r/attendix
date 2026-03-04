@@ -369,6 +369,20 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
   @override
   Widget build(BuildContext context) {
     final tenant = ref.watch(currentTenantProvider);
+    // B3-028: Reset filters when tenant changes
+    ref.listen(currentTenantProvider, (previous, next) {
+      if (previous?.id != next?.id) {
+        setState(() {
+          _filterOption = 'all';
+          _sortOption = 'group';
+          _searchQuery = '';
+          _searchController.clear();
+          _isSelectionMode = false;
+          _selectedPlayerIds.clear();
+        });
+        _loadViewOptions();
+      }
+    });
     // Use realtime provider for live updates
     final peopleAsync = ref.watch(realtimePlayersProvider);
     final percentages = ref.watch(playerAttendancePercentagesProvider).valueOrNull ?? {};
@@ -1131,6 +1145,7 @@ class _PersonListItem extends StatelessWidget {
   bool get _showLeaderBadge => viewOptions.contains('leader') && person.isLeader;
   bool get _showPausedBadge => viewOptions.contains('paused') && person.paused;
   bool get _showCriticalBadge => viewOptions.contains('critical') && person.critical;
+  bool get _showNotesBadge => person.notes != null && person.notes!.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -1407,6 +1422,15 @@ class _PersonListItem extends StatelessWidget {
                       Icons.warning_amber,
                       size: 18,
                       color: AppColors.danger,
+                    ),
+                  ),
+                if (_showNotesBadge)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4),
+                    child: Icon(
+                      Icons.sticky_note_2_outlined,
+                      size: 16,
+                      color: AppColors.medium,
                     ),
                   ),
               ],

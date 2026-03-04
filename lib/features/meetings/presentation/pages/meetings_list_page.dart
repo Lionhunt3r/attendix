@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
@@ -10,6 +11,7 @@ import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/meeting/meeting.dart';
+import '../../../../shared/widgets/loading/loading.dart';
 
 /// Meetings list page
 class MeetingsListPage extends ConsumerWidget {
@@ -30,7 +32,7 @@ class MeetingsListPage extends ConsumerWidget {
         ),
       ),
       body: meetingsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const ListSkeleton(itemCount: 5, showSubtitle: true),
         error: (e, _) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -184,7 +186,7 @@ class _MeetingListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final date = DateTime.tryParse(meeting.date);
 
-    return Card(
+    final card = Card(
       margin: const EdgeInsets.only(bottom: AppDimensions.paddingS),
       child: ListTile(
         onTap: onTap,
@@ -222,13 +224,29 @@ class _MeetingListItem extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
         subtitle: _buildSubtitle(),
-        trailing: onDelete != null
-            ? IconButton(
-                icon: const Icon(Icons.delete_outline, color: AppColors.danger),
-                onPressed: onDelete,
-              )
-            : null,
+        trailing: const Icon(Icons.chevron_right, color: AppColors.medium),
       ),
+    );
+
+    if (onDelete == null) return card;
+
+    return Slidable(
+      key: ValueKey(meeting.id),
+      endActionPane: ActionPane(
+        motion: const BehindMotion(),
+        extentRatio: 0.25,
+        children: [
+          SlidableAction(
+            onPressed: (_) => onDelete!(),
+            backgroundColor: AppColors.danger,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Löschen',
+            borderRadius: BorderRadius.circular(AppDimensions.borderRadiusL),
+          ),
+        ],
+      ),
+      child: card,
     );
   }
 

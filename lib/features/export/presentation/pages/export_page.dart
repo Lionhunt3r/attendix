@@ -27,6 +27,7 @@ const _allFields = [
   'Gruppe',
   'Email',
   'Telefon',
+  'Testergebnis',
 ];
 
 /// Export Page
@@ -173,6 +174,30 @@ class _ExportPageState extends ConsumerState<ExportPage> {
               ),
             ),
             const SizedBox(height: AppDimensions.paddingXL),
+
+            // PDF limit hint for attendance export
+            if (_contentType == 'attendance' && _exportType == 'pdf')
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppDimensions.paddingM),
+                child: Card(
+                  color: AppColors.info.withValues(alpha: 0.1),
+                  child: const Padding(
+                    padding: EdgeInsets.all(AppDimensions.paddingS),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: AppColors.info),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'PDF-Export ist auf die letzten 8 Termine begrenzt. Für alle Termine nutze den Excel-Export.',
+                            style: TextStyle(fontSize: 12, color: AppColors.info),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
             // Export button
             SizedBox(

@@ -326,7 +326,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       children: [
                         const Text('Noch kein Konto?'),
                         TextButton(
-                          onPressed: () => context.push('/register'),
+                          onPressed: () {
+                            final email = _emailController.text.trim();
+                            final path = email.isNotEmpty
+                                ? '/register?email=${Uri.encodeComponent(email)}'
+                                : '/register';
+                            context.push(path);
+                          },
                           child: const Text('Registrieren'),
                         ),
                       ],

@@ -9,7 +9,9 @@ import '../../../../core/theme/app_colors.dart';
 
 /// Register page
 class RegisterPage extends ConsumerStatefulWidget {
-  const RegisterPage({super.key});
+  const RegisterPage({super.key, this.email});
+
+  final String? email;
 
   @override
   ConsumerState<RegisterPage> createState() => _RegisterPageState();
@@ -25,6 +27,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
   bool _registrationSuccess = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.email != null && widget.email!.isNotEmpty) {
+      _emailController.text = widget.email!;
+    }
+  }
 
   @override
   void dispose() {

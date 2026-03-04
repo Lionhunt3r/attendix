@@ -274,12 +274,7 @@ class _SelfServiceOverviewPageState
       return;
     }
 
-    final reasons = [
-      'Krankheitsbedingt',
-      'Beruflich verhindert',
-      'Familienfeier',
-      'Urlaub',
-    ];
+    final reasons = kSignOutReasons;
 
     String? selectedReason = await showModalBottomSheet<String>(
       context: context,

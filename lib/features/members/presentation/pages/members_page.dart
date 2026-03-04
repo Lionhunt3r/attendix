@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
+import '../../../../shared/widgets/loading/loading.dart';
 import '../../data/providers/members_providers.dart';
 
 /// Members page - read-only list of all members for players/helpers
@@ -57,7 +58,7 @@ class MembersPage extends ConsumerWidget {
                 await ref.read(membersGroupedProvider.future);
               },
               child: groupsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const GroupedListSkeleton(),
                 error: (error, stack) => Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

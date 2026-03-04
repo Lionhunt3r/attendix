@@ -8,7 +8,7 @@ class AppConstants {
   AppConstants._();
 
   static const String appName = 'Attendix';
-  static const String appVersion = '0.1.23';
+  static const String appVersion = '0.1.24';
 
   /// Demo credentials from environment (for development only)
   /// SEC-009: Only expose in debug mode
@@ -33,6 +33,15 @@ class AppConstants {
 
 /// Default avatar image URL
 const String kDefaultAvatarUrl = 'https://ionicframework.com/docs/img/demos/avatar.svg';
+
+/// Standard sign-out/late reasons used across self-service and parents portal
+const List<String> kSignOutReasons = [
+  'Krankheitsbedingt',
+  'Urlaubsbedingt',
+  'Arbeitsbedingt',
+  'Familienbedingt',
+  'Sonstiger Grund',
+];
 
 /// Checklist deadline options (in hours before event)
 const List<ChecklistDeadlineOption> kChecklistDeadlineOptions = [
