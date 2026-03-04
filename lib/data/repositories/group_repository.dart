@@ -89,19 +89,20 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
   /// Create a new group/instrument
   Future<Group> createGroup(Map<String, dynamic> data) async {
     try {
-      // Set defaults and required fields
-      data['tenantId'] = currentTenantId;
-      data.putIfAbsent('tuning', () => 'C');
-      data.putIfAbsent('clefs', () => ['g']);
+      // Create a sanitized copy — don't mutate caller's map
+      final sanitized = Map<String, dynamic>.from(data);
+      sanitized['tenantId'] = currentTenantId;
+      sanitized.putIfAbsent('tuning', () => 'C');
+      sanitized.putIfAbsent('clefs', () => ['g']);
       // Remove read-only fields that shouldn't be inserted
-      data.remove('id');
-      data.remove('created_at');
-      data.remove('categoryData');
+      sanitized.remove('id');
+      sanitized.remove('created_at');
+      sanitized.remove('categoryData');
 
       // RT-008: Use maybeSingle() to avoid StateError on empty result
       final response = await supabase
           .from('instruments')
-          .insert(data)
+          .insert(sanitized)
           .select()
           .maybeSingle();
 
