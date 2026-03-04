@@ -7,7 +7,7 @@ import '../config/supabase_config.dart';
 import '../../data/models/attendance/attendance.dart';
 import '../../data/models/person/person.dart';
 import '../../data/models/song/song.dart';
-import '../../data/repositories/attendance_repository.dart';
+import 'attendance_providers.dart';
 import 'player_providers.dart';
 import 'song_providers.dart';
 import 'tenant_providers.dart';
@@ -94,15 +94,12 @@ final realtimePlayersProvider = StreamProvider.autoDispose<List<Person>>((ref) a
 final realtimeAttendancesProvider = StreamProvider.autoDispose<List<Attendance>>((ref) async* {
   final supabase = ref.watch(supabaseClientProvider);
   final tenantId = ref.watch(currentTenantIdProvider);
-  final attendanceRepo = ref.watch(attendanceRepositoryProvider);
+  final attendanceRepo = ref.watch(attendanceRepositoryWithTenantProvider);
 
   if (tenantId == null) {
     yield [];
     return;
   }
-
-  // Set tenant ID for repository
-  attendanceRepo.setTenantId(tenantId);
 
   // Initial data
   final initialData = await attendanceRepo.getAttendances();
@@ -212,15 +209,13 @@ final realtimeSongsProvider = StreamProvider.autoDispose<List<Song>>((ref) async
 final realtimeAttendanceDetailProvider = StreamProvider.autoDispose
     .family<Attendance?, int>((ref, attendanceId) async* {
   final supabase = ref.watch(supabaseClientProvider);
-  final attendanceRepo = ref.watch(attendanceRepositoryProvider);
+  final attendanceRepo = ref.watch(attendanceRepositoryWithTenantProvider);
   final tenantId = ref.watch(currentTenantIdProvider);
 
   if (tenantId == null) {
     yield null;
     return;
   }
-
-  attendanceRepo.setTenantId(tenantId);
 
   // Initial data
   final initialData = await attendanceRepo.getAttendanceById(attendanceId);

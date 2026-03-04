@@ -392,9 +392,9 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
                 return RefreshIndicator(
                   // FN-013: await provider.future to show spinner until data loads
                   onRefresh: () async {
-                    // FN-013: Invalidate realtime provider for manual refresh
                     ref.invalidate(realtimeSongsProvider);
                     ref.invalidate(currentSongsProvider);
+                    await ref.read(realtimeSongsProvider.future);
                   },
                   child: ListView(
                     padding: const EdgeInsets.all(AppDimensions.paddingM),

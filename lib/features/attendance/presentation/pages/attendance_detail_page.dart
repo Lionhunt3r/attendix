@@ -14,7 +14,6 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_detail_providers.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/conductor_providers.dart';
-import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/services/export_service.dart';
@@ -294,12 +293,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     final personsAsync = ref.watch(filteredPersonsForAttendanceProvider(widget.attendanceId));
     ref.watch(filteredPersonAttendancesForAttendanceProvider(widget.attendanceId));
     final attendanceTypeAsync = ref.watch(attendanceTypeForAttendanceProvider(widget.attendanceId));
-
-    // Watch realtime provider to auto-refresh on person_attendances changes
-    ref.listen(realtimeAttendanceDetailProvider(widget.attendanceId), (_, __) {
-      ref.invalidate(attendanceDetailProvider(widget.attendanceId));
-      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
-    });
 
     final typeStatuses = attendanceTypeAsync.valueOrNull?.availableStatuses;
     final availableStatuses = (typeStatuses?.isNotEmpty == true) ? typeStatuses! : AttendanceStatus.values;
