@@ -76,6 +76,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
 
   // Extra fields
   List<ExtraField> _extraFields = [];
+  Set<String> _originalExtraFieldIds = {};
 
   // Critical rules
   List<CriticalRule> _criticalRules = [];
@@ -134,6 +135,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
         }
       }
       _extraFields = List.from(tenant.additionalFields ?? []);
+      _originalExtraFieldIds = _extraFields.map((f) => f.id).toSet();
       _criticalRules = List.from(tenant.criticalRules ?? []);
 
     } catch (e) {
@@ -207,6 +209,14 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       // Refresh tenant data
       ref.invalidate(currentTenantProvider);
       ref.invalidate(userTenantsProvider);
+
+      // B7-017: Sanitize player additional_fields for removed fields
+      final currentFieldIds = _extraFields.map((f) => f.id).toSet();
+      final removedFieldIds = _originalExtraFieldIds.difference(currentFieldIds);
+      if (removedFieldIds.isNotEmpty) {
+        await _sanitizePlayerFields(removedFieldIds, tenantId);
+        _originalExtraFieldIds = currentFieldIds;
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1393,6 +1403,44 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       if (mounted) {
         ToastHelper.showSuccess(context, 'Feld gelöscht');
       }
+    }
+  }
+
+  /// B7-017: Remove stale field keys from all player additional_fields
+  Future<void> _sanitizePlayerFields(Set<String> removedFieldIds, int tenantId) async {
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      // Fetch all players with non-null additional_fields
+      final response = await supabase
+          .from('player')
+          .select('id, additional_fields')
+          .eq('tenantId', tenantId)
+          .not('additional_fields', 'is', null);
+
+      final players = response as List;
+      for (final player in players) {
+        final fields = player['additional_fields'] as Map<String, dynamic>?;
+        if (fields == null) continue;
+
+        final cleaned = Map<String, dynamic>.from(fields);
+        var changed = false;
+        for (final removedId in removedFieldIds) {
+          if (cleaned.containsKey(removedId)) {
+            cleaned.remove(removedId);
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          await supabase
+              .from('player')
+              .update({'additional_fields': cleaned.isEmpty ? null : cleaned})
+              .eq('id', player['id'])
+              .eq('tenantId', tenantId);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error sanitizing player fields: $e');
     }
   }
 

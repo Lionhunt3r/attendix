@@ -1,6 +1,16 @@
 {
   "versions": [
     {
+      "version": "0.1.27",
+      "date": "4.3.2026",
+      "changes": [
+        "✨ Selbstservice: Noten herunterladen (statt nur Anzeigen)",
+        "✨ Anwesenheit: Netzwerk-Status-Banner bei Offline",
+        "✨ Einstellungen: Zusatzfeld-Werte bei Personen aufräumen nach Löschung",
+        "✨ Smart Print: Alle PDFs auswählbar (statt nur erste)"
+      ]
+    },
+    {
       "version": "0.1.26",
       "date": "4.3.2026",
       "changes": [

@@ -998,14 +998,53 @@ class _FilesSectionState extends ConsumerState<_FilesSection> {
     final pdfFiles = widget.files.where((f) => f.fileType.toLowerCase() == 'pdf').toList();
     if (pdfFiles.isEmpty) return;
 
-    // Show smart print dialog for first PDF (user can select instruments)
-    await showSmartPrintDialog(
-      context,
-      ref: ref,
-      url: pdfFiles.first.url,
-      fileName: pdfFiles.first.fileName,
-      instrumentId: pdfFiles.first.instrumentId,
-    );
+    if (pdfFiles.length == 1) {
+      // Single PDF — print directly
+      await showSmartPrintDialog(
+        context,
+        ref: ref,
+        url: pdfFiles.first.url,
+        fileName: pdfFiles.first.fileName,
+        instrumentId: pdfFiles.first.instrumentId,
+      );
+    } else {
+      // Multiple PDFs — let user select which to print
+      final groups = ref.read(groupsProvider).valueOrNull ?? [];
+      if (!context.mounted) return;
+      final selected = await showModalBottomSheet<SongFile>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                title: Text('PDF zum Drucken auswählen', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              const Divider(),
+              ...pdfFiles.map((file) {
+                final groupName = groups.where((g) => g.id == file.instrumentId).firstOrNull?.name;
+                return ListTile(
+                  leading: const Icon(Icons.picture_as_pdf),
+                  title: Text(file.fileName),
+                  subtitle: groupName != null ? Text(groupName) : null,
+                  onTap: () => Navigator.pop(ctx, file),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      );
+      if (selected != null && context.mounted) {
+        await showSmartPrintDialog(
+          context,
+          ref: ref,
+          url: selected.url,
+          fileName: selected.fileName,
+          instrumentId: selected.instrumentId,
+        );
+      }
+    }
   }
 
   Future<void> _downloadAllFiles(BuildContext context) async {
