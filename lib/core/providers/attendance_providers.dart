@@ -160,8 +160,8 @@ final playerAttendancePercentagesProvider =
     if (personId == null) continue;
     totals[personId] = (totals[personId] ?? 0) + 1;
     final status = a['status'] as int?;
-    // Status 1 = present, 3 = late, 5 = late (both count as attended)
-    if (status == 1 || status == 3 || status == 5) {
+    // BL-003: Use centralized definition for which statuses count as attended
+    if (AttendanceStatus.fromValue(status ?? 0).countsAsPresent) {
       attended[personId] = (attended[personId] ?? 0) + 1;
     }
   }
@@ -214,6 +214,7 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       await _repo.deleteAttendance(id);
       state = const AsyncValue.data(null);
       ref.invalidate(attendancesProvider);
+      ref.invalidate(playerAttendancePercentagesProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
