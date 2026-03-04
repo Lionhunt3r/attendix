@@ -152,6 +152,17 @@ class AttendancePersonTile extends StatelessWidget {
                             color: AppColors.medium,
                           ),
                         ),
+                      if (hasNotes)
+                        Text(
+                          notes!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.medium,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
                 ),
