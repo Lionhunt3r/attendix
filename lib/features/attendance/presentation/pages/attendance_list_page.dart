@@ -665,12 +665,16 @@ class _CalendarViewSheetState extends ConsumerState<_CalendarViewSheet> {
                   onPageChanged: (focusedDay) {
                     _focusedDay = focusedDay;
                   },
-                  calendarStyle: CalendarStyle(
+                  calendarStyle: const CalendarStyle(
                     todayDecoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.5),
+                      color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
-                    selectedDecoration: const BoxDecoration(
+                    todayTextStyle: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    selectedDecoration: BoxDecoration(
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
@@ -698,23 +702,17 @@ class _CalendarViewSheetState extends ConsumerState<_CalendarViewSheet> {
                       );
                     },
                     todayBuilder: (context, day, focusedDay) {
-                      final color = _getTypeColorForDay(day, types);
                       return Container(
                         margin: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: color?.withValues(alpha: 0.18) ??
-                              AppColors.primary.withValues(alpha: 0.12),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
                           shape: BoxShape.circle,
-                          border: Border.all(
-                            color: color ?? AppColors.primary,
-                            width: 1.5,
-                          ),
                         ),
                         alignment: Alignment.center,
                         child: Text(
                           '${day.day}',
-                          style: TextStyle(
-                            color: color ?? AppColors.primary,
+                          style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
