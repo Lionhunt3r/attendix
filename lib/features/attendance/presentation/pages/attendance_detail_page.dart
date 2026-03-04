@@ -45,7 +45,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   final Map<int, String?> _personNotes = {}; // Map personId -> notes
   final Map<int, String?> _changedBy = {}; // Map personId -> changedBy userId
   final Map<int, String?> _changedAt = {}; // Map personId -> changedAt timestamp
-  bool _hasChanges = false;
+  final Set<int> _savingPersonIds = {}; // Track in-flight saves to prevent realtime overwrites
   bool _isDisposed = false; // Track disposal state for realtime callbacks
 
   // Realtime channel - typed for proper cleanup
@@ -160,7 +160,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
         final value = next.value;
         if (value != null) {
           final isFirstLoad = _localStatuses.isEmpty;
-          if (isFirstLoad || !_hasChanges) {
+          if (isFirstLoad) {
             setState(() {
               for (final pa in value) {
                 if (pa.personId != null) {
@@ -244,12 +244,13 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   void _onPersonAttendanceChange(dynamic payload) {
     if (_isDisposed) return;
-    if (_hasChanges) return;
 
     final newRecord = payload.newRecord as Map<String, dynamic>?;
     if (newRecord == null || newRecord.isEmpty) return;
 
     final personId = newRecord['person_id'] as int?;
+    if (personId != null && _savingPersonIds.contains(personId)) return;
+
     final statusValue = newRecord['status'];
     final notes = newRecord['notes'] as String?;
     final changedBy = newRecord['changed_by'] as String?;
@@ -347,12 +348,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                 tooltip: 'Legende',
                 onPressed: () => showAttendanceLegendSheet(context),
               ),
-              if (_hasChanges)
-                TextButton.icon(
-                  onPressed: _saveChanges,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Speichern'),
-                ),
               PopupMenuButton<String>(
                 onSelected: _handleMenuAction,
                 itemBuilder: (context) => [
@@ -497,10 +492,11 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                       personNotes: _personNotes,
                       availableStatuses: availableStatuses,
                       onStatusChanged: (personId, status) {
+                        final previousStatus = _localStatuses[personId];
                         setState(() {
                           _localStatuses[personId] = status;
-                          _hasChanges = true;
                         });
+                        _savePersonStatus(personId, status, previousStatus: previousStatus);
                       },
                       onNoteChanged: _updatePersonNote,
                       onShowModifierInfo: _showModifierInfo,
@@ -1586,42 +1582,36 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     }
   }
 
-  Future<void> _saveChanges() async {
-    final changedEntries = <MapEntry<int, AttendanceStatus>>[];
+  /// Save a single person's attendance status immediately
+  Future<void> _savePersonStatus(
+    int personId,
+    AttendanceStatus status, {
+    AttendanceStatus? previousStatus,
+  }) async {
+    final personAttendanceId = _personAttendanceIds[personId];
+    if (personAttendanceId == null) return;
 
-    for (final entry in _localStatuses.entries) {
-      final personAttendanceId = _personAttendanceIds[entry.key];
-      if (personAttendanceId != null) {
-        changedEntries.add(entry);
+    _savingPersonIds.add(personId);
+    try {
+      final notifier = ref.read(attendanceNotifierProvider.notifier);
+      await notifier.updatePersonAttendance(
+        personAttendanceId,
+        widget.attendanceId,
+        personId,
+        {'status': status.value},
+      );
+      await notifier.recalculatePercentage(widget.attendanceId);
+    } catch (e) {
+      if (mounted) {
+        if (previousStatus != null) {
+          setState(() {
+            _localStatuses[personId] = previousStatus;
+          });
+        }
+        ToastHelper.showError(context, 'Fehler beim Speichern: $e');
       }
-    }
-
-    if (changedEntries.isEmpty) {
-      ToastHelper.showInfo(context, 'Keine Änderungen vorhanden');
-      return;
-    }
-
-    final notifier = ref.read(attendanceNotifierProvider.notifier);
-
-    for (final entry in changedEntries) {
-      final personAttendanceId = _personAttendanceIds[entry.key];
-      if (personAttendanceId != null) {
-        await notifier.updatePersonAttendance(
-          personAttendanceId,
-          widget.attendanceId,
-          entry.key,
-          {'status': entry.value.value},
-        );
-      }
-    }
-
-    await notifier.recalculatePercentage(widget.attendanceId);
-
-    if (mounted) {
-      ToastHelper.showSuccess(context, 'Änderungen gespeichert');
-      setState(() => _hasChanges = false);
-      ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
-      ref.invalidate(attendanceDetailProvider(widget.attendanceId));
+    } finally {
+      _savingPersonIds.remove(personId);
     }
   }
 }
