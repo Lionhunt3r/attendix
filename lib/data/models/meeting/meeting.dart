@@ -40,11 +40,13 @@ extension MeetingExtension on Meeting {
   }
 
   /// Extract plain text from notes for list preview.
-  /// Handles Quill Delta JSON, HTML (legacy Ionic), and plain text.
+  /// Handles HTML (Ionic + Flutter), Quill Delta JSON (legacy Flutter), and plain text.
   String? get plainTextPreview {
     if (notes == null || notes!.isEmpty) return null;
+    final trimmed = notes!.trim();
+    // Quill Delta JSON (legacy Flutter saves)
     try {
-      final decoded = jsonDecode(notes!.trim());
+      final decoded = jsonDecode(trimmed);
       List? ops;
       if (decoded is List) {
         ops = decoded;
@@ -59,12 +61,12 @@ extension MeetingExtension on Meeting {
         return text.isEmpty ? null : text;
       }
     } catch (_) {}
-    // HTML fallback (legacy Ionic data)
-    final trimmed = notes!.trim();
+    // HTML (Ionic app + new Flutter saves)
     if (trimmed.startsWith('<')) {
       final text = QuillUtils.stripHtml(trimmed);
       return text.isEmpty ? null : text;
     }
+    // Plain text fallback
     return trimmed;
   }
 }
