@@ -13,6 +13,7 @@ import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
+import '../../../../data/services/auth_service.dart';
 import '../widgets/handover_sheet.dart';
 import '../widgets/person_detail/person_detail.dart';
 
@@ -1132,6 +1133,20 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
                 _showTransferSheet(copy: true);
               },
             ),
+            if (ref.read(currentRoleProvider).isConductor) ...[
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: AppColors.danger),
+                title: const Text(
+                  'Endgültig entfernen',
+                  style: TextStyle(color: AppColors.danger),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteDialog();
+                },
+              ),
+            ],
             const Divider(),
             ListTile(
               leading: const Icon(Icons.close),
@@ -1154,6 +1169,75 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     if (result == true && mounted) {
       ref.invalidate(personProvider(widget.personId));
       ref.invalidate(realtimePlayersProvider);
+    }
+  }
+
+  Future<void> _showDeleteDialog() async {
+    final personName = widget.person.fullName;
+    final controller = TextEditingController();
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            final matches = controller.text.trim() == personName;
+            return AlertDialog(
+              title: const Text('Person endgültig entfernen?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Diese Aktion kann nicht rückgängig gemacht werden. '
+                    'Alle Daten von $personName werden unwiderruflich gelöscht.',
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Zur Bestätigung "$personName" eingeben:',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: InputDecoration(
+                      hintText: personName,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Abbrechen'),
+                ),
+                FilledButton(
+                  onPressed: matches ? () => Navigator.pop(context, true) : null,
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+                  child: const Text('Endgültig entfernen'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+
+      final notifier = ref.read(playerNotifierProvider.notifier);
+      await notifier.deletePlayer(widget.personId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Person wurde endgültig entfernt'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        context.pop();
+      }
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -1276,6 +1360,86 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     }
   }
 
+  Future<void> _createAccount(Person person) async {
+    final currentRole = ref.read(currentRoleProvider);
+    if (!currentRole.isConductor) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine Berechtigung zum Erstellen von Accounts'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (person.email == null || person.email!.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Keine E-Mail-Adresse vorhanden'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Account erstellen?'),
+        content: Text(
+          'Für ${person.fullName} wird ein Account mit der E-Mail '
+          '${person.email} erstellt. Die Person erhält eine E-Mail '
+          'zum Setzen des Passworts.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Account erstellen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant?.id == null) return;
+
+    try {
+      final authService = ref.read(authServiceProvider);
+      await authService.createAccountForPerson(
+        person: person,
+        role: Role.player,
+        tenantId: tenant!.id!,
+      );
+
+      ref.invalidate(personProvider(widget.personId));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account erstellt. Passwort-E-Mail wurde gesendet.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final person = _draft;
@@ -1370,6 +1534,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               isLoadingRole: _isLoadingRole,
               onRoleChanged: _updateUserRole,
               onUnlinkAccount: _unlinkAccount,
+              onCreateAccount: () => _createAccount(person),
               canEdit: canEdit,
             ),
 

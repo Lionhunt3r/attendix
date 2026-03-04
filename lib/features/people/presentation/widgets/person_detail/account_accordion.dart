@@ -20,6 +20,7 @@ class AccountAccordion extends ConsumerWidget {
     required this.isLoadingRole,
     required this.onRoleChanged,
     required this.onUnlinkAccount,
+    required this.onCreateAccount,
     required this.canEdit,
   });
 
@@ -30,6 +31,7 @@ class AccountAccordion extends ConsumerWidget {
   final bool isLoadingRole;
   final ValueChanged<Role> onRoleChanged;
   final VoidCallback onUnlinkAccount;
+  final VoidCallback onCreateAccount;
   final bool canEdit;
 
   @override
@@ -108,28 +110,35 @@ class AccountAccordion extends ConsumerWidget {
             ),
         ],
 
-        // Info for persons without account
+        // Create account button for persons with email but no account
         if (person.appId == null && person.email != null) ...[
           const SizedBox(height: AppDimensions.paddingM),
-          Container(
-            padding: const EdgeInsets.all(AppDimensions.paddingM),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+          if (canEdit)
+            FilledButton.icon(
+              onPressed: onCreateAccount,
+              icon: const Icon(Icons.person_add),
+              label: const Text('Account erstellen'),
             ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline, color: AppColors.primary, size: 20),
-                SizedBox(width: AppDimensions.paddingS),
-                Expanded(
-                  child: Text(
-                    'Account-Erstellung ist über die Web-Verwaltung möglich.',
-                    style: TextStyle(fontSize: 13, color: AppColors.dark),
+          if (!canEdit)
+            Container(
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                  SizedBox(width: AppDimensions.paddingS),
+                  Expanded(
+                    child: Text(
+                      'Kein Account verknüpft. Ein Dirigent kann einen Account erstellen.',
+                      style: TextStyle(fontSize: 13, color: AppColors.dark),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
 
         if (person.appId == null && person.email == null)

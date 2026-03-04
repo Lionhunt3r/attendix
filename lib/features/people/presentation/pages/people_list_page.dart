@@ -13,6 +13,7 @@ import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/dialog_helper.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../shared/widgets/loading/loading.dart';
 import '../../../../shared/widgets/common/empty_state.dart';
@@ -67,6 +68,44 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
     }
     rethrow;
   }
+});
+
+/// Provider for batch attendance percentages: Map<personId, percentage>
+final playerAttendancePercentagesProvider =
+    FutureProvider<Map<int, int>>((ref) async {
+  final supabase = ref.watch(supabaseClientProvider);
+  final tenant = ref.watch(currentTenantProvider);
+  if (tenant == null || tenant.id == null) return {};
+
+  final now = DateTime.now().toIso8601String();
+  final response = await supabase
+      .from('person_attendances')
+      .select('person_id, status, attendance:attendance_id!inner(date, tenantId)')
+      .eq('attendance.tenantId', tenant.id!)
+      .lte('attendance.date', now);
+
+  final attendances = response as List;
+
+  // Group by person_id
+  final totals = <int, int>{};
+  final attended = <int, int>{};
+
+  for (final a in attendances) {
+    final personId = a['person_id'] as int?;
+    if (personId == null) continue;
+    totals[personId] = (totals[personId] ?? 0) + 1;
+    final status = a['status'] as int?;
+    // Status 1 = present, 3 = late, 5 = late (both count as attended)
+    if (status == 1 || status == 3 || status == 5) {
+      attended[personId] = (attended[personId] ?? 0) + 1;
+    }
+  }
+
+  return totals.map((personId, total) {
+    final att = attended[personId] ?? 0;
+    final pct = total > 0 ? (att / total * 100).round() : 0;
+    return MapEntry(personId, pct);
+  });
 });
 
 /// People list page
@@ -332,6 +371,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
     final tenant = ref.watch(currentTenantProvider);
     // Use realtime provider for live updates
     final peopleAsync = ref.watch(realtimePlayersProvider);
+    final percentages = ref.watch(playerAttendancePercentagesProvider).valueOrNull ?? {};
 
     return Scaffold(
       appBar: AppBar(
@@ -616,6 +656,12 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                                   onPause: () => _showPauseDialog(person),
                                   onUnpause: () => _unpausePerson(person),
                                   onArchive: () => _showArchiveDialog(person),
+                                  onDelete: ref.watch(currentRoleProvider).isConductor
+                                      ? () => _showDeleteDialog(person)
+                                      : null,
+                                  attendancePercentage: person.id != null
+                                      ? percentages[person.id]
+                                      : null,
                                 ),
                               );
                             }),
@@ -653,6 +699,12 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                           onPause: () => _showPauseDialog(person),
                           onUnpause: () => _unpausePerson(person),
                           onArchive: () => _showArchiveDialog(person),
+                          onDelete: ref.watch(currentRoleProvider).isConductor
+                              ? () => _showDeleteDialog(person)
+                              : null,
+                          attendancePercentage: person.id != null
+                              ? percentages[person.id]
+                              : null,
                         ),
                       );
                     },
@@ -993,6 +1045,39 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
       }
     }
   }
+
+  Future<void> _showDeleteDialog(Person person) async {
+    final confirmed = await DialogHelper.showConfirmation(
+      context,
+      title: '${person.firstName} endgültig entfernen?',
+      message: 'Diese Aktion kann nicht rückgängig gemacht werden. '
+          'Alle Daten von ${person.fullName} werden unwiderruflich gelöscht.',
+      confirmText: 'Endgültig entfernen',
+      isDestructive: true,
+    );
+
+    if (confirmed == true && mounted && person.id != null) {
+      try {
+        final notifier = ref.read(playerNotifierProvider.notifier);
+        await notifier.deletePlayer(person.id!);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${person.firstName} wurde entfernt'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+          );
+        }
+      }
+    }
+  }
 }
 
 class _PersonListItem extends StatelessWidget {
@@ -1004,6 +1089,8 @@ class _PersonListItem extends StatelessWidget {
     this.onPause,
     this.onUnpause,
     this.onArchive,
+    this.onDelete,
+    this.attendancePercentage,
     this.viewOptions = const {'group', 'paused', 'critical', 'leader'},
   });
 
@@ -1014,6 +1101,8 @@ class _PersonListItem extends StatelessWidget {
   final VoidCallback? onPause;
   final VoidCallback? onUnpause;
   final VoidCallback? onArchive;
+  final VoidCallback? onDelete;
+  final int? attendancePercentage;
   final Set<String> viewOptions;
 
   String? _buildSubtitle() {
@@ -1172,49 +1261,88 @@ class _PersonListItem extends StatelessWidget {
             ),
           ],
         ),
-        // Swipe right for archive
-        startActionPane: onArchive != null
+        // Swipe right for archive + delete
+        startActionPane: (onArchive != null || onDelete != null)
             ? ActionPane(
                 motion: const BehindMotion(),
-                extentRatio: 0.25,
+                extentRatio: onArchive != null && onDelete != null ? 0.5 : 0.25,
                 children: [
-                  CustomSlidableAction(
-                    onPressed: (slideContext) {
-                      Slidable.of(slideContext)?.close();
-                      onArchive!();
-                    },
-                    backgroundColor: Colors.transparent,
-                    padding: EdgeInsets.zero,
-                    child: Container(
-                      margin:
-                          const EdgeInsets.only(right: AppDimensions.paddingS),
-                      decoration: BoxDecoration(
-                        color: AppColors.danger,
-                        borderRadius: cardBorderRadius,
-                      ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.archive,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Archiv',
-                              style: TextStyle(
+                  if (onArchive != null)
+                    CustomSlidableAction(
+                      onPressed: (slideContext) {
+                        Slidable.of(slideContext)?.close();
+                        onArchive!();
+                      },
+                      backgroundColor: Colors.transparent,
+                      padding: EdgeInsets.zero,
+                      child: Container(
+                        margin:
+                            const EdgeInsets.only(right: AppDimensions.paddingS),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          borderRadius: cardBorderRadius,
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.archive,
                                 color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
+                                size: 28,
                               ),
-                            ),
-                          ],
+                              SizedBox(height: 4),
+                              Text(
+                                'Archiv',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  if (onDelete != null)
+                    CustomSlidableAction(
+                      onPressed: (slideContext) {
+                        Slidable.of(slideContext)?.close();
+                        onDelete!();
+                      },
+                      backgroundColor: Colors.transparent,
+                      padding: EdgeInsets.zero,
+                      child: Container(
+                        margin:
+                            const EdgeInsets.only(right: AppDimensions.paddingS),
+                        decoration: BoxDecoration(
+                          color: AppColors.dark,
+                          borderRadius: cardBorderRadius,
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.delete_forever,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Löschen',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               )
             : null,
@@ -1294,11 +1422,50 @@ class _PersonListItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   )
                 : null,
-            trailing: const Icon(
-              Icons.chevron_right,
-              color: AppColors.medium,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (attendancePercentage != null)
+                  _AttendanceBadge(percentage: attendancePercentage!),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.medium,
+                ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AttendanceBadge extends StatelessWidget {
+  const _AttendanceBadge({required this.percentage});
+
+  final int percentage;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = percentage >= 80
+        ? AppColors.success
+        : percentage >= 50
+            ? AppColors.warning
+            : AppColors.danger;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      margin: const EdgeInsets.only(right: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        '$percentage%',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: color,
         ),
       ),
     );
