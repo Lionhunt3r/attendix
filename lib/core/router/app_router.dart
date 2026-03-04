@@ -11,6 +11,7 @@ import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/tenant_selection/presentation/pages/tenant_selection_page.dart';
 import '../../features/tenant_selection/presentation/pages/tenant_create_page.dart';
+import '../../features/tenant_selection/presentation/pages/tenant_detail_page.dart';
 import '../../shared/widgets/layout/main_shell.dart';
 import '../../features/people/presentation/pages/people_list_page.dart';
 import '../../features/people/presentation/pages/person_detail_page.dart';
@@ -219,6 +220,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'new',
             name: 'tenantCreate',
             builder: (context, state) => const TenantCreatePage(),
+          ),
+          GoRoute(
+            path: ':id',
+            name: 'tenantDetail',
+            builder: (context, state) {
+              final id = int.tryParse(state.pathParameters['id'] ?? '');
+              if (id == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Ungültige Instanz-ID')),
+                );
+              }
+              return TenantDetailPage(tenantId: id);
+            },
           ),
         ],
       ),
@@ -560,4 +574,5 @@ class AppRoutes {
   static const String history = 'history';
   static const String shifts = 'shifts';
   static const String shiftDetail = 'shiftDetail';
+  static const String tenantDetail = 'tenantDetail';
 }
