@@ -4,9 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/organisation_providers.dart';
 import '../../../../core/providers/statistics_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_helper.dart';
+import '../../../../data/models/organisation/organisation.dart';
+import '../../../../data/models/person/person.dart';
+import '../../../../data/models/tenant/tenant.dart';
 
 /// Statistics Page with Charts
 ///
@@ -119,6 +123,11 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                   _buildSectionTitle('Unentschuldigte Abwesenheiten'),
                   const SizedBox(height: AppDimensions.paddingS),
                   const _DivaIndexChart(),
+                  const SizedBox(height: AppDimensions.paddingL),
+
+                  // Organisation statistics (only shown if tenant has an org)
+                  const _OrganisationStatsSection(),
+
                   const SizedBox(height: AppDimensions.paddingXL),
                 ],
               ),
@@ -976,4 +985,270 @@ class _EmptyChartPlaceholder extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Organisation statistics section
+/// Shows cross-tenant person analysis when the current tenant belongs to an organisation
+class _OrganisationStatsSection extends ConsumerStatefulWidget {
+  const _OrganisationStatsSection();
+
+  @override
+  ConsumerState<_OrganisationStatsSection> createState() =>
+      _OrganisationStatsSectionState();
+}
+
+class _OrganisationStatsSectionState
+    extends ConsumerState<_OrganisationStatsSection> {
+  Set<int> _selectedTenantIds = {};
+  bool _filterInitialized = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final orgAsync = ref.watch(currentOrganisationProvider);
+
+    return orgAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (org) {
+        if (org == null) return const SizedBox.shrink();
+        return _buildOrgSection(org);
+      },
+    );
+  }
+
+  Widget _buildOrgSection(Organisation organisation) {
+    final tenantsAsync =
+        ref.watch(organisationTenantsProvider(organisation.id!));
+
+    return tenantsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (tenants) {
+        // Initialize filter with all tenants selected
+        if (!_filterInitialized && tenants.isNotEmpty) {
+          _selectedTenantIds =
+              tenants.map((t) => t.id!).whereType<int>().toSet();
+          _filterInitialized = true;
+        }
+
+        final filteredTenants = tenants
+            .where((t) => t.id != null && _selectedTenantIds.contains(t.id))
+            .toList();
+
+        final personsAsync =
+            ref.watch(organisationPersonsProvider(filteredTenants));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Divider(height: 32),
+            Text(
+              'Organisation: ${organisation.name}',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: AppDimensions.paddingS),
+
+            // Tenant filter chips
+            Wrap(
+              spacing: AppDimensions.paddingS,
+              runSpacing: AppDimensions.paddingXS,
+              children: tenants.map((t) {
+                final isSelected = _selectedTenantIds.contains(t.id);
+                return FilterChip(
+                  label: Text(t.shortName),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedTenantIds.add(t.id!);
+                      } else if (_selectedTenantIds.length > 1) {
+                        _selectedTenantIds.remove(t.id);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppDimensions.paddingS),
+            Text(
+              _selectedTenantIds.length == tenants.length
+                  ? 'Alle (${tenants.length})'
+                  : '${_selectedTenantIds.length} von ${tenants.length} ausgewählt',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.medium,
+                  ),
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+
+            // Persons count + modal
+            personsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text('Fehler: $e'),
+              data: (persons) {
+                final uniquePersons =
+                    _deduplicatePersons(persons, filteredTenants);
+
+                return Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.people, color: AppColors.primary),
+                    title: const Text('Personen über alle Instanzen'),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '${uniquePersons.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    onTap: () =>
+                        _showPersonsModal(uniquePersons, filteredTenants),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// De-duplicate persons across tenants
+  /// Matches by appId (if exists) or by firstName+lastName+birthday
+  List<_UniqueOrgPerson> _deduplicatePersons(
+      List<Person> allPersons, List<Tenant> tenants) {
+    final tenantMap = {for (final t in tenants) t.id: t};
+    final byAppId = <String, _UniqueOrgPerson>{};
+    final byNameBday = <String, _UniqueOrgPerson>{};
+
+    for (final person in allPersons) {
+      final tenantName =
+          tenantMap[person.tenantId]?.shortName ?? 'Unbekannt';
+
+      if (person.appId != null && person.appId!.isNotEmpty) {
+        final existing = byAppId[person.appId!];
+        if (existing != null) {
+          existing.tenantNames.add(tenantName);
+        } else {
+          byAppId[person.appId!] = _UniqueOrgPerson(
+            person: person,
+            tenantNames: {tenantName},
+          );
+        }
+      } else {
+        final key =
+            '${person.firstName.toLowerCase()}|${person.lastName.toLowerCase()}|${person.birthday ?? ''}';
+        final existing = byNameBday[key];
+        if (existing != null) {
+          existing.tenantNames.add(tenantName);
+        } else {
+          byNameBday[key] = _UniqueOrgPerson(
+            person: person,
+            tenantNames: {tenantName},
+          );
+        }
+      }
+    }
+
+    final all = [...byAppId.values, ...byNameBday.values];
+    // Sort: most tenants first, then by name
+    all.sort((a, b) {
+      final cmp = b.tenantNames.length.compareTo(a.tenantNames.length);
+      if (cmp != 0) return cmp;
+      return a.person.lastName.compareTo(b.person.lastName);
+    });
+    return all;
+  }
+
+  void _showPersonsModal(
+      List<_UniqueOrgPerson> persons, List<Tenant> tenants) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => SafeArea(
+          child: Column(
+            children: [
+              ListTile(
+                title: Text(
+                  'Personen (${persons.length})',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                    '${tenants.length} Instanzen'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: persons.length,
+                  itemBuilder: (context, index) {
+                    final p = persons[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.1),
+                        child: Text(
+                          p.person.initials,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      title: Text(p.person.fullName),
+                      subtitle: Text(p.tenantNames.join(', ')),
+                      trailing: p.tenantNames.length > 1
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${p.tenantNames.length}',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            )
+                          : null,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Represents a unique person across organisation tenants
+class _UniqueOrgPerson {
+  final Person person;
+  final Set<String> tenantNames;
+
+  _UniqueOrgPerson({required this.person, required this.tenantNames});
 }

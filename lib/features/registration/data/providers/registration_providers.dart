@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/supabase_config.dart';
+import '../../../../core/constants/table_names.dart';
 import '../../../../data/models/tenant/tenant.dart';
 
 /// Provider for loading a tenant by its register ID
@@ -47,6 +51,7 @@ class RegistrationFormData {
   DateTime? birthDate;
   String? notes;
   Map<String, dynamic> additionalFields;
+  Uint8List? profileImageBytes;
 
   RegistrationFormData({
     this.email = '',
@@ -59,6 +64,7 @@ class RegistrationFormData {
     this.birthDate,
     this.notes,
     Map<String, dynamic>? additionalFields,
+    this.profileImageBytes,
   }) : additionalFields = additionalFields ?? {};
 }
 
@@ -154,7 +160,38 @@ class RegistrationService {
             : null,
       };
 
-      await supabase.from('player').insert(playerData);
+      final playerResponse = await supabase
+          .from('player')
+          .insert(playerData)
+          .select('id')
+          .single();
+      final playerId = playerResponse['id'] as int;
+
+      // Upload profile image if provided
+      if (formData.profileImageBytes != null) {
+        try {
+          final storagePath = '${tenant.id}/$playerId.jpg';
+          await supabase.storage.from(SupabaseBuckets.profiles).uploadBinary(
+                storagePath,
+                formData.profileImageBytes!,
+                fileOptions: const FileOptions(
+                  contentType: 'image/jpeg',
+                  upsert: true,
+                ),
+              );
+          final publicUrl = supabase.storage
+              .from(SupabaseBuckets.profiles)
+              .getPublicUrl(storagePath);
+          await supabase
+              .from('player')
+              .update({'img': publicUrl})
+              .eq('id', playerId)
+              .eq('tenantId', tenant.id!);
+        } catch (e, stack) {
+          // Log but don't block registration
+          debugPrint('Profile image upload failed: $e\n$stack');
+        }
+      }
 
       return RegistrationResult.success(
         isNewAccount: isNewAccount,

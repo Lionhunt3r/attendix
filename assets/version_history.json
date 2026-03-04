@@ -5,7 +5,12 @@
       "date": "4.3.2026",
       "changes": [
         "✨ Instanz-Details: Neue Seite mit Info und Gefahrenzone",
-        "♻️ 'Instanz löschen' von Einstellungen zu Instanz-Details verschoben"
+        "♻️ 'Instanz löschen' von Einstellungen zu Instanz-Details verschoben",
+        "✨ Einstellungen: Registrierungsfelder konfigurierbar (Pflichtfelder wählen)",
+        "✨ Registrierung: Gemeinde-Auswahl (BFECG) mit eigener Eingabe",
+        "✨ Registrierung: Passbild-Upload mit Vorschau und Validierung",
+        "✨ Eltern-Portal: Alle Kinder gleichzeitig an-/abmelden",
+        "✨ Statistiken: Organisations-Übersicht mit Personen über alle Instanzen"
       ]
     },
     {

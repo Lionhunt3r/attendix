@@ -72,6 +72,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
   bool _registrationEnabled = false;
   String? _registerId;
   bool _autoApproveRegistrations = false;
+  List<String> _selectedRegistrationFields = [];
 
   // Extra fields
   List<ExtraField> _extraFields = [];
@@ -123,6 +124,15 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
       _registrationEnabled = tenant.registerId != null && tenant.registerId!.isNotEmpty;
       _registerId = tenant.registerId;
       _autoApproveRegistrations = tenant.autoApproveRegistrations;
+      _selectedRegistrationFields = List.from(
+        tenant.registrationFields ?? ['firstName', 'lastName', 'birthDate', 'group'],
+      );
+      // Ensure required fields are always included
+      for (final required in ['firstName', 'lastName', 'group']) {
+        if (!_selectedRegistrationFields.contains(required)) {
+          _selectedRegistrationFields.add(required);
+        }
+      }
       _extraFields = List.from(tenant.additionalFields ?? []);
       _criticalRules = List.from(tenant.criticalRules ?? []);
 
@@ -172,6 +182,7 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
         'song_sharing_id': _songSharingEnabled ? (_songSharingId ?? const Uuid().v4()) : null,
         'register_id': _registrationEnabled ? (_registerId ?? const Uuid().v4()) : null,
         'auto_approve_registrations': _autoApproveRegistrations,
+        'registration_fields': _registrationEnabled ? _selectedRegistrationFields : null,
         'additional_fields': _extraFields.map((f) => {
           'id': f.id,
           'name': f.name,
@@ -264,6 +275,45 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
     final minute = int.tryParse(parts[1]);
     if (hour == null || minute == null) return null;
     return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  List<Widget> _buildRegistrationFieldChips() {
+    // Base fields: firstName and lastName are always required (disabled)
+    final baseFields = [
+      (key: 'firstName', label: 'Vorname', required: true),
+      (key: 'lastName', label: 'Nachname', required: true),
+      (key: 'group', label: 'Gruppe', required: true),
+      (key: 'picture', label: 'Passbild', required: false),
+      (key: 'birthDate', label: 'Geburtsdatum', required: false),
+      (key: 'phone', label: 'Handynummer', required: false),
+    ];
+
+    // Add any extra fields defined for the tenant
+    final extraFieldChips = _extraFields.map((f) =>
+      (key: f.id, label: f.name, required: false),
+    );
+
+    final allFields = [...baseFields, ...extraFieldChips];
+
+    return allFields.map((field) {
+      final isSelected = _selectedRegistrationFields.contains(field.key);
+      return FilterChip(
+        label: Text(field.label),
+        selected: isSelected,
+        onSelected: field.required
+            ? null // Cannot deselect required fields
+            : (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedRegistrationFields.add(field.key);
+                  } else {
+                    _selectedRegistrationFields.remove(field.key);
+                  }
+                });
+                _markChanged();
+              },
+      );
+    }).toList();
   }
 
   Future<void> _copyLink(String baseUrl, String? id) async {
@@ -524,6 +574,24 @@ class _GeneralSettingsPageState extends ConsumerState<GeneralSettingsPage> {
                         setState(() => _autoApproveRegistrations = v);
                         _markChanged();
                       },
+                    ),
+                    const SizedBox(height: AppDimensions.paddingM),
+                    const Text(
+                      'Registrierungsfelder',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: AppDimensions.paddingXS),
+                    Text(
+                      'Alle ausgewählten Felder sind Pflichtfelder bei der Registrierung.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.medium,
+                      ),
+                    ),
+                    const SizedBox(height: AppDimensions.paddingS),
+                    Wrap(
+                      spacing: AppDimensions.paddingS,
+                      runSpacing: AppDimensions.paddingXS,
+                      children: _buildRegistrationFieldChips(),
                     ),
                   ],
 

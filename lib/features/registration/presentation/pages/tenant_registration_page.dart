@@ -1,10 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/church_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/string_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
@@ -33,6 +37,7 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  Uint8List? _profileImageBytes;
 
   bool get _isLoggedIn => ref.read(supabaseClientProvider).auth.currentUser != null;
 
@@ -299,6 +304,12 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
             },
           ),
 
+          // Profile picture
+          if (registrationFields.contains('picture')) ...[
+            const SizedBox(height: AppDimensions.paddingM),
+            _buildProfilePictureField(),
+          ],
+
           // Optional fields based on registration_fields
           if (registrationFields.contains('birthDate')) ...[
             const SizedBox(height: AppDimensions.paddingM),
@@ -534,10 +545,199 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
             ),
           );
           break;
+
+        case 'bfecg_church':
+          widgets.add(_buildChurchField(field));
+          break;
       }
     }
 
     return widgets;
+  }
+
+  Widget _buildProfilePictureField() {
+    return FormField<Uint8List>(
+      validator: (_) {
+        if (_profileImageBytes == null) {
+          return 'Bitte wähle ein Passbild aus';
+        }
+        return null;
+      },
+      builder: (fieldState) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: _pickImage,
+            borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
+            child: Container(
+              padding: const EdgeInsets.all(AppDimensions.paddingM),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: fieldState.hasError ? AppColors.danger : AppColors.light,
+                ),
+                borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: AppColors.primaryLight,
+                    backgroundImage: _profileImageBytes != null
+                        ? MemoryImage(_profileImageBytes!)
+                        : null,
+                    child: _profileImageBytes == null
+                        ? const Icon(Icons.person, size: 30, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: AppDimensions.paddingM),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _profileImageBytes != null
+                              ? 'Passbild ändern'
+                              : 'Passbild auswählen *',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Max. 15 MB',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.medium,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.photo_camera, color: AppColors.primary),
+                ],
+              ),
+            ),
+          ),
+          if (fieldState.hasError)
+            Padding(
+              padding: const EdgeInsets.only(
+                left: AppDimensions.paddingM,
+                top: AppDimensions.paddingXS,
+              ),
+              child: Text(
+                fieldState.errorText!,
+                style: TextStyle(color: AppColors.danger, fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+
+      // Check file size (max 15MB)
+      if (bytes.length > 15 * 1024 * 1024) {
+        if (mounted) {
+          ToastHelper.showError(context, 'Bild ist zu groß (max 15 MB)');
+        }
+        return;
+      }
+
+      setState(() => _profileImageBytes = bytes);
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Fehler beim Auswählen: $e');
+      }
+    }
+  }
+
+  Widget _buildChurchField(ExtraField field) {
+    final churchesAsync = ref.watch(churchesProvider);
+
+    return churchesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const Text('Fehler beim Laden der Gemeinden'),
+      data: (churches) {
+        return StatefulBuilder(
+          builder: (context, setFieldState) {
+            final selectedChurchId =
+                _formData.additionalFields[field.id]?.toString();
+            final isCustom = selectedChurchId == '';
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    labelText: field.name.isNotEmpty ? field.name : 'Gemeinde',
+                    prefixIcon: const Icon(Icons.church_outlined),
+                  ),
+                  value: selectedChurchId,
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: '',
+                      child: Text('Nicht gelistet'),
+                    ),
+                    ...churches.map((c) => DropdownMenuItem<String>(
+                          value: c.id,
+                          child: Text(c.name),
+                        )),
+                  ],
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Bitte wähle eine Gemeinde aus';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    setFieldState(() {
+                      _formData.additionalFields[field.id] = value;
+                      if (value != '') {
+                        _formData.additionalFields.remove('_custom_church');
+                      }
+                    });
+                  },
+                ),
+                if (isCustom) ...[
+                  const SizedBox(height: AppDimensions.paddingM),
+                  TextFormField(
+                    decoration: const InputDecoration(
+                      labelText: 'Name der Gemeinde *',
+                      prefixIcon: Icon(Icons.edit),
+                      helperText: 'Mindestens 5 Zeichen',
+                    ),
+                    validator: (value) {
+                      if (isCustom &&
+                          (value == null || value.trim().length < 5)) {
+                        return 'Bitte gib den Namen deiner Gemeinde ein (min. 5 Zeichen)';
+                      }
+                      return null;
+                    },
+                    onSaved: (value) {
+                      _formData.additionalFields['_custom_church'] =
+                          value?.trim();
+                    },
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _submit(Tenant tenant) async {
@@ -545,6 +745,27 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
     _formKey.currentState!.save();
 
     setState(() => _isLoading = true);
+
+    // Handle custom church creation (bfecg_church field)
+    final customChurchName = _formData.additionalFields.remove('_custom_church');
+    if (_formData.additionalFields['bfecg_church'] == '' &&
+        customChurchName != null &&
+        customChurchName.toString().isNotEmpty) {
+      final churchId = await ref
+          .read(churchNotifierProvider.notifier)
+          .createChurch(customChurchName.toString());
+      if (churchId != null) {
+        _formData.additionalFields['bfecg_church'] = churchId;
+      } else {
+        setState(() => _isLoading = false);
+        if (!mounted) return;
+        ToastHelper.showError(context, 'Fehler beim Erstellen der Gemeinde.');
+        return;
+      }
+    }
+
+    // Attach profile image bytes if selected
+    _formData.profileImageBytes = _profileImageBytes;
 
     final service = ref.read(registrationServiceProvider);
     final supabase = ref.read(supabaseClientProvider);

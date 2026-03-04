@@ -231,6 +231,8 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
     final childAttendances = group.childAttendances;
     if (childAttendances.isEmpty) return;
 
+    final hasMultipleChildren = childAttendances.length > 1;
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -275,6 +277,21 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
                       )
                     : null,
               ),
+              // Bulk action for multiple children
+              if (hasMultipleChildren && !group.isDeadlinePassed) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.group, color: AppColors.primary),
+                  title: const Text(
+                    'Alle Kinder An- bzw. Abmelden',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showBulkActions(group);
+                  },
+                ),
+              ],
               const Divider(),
               Expanded(
                 child: ListView.builder(
@@ -306,6 +323,212 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _showBulkActions(ParentAttendanceGroup group) async {
+    final actionableChildren = group.childAttendances
+        .where((c) =>
+            c.id != null &&
+            c.status != AttendanceStatus.present &&
+            c.status != AttendanceStatus.excused &&
+            c.status != AttendanceStatus.late &&
+            c.status != AttendanceStatus.lateExcused)
+        .toList();
+
+    final allIds = group.childAttendances
+        .where((c) => c.id != null)
+        .map((c) => c.id!)
+        .toList();
+
+    if (allIds.isEmpty) {
+      ToastHelper.showWarning(context, 'Keine gültigen Einträge gefunden');
+      return;
+    }
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                'Alle ${group.childAttendances.length} Kinder',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(group.displayTitle),
+            ),
+            const Divider(),
+            if (actionableChildren.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.check, color: AppColors.success),
+                title: Text('Alle anmelden (${actionableChildren.length})'),
+                onTap: () => Navigator.pop(context, 'signIn'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.close, color: AppColors.danger),
+              title: const Text('Alle abmelden'),
+              onTap: () => Navigator.pop(context, 'signOut'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.schedule, color: AppColors.warning),
+              title: const Text('Alle verspätet'),
+              onTap: () => Navigator.pop(context, 'lateComing'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Abbrechen'),
+              onTap: () => Navigator.pop(context),
+            ),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+        ),
+      ),
+    );
+
+    if (action == null || !mounted) return;
+
+    switch (action) {
+      case 'signIn':
+        for (final child in actionableChildren) {
+          await ref.read(parentSignInOutNotifierProvider.notifier).signIn(
+                child.id!,
+                SignInType.normal,
+              );
+        }
+        if (mounted) {
+          ToastHelper.showSuccess(
+            context,
+            '${actionableChildren.length} Kinder angemeldet',
+          );
+        }
+      case 'signOut':
+        _showBulkSignOutDialog(allIds, group.displayTitle);
+      case 'lateComing':
+        _showBulkSignOutDialog(allIds, group.displayTitle, isLateComing: true);
+    }
+  }
+
+  Future<void> _showBulkSignOutDialog(
+    List<String> ids,
+    String title, {
+    bool isLateComing = false,
+  }) async {
+    final reasons = [
+      'Krankheitsbedingt',
+      'Urlaubsbedingt',
+      'Arbeitsbedingt',
+      'Familienbedingt',
+      'Sonstiger Grund',
+    ];
+
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                isLateComing
+                    ? 'Verspätung für alle Kinder'
+                    : 'Alle Kinder abmelden',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(isLateComing
+                  ? 'Bitte gib einen Grund für die Verspätung an'
+                  : 'Bitte wähle einen Grund'),
+            ),
+            const Divider(),
+            ...reasons.map((r) => ListTile(
+                  leading: const Icon(Icons.arrow_forward_ios, size: 16),
+                  title: Text(r),
+                  onTap: () {
+                    if (r == 'Sonstiger Grund') {
+                      Navigator.pop(context);
+                      _showBulkCustomReasonDialog(ids, isLateComing: isLateComing);
+                    } else {
+                      Navigator.pop(context, r);
+                    }
+                  },
+                )),
+            const SizedBox(height: AppDimensions.paddingM),
+          ],
+        ),
+      ),
+    );
+
+    if (reason != null && mounted) {
+      await ref.read(parentSignInOutNotifierProvider.notifier).signOut(
+            ids,
+            reason,
+            isLateComing: isLateComing,
+          );
+      if (mounted) {
+        ToastHelper.showSuccess(
+          context,
+          isLateComing
+              ? 'Verspätung für alle Kinder eingetragen'
+              : 'Alle Kinder abgemeldet',
+        );
+      }
+    }
+  }
+
+  Future<void> _showBulkCustomReasonDialog(
+    List<String> ids, {
+    bool isLateComing = false,
+  }) async {
+    final controller = TextEditingController();
+    try {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(isLateComing ? 'Grund für Verspätung' : 'Abmeldegrund'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: 'Mindestens 5 Zeichen eingeben',
+            ),
+            autofocus: true,
+            maxLines: 2,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.length >= 5) {
+                  Navigator.pop(context, controller.text);
+                }
+              },
+              child: const Text('Bestätigen'),
+            ),
+          ],
+        ),
+      );
+
+      if (reason != null && reason.length >= 5 && mounted) {
+        await ref.read(parentSignInOutNotifierProvider.notifier).signOut(
+              ids,
+              reason,
+              isLateComing: isLateComing,
+            );
+        if (mounted) {
+          ToastHelper.showSuccess(
+            context,
+            isLateComing
+                ? 'Verspätung für alle Kinder eingetragen'
+                : 'Alle Kinder abgemeldet',
+          );
+        }
+      }
+    } finally {
+      controller.dispose();
+    }
   }
 
   Future<void> _showPlanViewer(ParentAttendanceGroup group) async {
