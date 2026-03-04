@@ -62,7 +62,7 @@ class AppColors {
   static const Color statusExcused = info;
   static const Color statusLate = Color(0xFFFF9500);
   static const Color statusNeutral = medium;
-  static const Color statusLateExcused = Color(0xFFFFB347);
+  static const Color statusLateExcused = warning;
 
   // Divider
   static const Color dividerLight = Color(0xFFE0E0E0);
