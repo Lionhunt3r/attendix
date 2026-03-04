@@ -33,7 +33,16 @@ class TeachersListPage extends ConsumerWidget {
             children: [
               const Icon(Icons.error_outline, size: 64, color: AppColors.danger),
               const SizedBox(height: AppDimensions.paddingM),
-              Text('Fehler: $error'),
+              Text(
+                'Lehrer konnten nicht geladen werden',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: AppDimensions.paddingXS),
+              Text(
+                '$error',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.medium),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: AppDimensions.paddingM),
               ElevatedButton(
                 onPressed: () => ref.invalidate(enrichedTeachersProvider),

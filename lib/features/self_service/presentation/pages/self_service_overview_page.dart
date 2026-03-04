@@ -72,24 +72,6 @@ class _SelfServiceOverviewPageState
             tooltip: 'Aktuelle Stücke',
             onPressed: () => showUpcomingSongsSheet(context),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.sort),
-            tooltip: 'Gruppierung',
-            initialValue: _groupingMode,
-            onSelected: (value) {
-              setState(() => _groupingMode = value);
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'chronological',
-                child: Text('Chronologisch'),
-              ),
-              const PopupMenuItem(
-                value: 'byTenant',
-                child: Text('Nach Gruppe'),
-              ),
-            ],
-          ),
         ],
       ),
       body: attendancesAsync.when(
@@ -157,6 +139,23 @@ class _SelfServiceOverviewPageState
                           : null,
                     ),
                   ),
+
+                // Grouping mode toggle
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM, vertical: AppDimensions.paddingS),
+                    child: SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'chronological', label: Text('Chronologisch')),
+                        ButtonSegment(value: 'byTenant', label: Text('Nach Gruppe')),
+                      ],
+                      selected: {_groupingMode},
+                      onSelectionChanged: (value) {
+                        setState(() => _groupingMode = value.first);
+                      },
+                    ),
+                  ),
+                ),
 
                 // Upcoming/Past Lists
                 if (_groupingMode == 'chronological') ...[

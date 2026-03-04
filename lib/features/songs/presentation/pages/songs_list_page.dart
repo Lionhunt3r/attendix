@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,7 @@ import '../../../../core/providers/song_filter_providers.dart';
 import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/song/song.dart';
 import '../../../../data/models/song/song_filter.dart';
 import '../widgets/song_filter_sheet.dart';
@@ -41,6 +43,18 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
     super.dispose();
   }
 
+  void _shareSongLink(WidgetRef ref, BuildContext context) {
+    final tenant = ref.read(currentTenantProvider);
+    final sharingId = tenant?.songSharingId;
+    if (sharingId == null || sharingId.isEmpty) {
+      ToastHelper.showError(context, 'Teilen ist nicht aktiviert. Aktiviere es unter Einstellungen → Allgemein.');
+      return;
+    }
+    final link = 'https://attendix.de/songs/$sharingId';
+    Clipboard.setData(ClipboardData(text: link));
+    ToastHelper.showSuccess(context, 'Link kopiert');
+  }
+
   void _handleMenuAction(String value, WidgetRef ref, BuildContext context, bool isConductor) {
     final notifier = ref.read(songViewOptionsProvider.notifier);
     switch (value) {
@@ -58,6 +72,8 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
         notifier.setShowLastSung(!ref.read(songViewOptionsProvider).showLastSung);
       case 'categories':
         if (isConductor) showSongCategoriesSheet(context);
+      case 'share':
+        _shareSongLink(ref, context);
     }
   }
 
@@ -189,6 +205,16 @@ class _SongsListPageState extends ConsumerState<SongsListPage> {
               // Admin section
               if (isConductor) ...[
                 const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'share',
+                  child: Row(
+                    children: [
+                      Icon(Icons.share, size: 20),
+                      SizedBox(width: 12),
+                      Text('Teilen-Link kopieren'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'categories',
                   child: Row(

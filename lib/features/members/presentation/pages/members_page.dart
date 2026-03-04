@@ -14,8 +14,10 @@ class MembersPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(filteredMembersGroupedProvider);
+    final allGroupsAsync = ref.watch(membersGroupedProvider);
     final totalCount = ref.watch(memberCountProvider);
     final searchTerm = ref.watch(membersSearchTermProvider);
+    final groupFilter = ref.watch(membersGroupFilterProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -49,6 +51,44 @@ class MembersPage extends ConsumerWidget {
               },
             ),
           ),
+
+          // Group filter chips
+          allGroupsAsync.whenOrNull(
+            data: (allGroups) {
+              if (allGroups.length <= 1) return null;
+              return SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.paddingM),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: AppDimensions.paddingS),
+                      child: FilterChip(
+                        label: const Text('Alle'),
+                        selected: groupFilter == null,
+                        onSelected: (_) {
+                          ref.read(membersGroupFilterProvider.notifier).state = null;
+                        },
+                      ),
+                    ),
+                    ...allGroups.map((g) => Padding(
+                          padding: const EdgeInsets.only(right: AppDimensions.paddingS),
+                          child: FilterChip(
+                            label: Text(g.groupName),
+                            selected: groupFilter == g.groupId,
+                            onSelected: (_) {
+                              ref.read(membersGroupFilterProvider.notifier).state =
+                                  groupFilter == g.groupId ? null : g.groupId;
+                            },
+                          ),
+                        )),
+                  ],
+                ),
+              );
+            },
+          ) ?? const SizedBox.shrink(),
+          const SizedBox(height: AppDimensions.paddingS),
 
           // Members list
           Expanded(

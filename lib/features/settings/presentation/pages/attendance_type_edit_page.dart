@@ -157,10 +157,15 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_originalType!.name),
-        leading: IconButton(
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBackPressed();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_originalType!.name),
+          leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: _onBackPressed,
         ),
@@ -713,6 +718,7 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -982,15 +988,31 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
 
   Future<void> _onBackPressed() async {
     if (_hasChanges) {
-      final result = await DialogHelper.showConfirmation(
-        context,
-        title: 'Ungespeicherte Änderungen',
-        message: 'Möchtest du die Änderungen speichern bevor du gehst?',
-        confirmText: 'Speichern',
-        cancelText: 'Verwerfen',
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Ungespeicherte Änderungen'),
+          content: const Text('Du hast ungespeicherte Änderungen. Was möchtest du tun?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('cancel'),
+              child: const Text('Abbrechen'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop('discard'),
+              style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+              child: const Text('Verwerfen'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop('save'),
+              child: const Text('Speichern'),
+            ),
+          ],
+        ),
       );
 
-      if (result) {
+      if (result == null || result == 'cancel') return;
+      if (result == 'save') {
         await _save();
       }
     }

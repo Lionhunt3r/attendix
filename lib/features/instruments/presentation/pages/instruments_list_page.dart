@@ -70,10 +70,10 @@ class InstrumentsListPage extends ConsumerWidget {
                 children: [
                   const Icon(Icons.piano_outlined, size: 80, color: AppColors.medium),
                   const SizedBox(height: AppDimensions.paddingL),
-                  Text('Keine Instrumente', style: Theme.of(context).textTheme.titleLarge),
+                  Text('Keine $label', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: AppDimensions.paddingS),
                   Text(
-                    'Füge das erste Instrument hinzu',
+                    'Füge ${groupLabel(tenant?.type)} hinzu',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.medium),
                   ),
                 ],
@@ -96,14 +96,14 @@ class InstrumentsListPage extends ConsumerWidget {
               categories: categories,
               playerCounts: playerCounts,
               isConductor: isConductor,
-              onEdit: (group) => _showEditDialog(context, ref, group, categories, isConductor),
+              onEdit: (group) => _showEditDialog(context, ref, group, categories, isConductor, tenantType: tenant?.type),
             ),
           );
         },
       ),
       floatingActionButton: isConductor
           ? FloatingActionButton(
-              onPressed: () => _showEditDialog(context, ref, null, categoriesAsync.valueOrNull ?? [], isConductor),
+              onPressed: () => _showEditDialog(context, ref, null, categoriesAsync.valueOrNull ?? [], isConductor, tenantType: tenant?.type),
               child: const Icon(Icons.add),
             )
           : null,
@@ -302,6 +302,9 @@ class _GroupListItem extends StatelessWidget {
     if (group.tuning != null && group.tuning != 'C') {
       parts.add('in ${group.tuning}');
     }
+    if (group.clefs != null && group.clefs!.isNotEmpty) {
+      parts.add(group.clefs!.map((c) => '${c.toUpperCase()}-Schlüssel').join(', '));
+    }
     if (parts.isEmpty) return null;
     return Text(parts.join(' · '));
   }
@@ -348,8 +351,9 @@ Future<void> _showEditDialog(
   WidgetRef ref,
   Group? group,
   List<GroupCategory> categories,
-  bool isConductor,
-) async {
+  bool isConductor, {
+  String? tenantType,
+}) async {
   if (!isConductor) return;
 
   final result = await showDialog<Map<String, dynamic>>(
@@ -357,6 +361,7 @@ Future<void> _showEditDialog(
     builder: (context) => _InstrumentEditDialog(
       group: group,
       categories: categories,
+      tenantType: tenantType,
     ),
   );
 
@@ -368,13 +373,13 @@ Future<void> _showEditDialog(
         try {
           await notifier.deleteGroup(group!.id!);
           if (context.mounted) {
-            ToastHelper.showSuccess(context, 'Instrument gelöscht');
+            ToastHelper.showSuccess(context, '${groupLabel(tenantType)} gelöscht');
           }
         } catch (e) {
           if (context.mounted) {
             final message = e.toString().contains('Spieler sind noch zugewiesen')
                 ? e.toString().replaceAll('Exception: ', '')
-                : 'Instrument kann nicht gelöscht werden. Bitte weise zuerst alle Spieler einem anderen Instrument zu.';
+                : '${groupLabel(tenantType)} kann nicht gelöscht werden. Bitte weise zuerst alle Spieler einem anderen ${groupLabel(tenantType)} zu.';
             ToastHelper.showError(context, message);
           }
           return;
@@ -382,12 +387,12 @@ Future<void> _showEditDialog(
       } else if (group != null) {
         await notifier.updateGroup(group.id!, result);
         if (context.mounted) {
-          ToastHelper.showSuccess(context, 'Instrument aktualisiert');
+          ToastHelper.showSuccess(context, '${groupLabel(tenantType)} aktualisiert');
         }
       } else {
         await notifier.createGroup(result);
         if (context.mounted) {
-          ToastHelper.showSuccess(context, 'Instrument erstellt');
+          ToastHelper.showSuccess(context, '${groupLabel(tenantType)} erstellt');
         }
       }
       // Refresh player counts after changes
@@ -411,10 +416,12 @@ class _InstrumentEditDialog extends StatefulWidget {
   const _InstrumentEditDialog({
     this.group,
     required this.categories,
+    this.tenantType,
   });
 
   final Group? group;
   final List<GroupCategory> categories;
+  final String? tenantType;
 
   @override
   State<_InstrumentEditDialog> createState() => _InstrumentEditDialogState();
@@ -464,7 +471,7 @@ class _InstrumentEditDialogState extends State<_InstrumentEditDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(isEditing ? 'Instrument bearbeiten' : 'Neues Instrument'),
+      title: Text(isEditing ? '${groupLabel(widget.tenantType)} bearbeiten' : '${groupLabel(widget.tenantType)} erstellen'),
       content: Form(
         key: _formKey,
         child: SizedBox(
@@ -659,7 +666,7 @@ class _InstrumentEditDialogState extends State<_InstrumentEditDialog> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Instrument löschen?'),
+        title: Text('${groupLabel(widget.tenantType)} löschen?'),
         content: Text('Möchtest du "${widget.group!.name}" wirklich löschen?'),
         actions: [
           TextButton(
