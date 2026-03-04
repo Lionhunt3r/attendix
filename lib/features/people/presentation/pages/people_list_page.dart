@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -86,15 +87,109 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
   bool _isSelectionMode = false;
   final Set<int> _selectedPlayerIds = {};
 
+  // View options
+  Set<String> _viewOptions = {'group', 'paused', 'critical', 'leader'};
+
+  static const _defaultViewOptions = {'group', 'paused', 'critical', 'leader'};
+  static const _allViewOptionLabels = {
+    'group': 'Gruppe',
+    'birthday': 'Geburtsdatum',
+    'notes': 'Notizen',
+    'leader': 'Stimmführer',
+    'paused': 'Pausiert',
+    'critical': 'Problemfälle',
+    'teacher': 'Lehrer',
+    'photo': 'Passbild',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadViewOptions();
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
+  Future<void> _loadViewOptions() async {
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList('viewOpts_${tenant.id}');
+    if (saved != null && mounted) {
+      setState(() => _viewOptions = saved.toSet());
+    }
+  }
+
+  Future<void> _saveViewOptions() async {
+    final tenant = ref.read(currentTenantProvider);
+    if (tenant == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('viewOpts_${tenant.id}', _viewOptions.toList());
+  }
+
+  Future<void> _showViewOptionsDialog() async {
+    final selected = Set<String>.from(_viewOptions);
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Ansicht konfigurieren'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: _allViewOptionLabels.entries.map((entry) {
+                return CheckboxListTile(
+                  title: Text(entry.value),
+                  value: selected.contains(entry.key),
+                  onChanged: (v) {
+                    setDialogState(() {
+                      if (v == true) {
+                        selected.add(entry.key);
+                      } else {
+                        selected.remove(entry.key);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setDialogState(() {
+                  selected.clear();
+                  selected.addAll(_defaultViewOptions);
+                });
+              },
+              child: const Text('Standard'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, selected),
+              child: const Text('Übernehmen'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() => _viewOptions = result);
+      _saveViewOptions();
+    }
+  }
+
   List<Person> _filterPeople(List<Person> people) {
     var filtered = people;
-    
+
     // Apply filter
     switch (_filterOption) {
       case 'critical':
@@ -109,8 +204,21 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
       case 'active':
         filtered = filtered.where((p) => !p.paused).toList();
         break;
+      case 'noAccount':
+        filtered = filtered.where((p) => p.appId == null).toList();
+        break;
+      case 'examinees':
+        filtered = filtered.where((p) => p.examinee).toList();
+        break;
+      case 'noTeacher':
+        filtered = filtered.where((p) => !p.hasTeacher).toList();
+        break;
+      case 'noTest':
+        filtered = filtered.where((p) =>
+            p.testResult == null || p.testResult!.isEmpty).toList();
+        break;
     }
-    
+
     // Apply search
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
@@ -120,7 +228,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
             (person.groupName?.toLowerCase().contains(query) ?? false);
       }).toList();
     }
-    
+
     return filtered;
   }
 
@@ -183,6 +291,16 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
           if (a.joined == null) return 1;
           if (b.joined == null) return -1;
           return b.joined!.compareTo(a.joined!);
+        });
+        break;
+      case 'testResult':
+        sorted.sort((a, b) {
+          final aVal = double.tryParse(a.testResult ?? '');
+          final bVal = double.tryParse(b.testResult ?? '');
+          if (aVal == null && bVal == null) return 0;
+          if (aVal == null) return 1;
+          if (bVal == null) return -1;
+          return bVal.compareTo(aVal); // descending
         });
         break;
       case 'group':
@@ -289,6 +407,13 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                     const PopupMenuItem(value: 'paused', child: Text('Pausiert')),
                     const PopupMenuItem(value: 'critical', child: Text('Kritisch')),
                     const PopupMenuItem(value: 'leaders', child: Text('Leiter')),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(value: 'noAccount', child: Text('Ohne Account')),
+                    const PopupMenuItem(value: 'noTeacher', child: Text('Ohne Lehrer')),
+                    if (tenant != null && tenant.type != 'general')
+                      const PopupMenuItem(value: 'examinees', child: Text('Prüflinge')),
+                    if (tenant != null && tenant.type != 'general')
+                      const PopupMenuItem(value: 'noTest', child: Text('Ohne Test')),
                   ],
                 ),
                 // Sort button
@@ -311,7 +436,14 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                     const PopupMenuDivider(),
                     _buildSortMenuItem('joinedAsc', 'Beitritt (älteste)'),
                     _buildSortMenuItem('joinedDesc', 'Beitritt (neueste)'),
+                    if (tenant != null && tenant.type != 'general')
+                      _buildSortMenuItem('testResult', 'Testergebnis'),
                   ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: 'Ansicht',
+                  onPressed: _showViewOptionsDialog,
                 ),
                 IconButton(
                   icon: const Icon(Icons.swap_horiz),
@@ -482,6 +614,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                                   person: person,
                                   isSelectionMode: _isSelectionMode,
                                   isSelected: isSelected,
+                                  viewOptions: _viewOptions,
                                   onTap: _isSelectionMode && person.id != null
                                       ? () => _togglePlayerSelection(person.id!)
                                       : () => context.push('/people/${person.id}'),
@@ -518,6 +651,7 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
                           person: person,
                           isSelectionMode: _isSelectionMode,
                           isSelected: isSelected,
+                          viewOptions: _viewOptions,
                           onTap: _isSelectionMode && person.id != null
                               ? () => _togglePlayerSelection(person.id!)
                               : () => context.push('/people/${person.id}'),
@@ -556,6 +690,10 @@ class _PeopleListPageState extends ConsumerState<PeopleListPage> {
       'paused' => 'Pausiert',
       'leaders' => 'Leiter',
       'active' => 'Aktiv',
+      'noAccount' => 'Ohne Account',
+      'examinees' => 'Prüflinge',
+      'noTeacher' => 'Ohne Lehrer',
+      'noTest' => 'Ohne Test',
       _ => 'Alle',
     };
   }
@@ -871,6 +1009,7 @@ class _PersonListItem extends StatelessWidget {
     this.onPause,
     this.onUnpause,
     this.onArchive,
+    this.viewOptions = const {'group', 'paused', 'critical', 'leader'},
   });
 
   final Person person;
@@ -880,6 +1019,34 @@ class _PersonListItem extends StatelessWidget {
   final VoidCallback? onPause;
   final VoidCallback? onUnpause;
   final VoidCallback? onArchive;
+  final Set<String> viewOptions;
+
+  String? _buildSubtitle() {
+    final parts = <String>[];
+
+    if (viewOptions.contains('group') && person.groupName != null) {
+      parts.add(person.groupName!);
+    }
+    if (viewOptions.contains('birthday') && person.birthday != null) {
+      final date = DateTime.tryParse(person.birthday!);
+      if (date != null) {
+        parts.add(DateFormat('dd.MM.yyyy').format(date));
+      }
+    }
+    if (viewOptions.contains('notes') && person.notes != null && person.notes!.isNotEmpty) {
+      parts.add(person.notes!);
+    }
+    if (viewOptions.contains('teacher') && person.teacherName != null) {
+      parts.add('Lehrer: ${person.teacherName}');
+    }
+
+    return parts.isNotEmpty ? parts.join(' | ') : null;
+  }
+
+  bool get _showPhoto => viewOptions.contains('photo');
+  bool get _showLeaderBadge => viewOptions.contains('leader') && person.isLeader;
+  bool get _showPausedBadge => viewOptions.contains('paused') && person.paused;
+  bool get _showCriticalBadge => viewOptions.contains('critical') && person.critical;
 
   @override
   Widget build(BuildContext context) {
@@ -942,13 +1109,15 @@ class _PersonListItem extends StatelessWidget {
               person.fullName,
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
-            subtitle: person.groupName != null
+            subtitle: _buildSubtitle() != null
                 ? Text(
-                    person.groupName!,
+                    _buildSubtitle()!,
                     style: const TextStyle(
                       color: AppColors.medium,
                       fontSize: 13,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   )
                 : null,
           ),
@@ -1065,10 +1234,10 @@ class _PersonListItem extends StatelessWidget {
                       ? AppColors.warning.withValues(alpha: 0.2)
                       : AppColors.primaryLight.withValues(alpha: 0.2),
               // RT-002: Use null-safe pattern for imageUrl
-              backgroundImage: (person.imageUrl?.contains('.svg') == false)
+              backgroundImage: (_showPhoto && person.imageUrl?.contains('.svg') == false)
                   ? NetworkImage(person.imageUrl!)
                   : null,
-              child: (person.imageUrl == null || person.imageUrl!.contains('.svg'))
+              child: (!_showPhoto || person.imageUrl == null || person.imageUrl!.contains('.svg'))
                   ? Text(
                       person.initials,
                       style: TextStyle(
@@ -1090,7 +1259,7 @@ class _PersonListItem extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ),
-                if (person.isLeader)
+                if (_showLeaderBadge)
                   const Padding(
                     padding: EdgeInsets.only(left: 4),
                     child: Icon(
@@ -1099,7 +1268,7 @@ class _PersonListItem extends StatelessWidget {
                       color: AppColors.primary,
                     ),
                   ),
-                if (person.paused)
+                if (_showPausedBadge)
                   const Padding(
                     padding: EdgeInsets.only(left: 4),
                     child: Icon(
@@ -1108,7 +1277,7 @@ class _PersonListItem extends StatelessWidget {
                       color: AppColors.warning,
                     ),
                   ),
-                if (person.critical)
+                if (_showCriticalBadge)
                   const Padding(
                     padding: EdgeInsets.only(left: 4),
                     child: Icon(
@@ -1119,13 +1288,15 @@ class _PersonListItem extends StatelessWidget {
                   ),
               ],
             ),
-            subtitle: person.groupName != null
+            subtitle: _buildSubtitle() != null
                 ? Text(
-                    person.groupName!,
+                    _buildSubtitle()!,
                     style: const TextStyle(
                       color: AppColors.medium,
                       fontSize: 13,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   )
                 : null,
             trailing: const Icon(

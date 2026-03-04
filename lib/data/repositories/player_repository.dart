@@ -565,15 +565,80 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Approve a pending player
-  Future<void> approvePlayer(int playerId) async {
+  Future<void> approvePlayer(Person player) async {
+    if (player.id == null) {
+      throw RepositoryException(
+        message: 'Player ID is required',
+        operation: 'approvePlayer',
+      );
+    }
+
     try {
+      final history = List<Map<String, dynamic>>.from(
+        player.history.map((e) => e.toJson()),
+      );
+      history.add({
+        'date': DateTime.now().toIso8601String(),
+        'text': 'Genehmigt',
+        'type': PlayerHistoryType.approved.value,
+      });
+
       await supabase
           .from('player')
-          .update({'pending': false})
-          .eq('id', playerId)
+          .update({
+            'pending': false,
+            'history': history,
+          })
+          .eq('id', player.id!)
           .eq('tenantId', currentTenantId);
+
+      // Add to upcoming attendances (same as unpause)
+      await addToUpcomingAttendances(player);
     } catch (e, stack) {
       handleError(e, stack, 'approvePlayer');
+      rethrow;
+    }
+  }
+
+  /// Decline a pending player - archives them with a reason
+  Future<void> declinePlayer(Person player, String reason) async {
+    if (player.id == null) {
+      throw RepositoryException(
+        message: 'Player ID is required',
+        operation: 'declinePlayer',
+      );
+    }
+
+    try {
+      final history = List<Map<String, dynamic>>.from(
+        player.history.map((e) => e.toJson()),
+      );
+      history.add({
+        'date': DateTime.now().toIso8601String(),
+        'text': reason,
+        'type': PlayerHistoryType.declined.value,
+      });
+
+      await supabase
+          .from('player')
+          .update({
+            'pending': false,
+            'left': DateTime.now().toIso8601String(),
+            'history': history,
+          })
+          .eq('id', player.id!)
+          .eq('tenantId', currentTenantId);
+
+      // Remove from tenantUsers if linked
+      if (player.appId != null) {
+        await supabase
+            .from('tenantUsers')
+            .delete()
+            .eq('userId', player.appId!)
+            .eq('tenantId', currentTenantId);
+      }
+    } catch (e, stack) {
+      handleError(e, stack, 'declinePlayer');
       rethrow;
     }
   }

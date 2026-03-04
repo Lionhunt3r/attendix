@@ -150,6 +150,18 @@ class AllgemeinAccordion extends ConsumerWidget {
                   if (person.otherExercise != null || canEdit)
                     _buildOtherExerciseField(context),
 
+                  // Choir-specific: Stimmumfang (range)
+                  if (tenant != null && tenant.type == 'choir')
+                    _buildRangeField(context),
+
+                  // Non-general: Prüfling (examinee)
+                  if (tenant != null && tenant.type != 'general')
+                    _buildExamineeField(context),
+
+                  // Non-general: Testergebnis (testResult)
+                  if (tenant != null && tenant.type != 'general')
+                    _buildTestResultField(context),
+
                   // Extra Fields
                   if (extraFields.isNotEmpty) ...[
                     const Divider(height: 32),
@@ -685,6 +697,54 @@ class AllgemeinAccordion extends ConsumerWidget {
         }
         break;
     }
+  }
+
+  Widget _buildRangeField(BuildContext context) {
+    final rangeValue = person.range;
+    if (rangeValue == null && !canEdit) return const SizedBox.shrink();
+
+    return EditableInfoRow(
+      icon: Icons.music_note_outlined,
+      label: 'Stimmumfang',
+      value: rangeValue ?? 'Nicht angegeben',
+      editable: canEdit,
+      onEdit: () => _editTextField(
+        context,
+        title: 'Stimmumfang',
+        initialValue: rangeValue ?? '',
+        fieldKey: 'range',
+        hint: 'z.B. C3 - C5',
+      ),
+    );
+  }
+
+  Widget _buildExamineeField(BuildContext context) {
+    return EditableToggleRow(
+      icon: Icons.school_outlined,
+      label: 'Prüfling',
+      value: person.examinee,
+      editable: canEdit,
+      onChanged: (v) => onFieldChanged('examinee', v),
+    );
+  }
+
+  Widget _buildTestResultField(BuildContext context) {
+    final testResultValue = person.testResult;
+    if (testResultValue == null && !canEdit) return const SizedBox.shrink();
+
+    return EditableInfoRow(
+      icon: Icons.assignment_outlined,
+      label: 'Testergebnis',
+      value: testResultValue ?? 'Nicht angegeben',
+      editable: canEdit,
+      onEdit: () => _editTextField(
+        context,
+        title: 'Testergebnis',
+        initialValue: testResultValue ?? '',
+        fieldKey: 'testResult',
+        hint: 'Ergebnis eingeben...',
+      ),
+    );
   }
 
   Future<void> _editTextField(

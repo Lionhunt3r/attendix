@@ -17,10 +17,12 @@ import '../../../../data/models/tenant/tenant.dart';
 /// Sheet for transferring players to another tenant (handover)
 class HandoverSheet extends ConsumerStatefulWidget {
   final List<Person> selectedPlayers;
+  final bool initialStayInInstance;
 
   const HandoverSheet({
     super.key,
     required this.selectedPlayers,
+    this.initialStayInInstance = false,
   });
 
   @override
@@ -35,6 +37,12 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
   final Map<int, int?> _groupMapping = {};
   List<Group> _targetGroups = [];
   bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _stayInInstance = widget.initialStayInInstance;
+  }
 
   // FN-004: Move initialization to didChangeDependencies instead of build
   @override
@@ -668,10 +676,14 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
 Future<bool?> showHandoverSheet(
   BuildContext context, {
   required List<Person> selectedPlayers,
+  bool initialStayInInstance = false,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => HandoverSheet(selectedPlayers: selectedPlayers),
+    builder: (context) => HandoverSheet(
+      selectedPlayers: selectedPlayers,
+      initialStayInInstance: initialStayInInstance,
+    ),
   );
 }

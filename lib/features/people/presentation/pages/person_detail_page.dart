@@ -13,6 +13,7 @@ import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/models/tenant/tenant.dart';
+import '../widgets/handover_sheet.dart';
 import '../widgets/person_detail/person_detail.dart';
 
 /// Provider for single person with group name
@@ -444,6 +445,12 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         _draft = _draft.copyWith(parentId: value);
       } else if (field == 'otherExercise') {
         _draft = _draft.copyWith(otherExercise: value as String?);
+      } else if (field == 'range') {
+        _draft = _draft.copyWith(range: value as String?);
+      } else if (field == 'examinee') {
+        _draft = _draft.copyWith(examinee: value as bool);
+      } else if (field == 'testResult') {
+        _draft = _draft.copyWith(testResult: value as String?);
       } else if (field.startsWith('additionalFields.')) {
         final fieldId = field.substring('additionalFields.'.length);
         _additionalFieldValues[fieldId] = value;
@@ -537,6 +544,9 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'correctBirthday': true,
         'history': updatedHistory,
         'additional_fields': _additionalFieldValues.isNotEmpty ? _additionalFieldValues : null,
+        'range': _draft.range?.isEmpty ?? true ? null : _draft.range,
+        'examinee': _draft.examinee,
+        'testResult': _draft.testResult?.isEmpty ?? true ? null : _draft.testResult,
       }).eq('id', personId).eq('tenantId', tenantId);
 
       ref.invalidate(personProvider(widget.personId));
@@ -932,6 +942,155 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     }
   }
 
+  Future<void> _approvePerson() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Person genehmigen?'),
+        content: Text('${widget.person.fullName} als Mitglied freischalten?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Genehmigen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final notifier = ref.read(playerNotifierProvider.notifier);
+      await notifier.approvePlayer(widget.person);
+
+      ref.invalidate(personProvider(widget.personId));
+      ref.invalidate(realtimePlayersProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Person wurde genehmigt'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    }
+  }
+
+  Future<void> _declinePerson() async {
+    final reasonController = TextEditingController();
+    try {
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Person ablehnen'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${widget.person.fullName} wird abgelehnt und archiviert.'),
+              const SizedBox(height: AppDimensions.paddingM),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Grund *',
+                  hintText: 'Warum wird die Person abgelehnt?',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+                autofocus: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+              onPressed: () {
+                if (reasonController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Bitte Grund angeben')),
+                  );
+                  return;
+                }
+                Navigator.pop(context, reasonController.text);
+              },
+              child: const Text('Ablehnen'),
+            ),
+          ],
+        ),
+      );
+
+      if (reason == null || !mounted) return;
+
+      final notifier = ref.read(playerNotifierProvider.notifier);
+      await notifier.declinePlayer(widget.person, reason);
+
+      ref.invalidate(personProvider(widget.personId));
+      ref.invalidate(realtimePlayersProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Person wurde abgelehnt'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler: $e'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      reasonController.dispose();
+    }
+  }
+
+  void _showPendingActions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.check_circle, color: AppColors.success),
+              title: const Text('Person genehmigen'),
+              onTap: () { Navigator.pop(context); _approvePerson(); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.cancel, color: AppColors.danger),
+              title: const Text('Person ablehnen'),
+              onTap: () { Navigator.pop(context); _declinePerson(); },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Abbrechen'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showMoreActions() {
     showModalBottomSheet(
       context: context,
@@ -958,6 +1117,23 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
             ),
             const Divider(),
             ListTile(
+              leading: const Icon(Icons.swap_horiz, color: AppColors.primary),
+              title: const Text('In andere Instanz übertragen'),
+              onTap: () {
+                Navigator.pop(context);
+                _showTransferSheet();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy, color: AppColors.primary),
+              title: const Text('In andere Instanz kopieren'),
+              onTap: () {
+                Navigator.pop(context);
+                _showTransferSheet(copy: true);
+              },
+            ),
+            const Divider(),
+            ListTile(
               leading: const Icon(Icons.close),
               title: const Text('Abbrechen'),
               onTap: () => Navigator.pop(context),
@@ -966,6 +1142,19 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         ),
       ),
     );
+  }
+
+  Future<void> _showTransferSheet({bool copy = false}) async {
+    final result = await showHandoverSheet(
+      context,
+      selectedPlayers: [widget.person],
+      initialStayInInstance: copy,
+    );
+
+    if (result == true && mounted) {
+      ref.invalidate(personProvider(widget.personId));
+      ref.invalidate(realtimePlayersProvider);
+    }
   }
 
   Future<void> _updateUserRole(Role newRole) async {
@@ -1130,7 +1319,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
           padding: const EdgeInsets.only(bottom: 100),
           children: [
             // Header with avatar and stats
-            PersonHeader(person: person, statsAsync: statsAsync),
+            PersonHeader(person: person, statsAsync: statsAsync, canEdit: canEdit),
 
             // Status badges
             PersonStatusBadges(person: person),
@@ -1190,7 +1379,16 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
               onToggle: () => setState(() => _showHistorie = !_showHistorie),
               historyAsync: historyAsync,
               statsAsync: statsAsync,
+              personId: widget.personId,
+              canEdit: canEdit,
             ),
+
+            // Upcoming Appointments Accordion
+            UpcomingAppointmentsAccordion(personId: widget.personId),
+
+            // Other Tenants Accordion (only if person has an account)
+            if (widget.person.appId != null)
+              AndereInstanzenAccordion(appId: widget.person.appId!),
           ],
         ),
         floatingActionButton: _hasChanges
@@ -1206,7 +1404,13 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
                 label: Text(_isSaving ? 'Speichern...' : 'Speichern'),
                 backgroundColor: AppColors.primary,
               )
-            : null,
+            : widget.person.pending && canEdit
+                ? FloatingActionButton(
+                    onPressed: _showPendingActions,
+                    backgroundColor: AppColors.warning,
+                    child: const Icon(Icons.more_horiz),
+                  )
+                : null,
       ),
     );
   }

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../../core/config/supabase_config.dart';
 import '../../../../../core/constants/app_constants.dart';
 import '../../../../../core/constants/enums.dart';
+import '../../../../../core/providers/realtime_providers.dart';
+import '../../../../../core/providers/tenant_providers.dart';
 import '../../../../../core/theme/app_colors.dart';
+import '../../pages/person_detail_page.dart';
 
 /// Accordion section displaying person history (attendance + changes).
 class HistorieAccordion extends ConsumerWidget {
@@ -14,12 +19,16 @@ class HistorieAccordion extends ConsumerWidget {
     required this.onToggle,
     required this.historyAsync,
     required this.statsAsync,
+    required this.personId,
+    required this.canEdit,
   });
 
   final bool isExpanded;
   final VoidCallback onToggle;
   final AsyncValue<List<Map<String, dynamic>>> historyAsync;
   final AsyncValue<Map<String, dynamic>> statsAsync;
+  final int personId;
+  final bool canEdit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -46,14 +55,14 @@ class HistorieAccordion extends ConsumerWidget {
                 AppDimensions.paddingM,
                 AppDimensions.paddingM,
               ),
-              child: _buildContent(context),
+              child: _buildContent(context, ref),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context) {
+  Widget _buildContent(BuildContext context, WidgetRef ref) {
     return historyAsync.when(
       loading: () => const Center(
         child: Padding(
@@ -84,7 +93,9 @@ class HistorieAccordion extends ConsumerWidget {
             _buildStatsRow(),
 
             // History items
-            ...history.take(20).map((item) => _buildHistoryItem(item)),
+            ...history.take(20).map(
+                  (item) => _buildHistoryItem(context, ref, item),
+                ),
           ],
         );
       },
@@ -106,7 +117,8 @@ class HistorieAccordion extends ConsumerWidget {
                 : AppColors.danger;
 
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
+          padding:
+              const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
           ),
@@ -122,7 +134,8 @@ class HistorieAccordion extends ConsumerWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: badgeColor,
                   borderRadius: BorderRadius.circular(4),
@@ -143,7 +156,8 @@ class HistorieAccordion extends ConsumerWidget {
     );
   }
 
-  Widget _buildHistoryItem(Map<String, dynamic> item) {
+  Widget _buildHistoryItem(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> item) {
     final date = DateTime.tryParse(item['date'] ?? '');
     final type = item['type'] as int?;
     final text = item['text']?.toString() ?? '';
@@ -196,9 +210,13 @@ class HistorieAccordion extends ConsumerWidget {
     }
 
     final dateStr = date != null ? DateFormat('dd.MM.yyyy').format(date) : '';
-    final titleStr = displayTitle.isNotEmpty ? '$dateStr | $displayTitle' : dateStr;
+    final titleStr =
+        displayTitle.isNotEmpty ? '$dateStr | $displayTitle' : dateStr;
 
-    return Container(
+    final isAttendance = type == PlayerHistoryType.attendance.value;
+    final isDeletable = canEdit && !isAttendance;
+
+    final content = Container(
       padding: const EdgeInsets.symmetric(vertical: AppDimensions.paddingM),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
@@ -215,15 +233,17 @@ class HistorieAccordion extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       notes,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                   ),
-                if (type != PlayerHistoryType.attendance.value && text.isNotEmpty)
+                if (!isAttendance && text.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       text,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                   ),
               ],
@@ -251,5 +271,98 @@ class HistorieAccordion extends ConsumerWidget {
         ],
       ),
     );
+
+    if (!isDeletable) return content;
+
+    return Slidable(
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.25,
+        children: [
+          SlidableAction(
+            onPressed: (_) => _confirmDelete(context, ref, item),
+            backgroundColor: AppColors.danger,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Löschen',
+          ),
+        ],
+      ),
+      child: content,
+    );
+  }
+
+  Future<void> _confirmDelete(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eintrag löschen'),
+        content:
+            const Text('Eintrag unwiderruflich entfernen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final tenant = ref.read(currentTenantProvider);
+      final person = await ref.read(personProvider(personId).future);
+
+      if (person == null || tenant == null) return;
+
+      // Remove the matching history entry by date and type
+      final itemDate = item['date']?.toString();
+      final itemType = item['type'] as int?;
+      final itemText = item['text']?.toString() ?? '';
+
+      final updatedHistory = person.history.where((h) {
+        // Match by date, type, and text to find exact entry
+        if (h.date == itemDate && h.type == itemType) {
+          if ((h.text ?? '') == itemText) return false;
+        }
+        return true;
+      }).map((h) => h.toJson()).toList();
+
+      await supabase
+          .from('player')
+          .update({'history': updatedHistory})
+          .eq('id', person.id!)
+          .eq('tenantId', tenant.id!);
+
+      ref.invalidate(personProvider(personId));
+      ref.invalidate(personHistoryProvider(personId));
+      ref.invalidate(realtimePlayersProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Eintrag gelöscht'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fehler: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
   }
 }

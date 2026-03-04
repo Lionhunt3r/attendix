@@ -1,23 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../../core/config/supabase_config.dart';
 import '../../../../../core/constants/app_constants.dart';
+import '../../../../../core/constants/table_names.dart';
+import '../../../../../core/providers/realtime_providers.dart';
+import '../../../../../core/providers/tenant_providers.dart';
 import '../../../../../core/theme/app_colors.dart';
+import '../../../../../core/utils/toast_helper.dart';
 import '../../../../../data/models/person/person.dart';
+import '../../../../../shared/widgets/sheets/image_viewer_sheet.dart';
+import '../../pages/person_detail_page.dart';
 
 /// Header widget displaying person avatar, group, and attendance stats.
-class PersonHeader extends StatelessWidget {
+class PersonHeader extends ConsumerWidget {
   const PersonHeader({
     super.key,
     required this.person,
     required this.statsAsync,
+    this.canEdit = false,
   });
 
   final Person person;
   final AsyncValue<Map<String, dynamic>> statsAsync;
+  final bool canEdit;
+
+  bool get _hasImage =>
+      person.img != null &&
+      person.img!.isNotEmpty &&
+      !person.img!.contains('.svg');
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.paddingL),
       decoration: BoxDecoration(
@@ -33,25 +49,25 @@ class PersonHeader extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Hero(
-            tag: 'person-${person.id}',
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.white,
-              backgroundImage:
-                  person.img != null && !person.img!.contains('.svg')
-                      ? NetworkImage(person.img!)
-                      : null,
-              child: person.img == null || person.img!.contains('.svg')
-                  ? Text(
-                      person.initials,
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    )
-                  : null,
+          GestureDetector(
+            onTap: () => _onAvatarTap(context, ref),
+            child: Hero(
+              tag: 'person-${person.id}',
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.white,
+                backgroundImage: _hasImage ? NetworkImage(person.img!) : null,
+                child: !_hasImage
+                    ? Text(
+                        person.initials,
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : null,
+              ),
             ),
           ),
           const SizedBox(height: AppDimensions.paddingM),
@@ -63,7 +79,8 @@ class PersonHeader extends StatelessWidget {
               ),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+                borderRadius:
+                    BorderRadius.circular(AppDimensions.borderRadiusS),
               ),
               child: Text(
                 person.groupName!,
@@ -110,6 +127,207 @@ class PersonHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _onAvatarTap(BuildContext context, WidgetRef ref) {
+    if (!canEdit && !_hasImage) return;
+
+    // If not editable but has image, just view it
+    if (!canEdit && _hasImage) {
+      showImageViewerSheet(
+        context,
+        url: person.img!,
+        fileName: '${person.fullName}.jpg',
+      );
+      return;
+    }
+
+    // Capture outer context before bottom sheet builder shadows it
+    final outerContext = context;
+
+    // Show action sheet
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Passbild ersetzen'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _replacePhoto(outerContext, ref);
+              },
+            ),
+            if (_hasImage)
+              ListTile(
+                leading: const Icon(Icons.delete, color: AppColors.danger),
+                title: const Text('Passbild entfernen'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _removePhoto(outerContext, ref);
+                },
+              ),
+            if (_hasImage)
+              ListTile(
+                leading: const Icon(Icons.visibility),
+                title: const Text('Passbild ansehen'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  showImageViewerSheet(
+                    outerContext,
+                    url: person.img!,
+                    fileName: '${person.fullName}.jpg',
+                  );
+                },
+              ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Abbrechen'),
+              onTap: () => Navigator.pop(sheetContext),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _replacePhoto(BuildContext context, WidgetRef ref) async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
+
+      if (image == null) return;
+
+      if (!context.mounted) return;
+      ToastHelper.showInfo(context, 'Lade Passbild hoch...');
+
+      final bytes = await image.readAsBytes();
+
+      // Check file size (max 2MB)
+      if (bytes.length > 2 * 1024 * 1024) {
+        if (context.mounted) {
+          ToastHelper.showError(context, 'Bild ist zu groß (max 2MB)');
+        }
+        return;
+      }
+
+      final supabase = ref.read(supabaseClientProvider);
+      final tenant = ref.read(currentTenantProvider);
+      final personId = person.id;
+
+      if (personId == null || tenant == null) return;
+
+      final storagePath = '${tenant.id}/$personId.jpg';
+
+      // Delete old file if it exists (ignore errors)
+      try {
+        await supabase.storage
+            .from(SupabaseBuckets.profiles)
+            .remove([storagePath]);
+      } catch (_) {}
+
+      // Upload new file
+      await supabase.storage.from(SupabaseBuckets.profiles).uploadBinary(
+            storagePath,
+            bytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/jpeg',
+              upsert: true,
+            ),
+          );
+
+      final publicUrl = supabase.storage
+          .from(SupabaseBuckets.profiles)
+          .getPublicUrl(storagePath);
+
+      // Add cache-busting query param
+      final urlWithCacheBust =
+          '$publicUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      // Update player record
+      await supabase
+          .from('player')
+          .update({'img': urlWithCacheBust})
+          .eq('id', personId)
+          .eq('tenantId', tenant.id!);
+
+      ref.invalidate(personProvider(personId));
+      ref.invalidate(realtimePlayersProvider);
+
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Passbild aktualisiert');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler beim Hochladen: $e');
+      }
+    }
+  }
+
+  Future<void> _removePhoto(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Passbild entfernen?'),
+        content:
+            const Text('Das Passbild wird unwiderruflich gelöscht.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Entfernen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final tenant = ref.read(currentTenantProvider);
+      final personId = person.id;
+
+      if (personId == null || tenant == null) return;
+
+      // Delete from storage
+      final storagePath = '${tenant.id}/$personId.jpg';
+      try {
+        await supabase.storage
+            .from(SupabaseBuckets.profiles)
+            .remove([storagePath]);
+      } catch (_) {}
+
+      // Clear img field on player record
+      await supabase
+          .from('player')
+          .update({'img': null})
+          .eq('id', personId)
+          .eq('tenantId', tenant.id!);
+
+      ref.invalidate(personProvider(personId));
+      ref.invalidate(realtimePlayersProvider);
+
+      if (context.mounted) {
+        ToastHelper.showSuccess(context, 'Passbild entfernt');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Fehler: $e');
+      }
+    }
   }
 }
 

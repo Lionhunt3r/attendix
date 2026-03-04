@@ -146,7 +146,14 @@ void main() {
       test('approvePlayer has both id and tenantId filter', () {
         final section = _extractMethodBody(playerRepoSource, 'approvePlayer');
         expect(section, isNotNull);
-        expect(section, contains(".eq('id', playerId)"));
+        expect(section, contains(".eq('id', player.id!)"));
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
+      });
+
+      test('declinePlayer has both id and tenantId filter', () {
+        final section = _extractMethodBody(playerRepoSource, 'declinePlayer');
+        expect(section, isNotNull);
+        expect(section, contains(".eq('id', player.id!)"));
         expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
 

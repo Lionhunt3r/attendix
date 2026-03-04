@@ -1,6 +1,21 @@
 {
   "versions": [
     {
+      "version": "0.1.13",
+      "date": "4.3.2026",
+      "changes": [
+        "📅 Anstehende Termine: Accordion in Personendetails",
+        "🗑️ Historie: Einträge per Swipe löschen",
+        "📸 Passbild: Ersetzen, entfernen und ansehen",
+        "🎵 Stimmumfang/Prüfling/Testergebnis: Felder für Chöre",
+        "✅ Genehmigen/Ablehnen: Neue Spieler bestätigen oder ablehnen",
+        "🔄 Übertragen/Kopieren: Einzelperson in andere Instanz",
+        "🔍 Erweiterte Filter: Ohne Account, Prüflinge, Ohne Lehrer, Ohne Test",
+        "⚙️ Ansichtsoptionen: Spalten in Personenliste konfigurieren",
+        "🏢 Andere Instanzen: Accordion zeigt Mitgliedschaften"
+      ]
+    },
+    {
       "version": "0.1.12",
       "date": "2.3.2026",
       "changes": [

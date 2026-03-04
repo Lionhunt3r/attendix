@@ -177,13 +177,26 @@ class PlayerNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> approvePlayer(int playerId) async {
+  Future<void> approvePlayer(Person player) async {
     state = const AsyncValue.loading();
     try {
-      await _repo.approvePlayer(playerId);
+      await _repo.approvePlayer(player);
       state = const AsyncValue.data(null);
       ref.invalidate(pendingPlayersProvider);
       ref.invalidate(playersProvider);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
+  }
+
+  Future<void> declinePlayer(Person player, String reason) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repo.declinePlayer(player, reason);
+      state = const AsyncValue.data(null);
+      ref.invalidate(pendingPlayersProvider);
+      ref.invalidate(playersProvider);
+      ref.invalidate(archivedPlayersProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
