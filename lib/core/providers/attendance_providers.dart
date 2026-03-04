@@ -134,6 +134,7 @@ final averageAttendancePercentProvider = Provider<double?>((ref) {
 ///
 /// Watches [attendanceRefetchCounter] so realtime changes to
 /// person_attendances automatically trigger a refetch.
+/// Uses paginated fetching to avoid the Supabase default 1000-row limit.
 final playerAttendancePercentagesProvider =
     FutureProvider<Map<int, int>>((ref) async {
   ref.watch(attendanceRefetchCounter);
@@ -143,19 +144,32 @@ final playerAttendancePercentagesProvider =
   if (tenant == null || tenant.id == null) return {};
 
   final now = DateTime.now().toIso8601String();
-  final response = await supabase
-      .from('person_attendances')
-      .select('person_id, status, attendance:attendance_id!inner(date, tenantId)')
-      .eq('attendance.tenantId', tenant.id!)
-      .lte('attendance.date', now);
 
-  final attendances = response as List;
+  // Fetch all records using pagination to avoid the PostgREST 1000-row default limit.
+  // A tenant with 50+ members and 25+ events easily exceeds 1000 person_attendances.
+  const batchSize = 1000;
+  final allAttendances = <dynamic>[];
+  int offset = 0;
+
+  while (true) {
+    final batch = await supabase
+        .from('person_attendances')
+        .select('person_id, status, attendance:attendance_id!inner(date, tenantId)')
+        .eq('attendance.tenantId', tenant.id!)
+        .lte('attendance.date', now)
+        .range(offset, offset + batchSize - 1);
+
+    final rows = batch as List;
+    allAttendances.addAll(rows);
+    if (rows.length < batchSize) break;
+    offset += batchSize;
+  }
 
   // Group by person_id
   final totals = <int, int>{};
   final attended = <int, int>{};
 
-  for (final a in attendances) {
+  for (final a in allAttendances) {
     final personId = a['person_id'] as int?;
     if (personId == null) continue;
     totals[personId] = (totals[personId] ?? 0) + 1;
