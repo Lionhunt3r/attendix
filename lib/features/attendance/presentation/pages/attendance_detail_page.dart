@@ -148,6 +148,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     _isDisposed = true;
     _providerSubscription?.close();
     _unsubscribeFromRealtimeChanges();
+    // Clear provider cache so re-entry gets fresh data from DB.
+    // Done here (not in _savePersonStatus) to avoid flicker from mid-use refetch.
+    ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
     super.dispose();
   }
 
