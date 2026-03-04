@@ -11,6 +11,15 @@ import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 
+/// Predefined reminder time options
+const _reminderPresets = [
+  (hours: 1, label: '1 Stunde'),
+  (hours: 2, label: '2 Stunden'),
+  (hours: 24, label: '1 Tag'),
+  (hours: 48, label: '2 Tage'),
+  (hours: 168, label: '1 Woche'),
+];
+
 /// Attendance Type Edit Page
 ///
 /// Edit an existing attendance type or create a new one.
@@ -29,6 +38,9 @@ class AttendanceTypeEditPage extends ConsumerStatefulWidget {
 class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _durationDaysController = TextEditingController(text: '1');
+  final _planningTitleController = TextEditingController();
+  final _customReminderController = TextEditingController();
 
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -47,6 +59,13 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   bool _hideName = false;
   bool _includeInAverage = true;
   String _color = 'primary';
+  bool _allDay = false;
+  int _durationDays = 1;
+  bool _notification = false;
+  List<int> _reminders = [];
+  List<ChecklistItem> _checklist = [];
+  List<Map<String, dynamic>> _planFields = [];
+  String _planningTitle = '';
 
   bool _isLoading = true;
   bool _hasChanges = false;
@@ -90,6 +109,15 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         _hideName = type.hideName;
         _includeInAverage = type.includeInAverage;
         _color = type.color ?? 'primary';
+        _allDay = type.allDay;
+        _durationDays = type.durationDays ?? 1;
+        _durationDaysController.text = '$_durationDays';
+        _notification = type.notification;
+        _reminders = List<int>.from(type.reminders ?? []);
+        _checklist = List<ChecklistItem>.from(type.checklist ?? []);
+        _planningTitle = type.planningTitle ?? '';
+        _planningTitleController.text = _planningTitle;
+        _planFields = _parsePlanFields(type.defaultPlan);
         _isLoading = false;
       });
     } else {
@@ -100,6 +128,9 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   @override
   void dispose() {
     _nameController.dispose();
+    _durationDaysController.dispose();
+    _planningTitleController.dispose();
+    _customReminderController.dispose();
     super.dispose();
   }
 
@@ -190,8 +221,59 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
             ),
             const SizedBox(height: AppDimensions.paddingL),
 
-            // Time Settings
+            // All-day toggle
             _buildSection(
+              title: 'Ganztägig',
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: const Text('Ganztägiger Termin'),
+                    subtitle: const Text('Keine Uhrzeit, nur Dauer in Tagen'),
+                    value: _allDay,
+                    onChanged: (value) => setState(() {
+                      _allDay = value;
+                      _hasChanges = true;
+                    }),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  if (_allDay)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          const Text('Dauer: '),
+                          SizedBox(
+                            width: 60,
+                            child: TextFormField(
+                              controller: _durationDaysController,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              ),
+                              onChanged: (value) {
+                                final parsed = int.tryParse(value);
+                                if (parsed != null && parsed > 0) {
+                                  _durationDays = parsed;
+                                  _hasChanges = true;
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(_durationDays == 1 ? 'Tag' : 'Tage'),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingL),
+
+            // Time Settings (hidden when allDay)
+            if (!_allDay) ...[
+              _buildSection(
               title: 'Zeiten',
               child: Row(
                 children: [
@@ -216,6 +298,7 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
               ),
             ),
             const SizedBox(height: AppDimensions.paddingL),
+            ], // end if (!_allDay)
 
             // Default Status
             _buildSection(
@@ -333,6 +416,258 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
                 ],
               ),
             ),
+            const SizedBox(height: AppDimensions.paddingL),
+
+            // Ablaufplan (Default Plan) - only when manageSongs is enabled
+            if (_manageSongs) ...[
+              _buildSection(
+                title: 'Ablaufplan-Vorlage',
+                child: Column(
+                  children: [
+                    // Planning title
+                    TextFormField(
+                      controller: _planningTitleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Ablaufplan-Titel',
+                        hintText: 'z.B. Probenplan',
+                      ),
+                      onChanged: (value) {
+                        _planningTitle = value;
+                        _hasChanges = true;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    // Plan fields list
+                    if (_planFields.isNotEmpty)
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _planFields.length,
+                        onReorder: (oldIndex, newIndex) {
+                          setState(() {
+                            if (newIndex > oldIndex) newIndex--;
+                            final item = _planFields.removeAt(oldIndex);
+                            _planFields.insert(newIndex, item);
+                            _hasChanges = true;
+                          });
+                        },
+                        itemBuilder: (context, index) {
+                          final field = _planFields[index];
+                          final isSongPlaceholder = (field['id'] as String? ?? '').startsWith('song-placeholder');
+                          return ListTile(
+                            key: ValueKey('plan-field-${field['id']}'),
+                            leading: ReorderableDragStartListener(
+                              index: index,
+                              child: const Icon(Icons.drag_handle),
+                            ),
+                            title: Text(
+                              field['name'] as String? ?? '',
+                              style: isSongPlaceholder
+                                  ? const TextStyle(fontStyle: FontStyle.italic)
+                                  : null,
+                            ),
+                            subtitle: Text('${field['time'] ?? '0'} Min.'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.close, size: 20),
+                              onPressed: () => setState(() {
+                                _planFields.removeAt(index);
+                                _hasChanges = true;
+                              }),
+                            ),
+                            onTap: () => _editPlanField(index),
+                          );
+                        },
+                      ),
+                    // Total duration
+                    if (_planFields.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Gesamt: ${_totalPlanMinutes()} Min.',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.medium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Add buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _addPlanField,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Feld'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _addSongPlaceholder,
+                            icon: const Icon(Icons.music_note, size: 18),
+                            label: const Text('Werk'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingL),
+            ],
+
+            // Terminerinnerungen
+            _buildSection(
+              title: 'Erinnerungen',
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    title: const Text('Erinnerungen aktivieren'),
+                    subtitle: const Text('Vor dem Termin erinnern'),
+                    value: _notification,
+                    onChanged: (value) => setState(() {
+                      _notification = value;
+                      _hasChanges = true;
+                    }),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  if (_notification) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _reminderPresets.map((preset) {
+                        final isSelected = _reminders.contains(preset.hours);
+                        return FilterChip(
+                          label: Text(preset.label),
+                          selected: isSelected,
+                          onSelected: (selected) => setState(() {
+                            if (selected) {
+                              _reminders.add(preset.hours);
+                              _reminders.sort();
+                            } else {
+                              _reminders.remove(preset.hours);
+                            }
+                            _hasChanges = true;
+                          }),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    // Custom reminder
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _customReminderController,
+                            decoration: const InputDecoration(
+                              labelText: 'Eigene (Stunden)',
+                              hintText: 'z.B. 72',
+                              isDense: true,
+                            ),
+                            keyboardType: TextInputType.number,
+                            onSubmitted: (value) {
+                              final hours = int.tryParse(value);
+                              if (hours != null && hours > 0 && !_reminders.contains(hours)) {
+                                setState(() {
+                                  _reminders.add(hours);
+                                  _reminders.sort();
+                                  _hasChanges = true;
+                                  _customReminderController.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_reminders.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Wrap(
+                          spacing: 4,
+                          children: _reminders.map((hours) {
+                            return Chip(
+                              label: Text(_formatReminderHours(hours)),
+                              onDeleted: () => setState(() {
+                                _reminders.remove(hours);
+                                _hasChanges = true;
+                              }),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: AppDimensions.paddingL),
+
+            // Checkliste (Template)
+            _buildSection(
+              title: 'Checkliste',
+              child: Column(
+                children: [
+                  if (_checklist.isNotEmpty)
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _checklist.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) newIndex--;
+                          final item = _checklist.removeAt(oldIndex);
+                          _checklist.insert(newIndex, item);
+                          _hasChanges = true;
+                        });
+                      },
+                      itemBuilder: (context, index) {
+                        final item = _checklist[index];
+                        return ListTile(
+                          key: ValueKey('checklist-${item.id}'),
+                          leading: ReorderableDragStartListener(
+                            index: index,
+                            child: const Icon(Icons.drag_handle),
+                          ),
+                          title: Text(item.text),
+                          subtitle: item.deadlineHours != null
+                              ? Text('Frist: ${_formatReminderHours(item.deadlineHours!)} vorher')
+                              : null,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () => setState(() {
+                              _checklist.removeAt(index);
+                              _hasChanges = true;
+                            }),
+                          ),
+                          onTap: () => _editChecklistItem(index),
+                        );
+                      },
+                    ),
+                  if (_checklist.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Keine To-Dos definiert',
+                        style: TextStyle(color: AppColors.medium),
+                      ),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _addChecklistItem,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('To-Do hinzufügen'),
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: AppDimensions.paddingXL),
           ],
         ),
@@ -358,7 +693,7 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
       children: [
         Text(
           title,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: AppColors.medium,
@@ -394,7 +729,7 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
           ? (_startTime ?? const TimeOfDay(hour: 19, minute: 0))
           : (_endTime ?? const TimeOfDay(hour: 20, minute: 30)),
     );
-    if (time != null) {
+    if (time != null && mounted) {
       setState(() {
         if (isStart) {
           _startTime = time;
@@ -417,6 +752,203 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
 
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  List<Map<String, dynamic>> _parsePlanFields(Map<String, dynamic>? plan) {
+    if (plan == null) return [];
+    final fields = plan['fields'];
+    if (fields is! List || fields.isEmpty) return [];
+    return fields
+        .map((f) => Map<String, dynamic>.from(f as Map))
+        .toList();
+  }
+
+  int _totalPlanMinutes() {
+    return _planFields.fold<int>(0, (sum, f) {
+      return sum + (int.tryParse('${f['time'] ?? '0'}') ?? 0);
+    });
+  }
+
+  Future<void> _addPlanField() async {
+    final result = await _showPlanFieldDialog();
+    if (result != null) {
+      setState(() {
+        _planFields.add(result);
+        _hasChanges = true;
+      });
+    }
+  }
+
+  Future<void> _addSongPlaceholder() async {
+    final index = _planFields.where((f) =>
+        (f['id'] as String? ?? '').startsWith('song-placeholder')).length;
+    setState(() {
+      _planFields.add({
+        'id': 'song-placeholder-$index',
+        'name': 'Werk ${index + 1}',
+        'time': '20',
+      });
+      _hasChanges = true;
+    });
+  }
+
+  Future<void> _editPlanField(int index) async {
+    final result = await _showPlanFieldDialog(existing: _planFields[index]);
+    if (result != null) {
+      setState(() {
+        _planFields[index] = result;
+        _hasChanges = true;
+      });
+    }
+  }
+
+  Future<Map<String, dynamic>?> _showPlanFieldDialog({Map<String, dynamic>? existing}) async {
+    final nameCtrl = TextEditingController(text: existing?['name'] as String? ?? '');
+    final timeCtrl = TextEditingController(text: existing?['time'] as String? ?? '10');
+    final id = existing?['id'] as String? ?? 'custom-${DateTime.now().millisecondsSinceEpoch}';
+
+    try {
+      return await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(existing != null ? 'Feld bearbeiten' : 'Neues Feld'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Bezeichnung',
+                  hintText: 'z.B. Einspielen, Pause',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: timeCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Dauer (Minuten)',
+                  hintText: 'z.B. 10',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(context, {
+                  'id': id,
+                  'name': name,
+                  'time': timeCtrl.text.trim().isEmpty ? '0' : timeCtrl.text.trim(),
+                });
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      nameCtrl.dispose();
+      timeCtrl.dispose();
+    }
+  }
+
+  Future<void> _addChecklistItem() async {
+    final result = await _showChecklistItemDialog();
+    if (result != null) {
+      setState(() {
+        _checklist.add(result);
+        _hasChanges = true;
+      });
+    }
+  }
+
+  Future<void> _editChecklistItem(int index) async {
+    final result = await _showChecklistItemDialog(existing: _checklist[index]);
+    if (result != null) {
+      setState(() {
+        _checklist[index] = result;
+        _hasChanges = true;
+      });
+    }
+  }
+
+  Future<ChecklistItem?> _showChecklistItemDialog({ChecklistItem? existing}) async {
+    final textCtrl = TextEditingController(text: existing?.text ?? '');
+    final deadlineCtrl = TextEditingController(
+      text: existing?.deadlineHours?.toString() ?? '',
+    );
+
+    try {
+      return await showDialog<ChecklistItem>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(existing != null ? 'To-Do bearbeiten' : 'Neues To-Do'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: textCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Aufgabe',
+                  hintText: 'z.B. Noten vorbereiten',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: deadlineCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Frist (Stunden vorher, optional)',
+                  hintText: 'z.B. 24 für 1 Tag',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final text = textCtrl.text.trim();
+                if (text.isEmpty) return;
+                Navigator.pop(context, ChecklistItem(
+                  id: existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  text: text,
+                  deadlineHours: int.tryParse(deadlineCtrl.text.trim()),
+                ));
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      textCtrl.dispose();
+      deadlineCtrl.dispose();
+    }
+  }
+
+  String _formatReminderHours(int hours) {
+    if (hours < 24) return '$hours Std.';
+    final days = hours ~/ 24;
+    final remaining = hours % 24;
+    if (remaining == 0) {
+      if (days == 7) return '1 Woche';
+      if (days == 14) return '2 Wochen';
+      return '$days ${days == 1 ? 'Tag' : 'Tage'}';
+    }
+    return '$days ${days == 1 ? 'Tag' : 'Tage'} $remaining Std.';
   }
 
   Future<void> _onBackPressed() async {
@@ -445,8 +977,8 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
     try {
       final updates = {
         'name': _nameController.text.trim(),
-        'start_time': _formatTime(_startTime ?? const TimeOfDay(hour: 19, minute: 0)),
-        'end_time': _formatTime(_endTime ?? const TimeOfDay(hour: 20, minute: 30)),
+        'start_time': _allDay ? null : _formatTime(_startTime ?? const TimeOfDay(hour: 19, minute: 0)),
+        'end_time': _allDay ? null : _formatTime(_endTime ?? const TimeOfDay(hour: 20, minute: 30)),
         'default_status': _defaultStatus.value,
         'available_statuses': _availableStatuses.map((s) => s.value).toList(),
         'manage_songs': _manageSongs,
@@ -455,6 +987,17 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         'hide_name': _hideName,
         'include_in_average': _includeInAverage,
         'color': _color,
+        'all_day': _allDay,
+        'duration_days': _allDay ? _durationDays : null,
+        'notification': _notification,
+        'reminders': _reminders.isNotEmpty ? _reminders : null,
+        'checklist': _checklist.isNotEmpty
+            ? _checklist.map((item) => item.toJson()).toList()
+            : null,
+        'default_plan': _planFields.isNotEmpty
+            ? {'fields': _planFields}
+            : null,
+        'planning_title': _planningTitle.isNotEmpty ? _planningTitle : null,
       };
 
       await ref.read(attendanceTypeNotifierProvider.notifier).updateType(widget.typeId, updates);
