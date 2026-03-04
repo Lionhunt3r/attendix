@@ -340,6 +340,18 @@ class _TenantCard extends ConsumerWidget {
                 },
               ),
 
+              IconButton(
+                icon: const Icon(
+                  Icons.info_outline,
+                  color: AppColors.medium,
+                ),
+                onPressed: () {
+                  if (tenant.id != null) {
+                    context.push('/tenants/${tenant.id}');
+                  }
+                },
+              ),
+
               const Icon(
                 Icons.chevron_right,
                 color: AppColors.medium,
