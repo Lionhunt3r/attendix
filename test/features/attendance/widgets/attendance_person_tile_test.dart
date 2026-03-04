@@ -100,6 +100,36 @@ void main() {
 
         expect(find.text('Max Mustermann'), findsOneWidget);
       });
+
+      widgetTest('does not show group name', (tester) async {
+        final personWithGroup = TestFactories.createPerson(
+          id: 1,
+          firstName: 'Max',
+          lastName: 'Mustermann',
+        );
+        // Person model has groupName but tile should not display it
+        await tester.pumpApp(
+          Scaffold(
+            body: AttendancePersonTile(
+              person: personWithGroup,
+              status: AttendanceStatus.present,
+              notes: null,
+              availableStatuses: AttendanceStatus.values,
+              onStatusChanged: (_) {},
+              onNoteChanged: (_) {},
+              onShowModifierInfo: () {},
+              onRemoveFromAttendance: () {},
+            ),
+          ),
+        );
+
+        // Only name should be shown, no subtitle when no notes
+        expect(find.text('Max Mustermann'), findsOneWidget);
+        // No second text line at all
+        final column = tester.widget<Column>(find.byType(Column).first);
+        final textChildren = column.children.whereType<Text>().toList();
+        expect(textChildren.length, 1); // Only the name
+      });
     });
   });
 }
