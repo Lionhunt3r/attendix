@@ -1,7 +1,7 @@
 name: attendix
 description: "Attendance Management App - Flutter Version"
 publish_to: 'none'
-version: 0.1.26+27
+version: 0.1.27+28
 
 environment:
   sdk: ^3.7.0
@@ -73,6 +73,7 @@ dependencies:
   web: ^1.1.0
   vsc_quill_delta_to_html: ^1.0.5
   flutter_quill_delta_from_html: ^1.5.3
+  connectivity_plus: ^7.0.0
 
 dev_dependencies:
   flutter_test:

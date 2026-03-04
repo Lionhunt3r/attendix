@@ -89,6 +89,13 @@ class SongOptionsSheet extends StatelessWidget {
                 subtitle: Text(instrumentFiles.first.fileName),
                 onTap: () => _openFile(context, instrumentFiles.first),
               ),
+              ListTile(
+                leading:
+                    const Icon(Icons.download, color: AppColors.success),
+                title: const Text('Noten herunterladen'),
+                subtitle: Text(instrumentFiles.first.fileName),
+                onTap: () => _downloadFile(context, instrumentFiles.first),
+              ),
             ] else ...[
               ListTile(
                 leading:
@@ -99,6 +106,18 @@ class SongOptionsSheet extends StatelessWidget {
                   context,
                   instrumentFiles,
                   'Noten auswählen',
+                ),
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.download, color: AppColors.success),
+                title: const Text('Noten herunterladen'),
+                subtitle: Text('${instrumentFiles.length} Dateien verfügbar'),
+                onTap: () => _showFileSelector(
+                  context,
+                  instrumentFiles,
+                  'Datei herunterladen',
+                  download: true,
                 ),
               ),
             ],
@@ -184,11 +203,28 @@ class SongOptionsSheet extends StatelessWidget {
     if (context.mounted) Navigator.pop(context);
   }
 
+  Future<void> _downloadFile(BuildContext context, SongFile file) async {
+    // Append ?download= to force Content-Disposition: attachment
+    final downloadUrl = file.url.contains('?')
+        ? '${file.url}&download='
+        : '${file.url}?download=';
+    final uri = Uri.parse(downloadUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ToastHelper.showError(context, 'Datei konnte nicht heruntergeladen werden');
+      }
+    }
+    if (context.mounted) Navigator.pop(context);
+  }
+
   void _showFileSelector(
     BuildContext context,
     List<SongFile> files,
-    String title,
-  ) {
+    String title, {
+    bool download = false,
+  }) {
     Navigator.pop(context);
     showModalBottomSheet(
       context: context,
@@ -207,7 +243,7 @@ class SongOptionsSheet extends StatelessWidget {
                   leading: Icon(_getFileIcon(file.fileType)),
                   title: Text(file.fileName),
                   subtitle: file.note != null ? Text(file.note!) : null,
-                  onTap: () => _openFile(context, file),
+                  onTap: () => download ? _downloadFile(context, file) : _openFile(context, file),
                 )),
             const SizedBox(height: AppDimensions.paddingM),
           ],

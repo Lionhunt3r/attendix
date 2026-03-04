@@ -14,6 +14,7 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_detail_providers.dart';
 import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/conductor_providers.dart';
+import '../../../../core/providers/connectivity_provider.dart';
 import '../../../../core/providers/realtime_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -449,6 +450,27 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
               return CustomScrollView(
                 slivers: [
+                  // Offline banner
+                  SliverToBoxAdapter(
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final isOnline = ref.watch(connectivityProvider).valueOrNull ?? true;
+                        if (isOnline) return const SizedBox.shrink();
+                        return MaterialBanner(
+                          content: const Text('Keine Internetverbindung. Änderungen werden möglicherweise nicht gespeichert.'),
+                          leading: const Icon(Icons.wifi_off, color: AppColors.warning),
+                          backgroundColor: AppColors.warning.withAlpha(30),
+                          actions: [
+                            TextButton(
+                              onPressed: () {},
+                              child: const Text('OK'),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+
                   SliverToBoxAdapter(
                     child: Column(
                       children: [
