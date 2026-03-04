@@ -334,7 +334,9 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
       final Map<String, List<SongHistory>> grouped = {};
       for (final item in response as List) {
         final history = SongHistory.fromJson(item as Map<String, dynamic>);
-        final date = history.date ?? '';
+        final rawDate = history.date ?? '';
+        // Normalize to YYYY-MM-DD to prevent duplicate groups from different date formats
+        final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
         grouped.putIfAbsent(date, () => []).add(history);
       }
 
