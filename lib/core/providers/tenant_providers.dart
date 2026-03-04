@@ -155,18 +155,20 @@ final userTenantsProvider = FutureProvider<List<Tenant>>((ref) async {
   // Get tenant user records including favorite flag
   final tenantUsersResponse = await supabase
       .from('tenantUsers')
-      .select('tenantId, favorite')
+      .select('tenantId, favorite, role')
       .eq('userId', userId);
 
   if ((tenantUsersResponse as List).isEmpty) return [];
 
-  // Build favorite map
+  // Build favorite and role maps
   final favoriteMap = <int, bool>{};
+  final roleMap = <int, int>{};
   final tenantIds = <int>[];
   for (final item in tenantUsersResponse as List) {
     final tenantId = item['tenantId'] as int;
     tenantIds.add(tenantId);
     favoriteMap[tenantId] = item['favorite'] as bool? ?? false;
+    roleMap[tenantId] = item['role'] as int? ?? 99;
   }
 
   // Then get the tenants
@@ -178,9 +180,13 @@ final userTenantsProvider = FutureProvider<List<Tenant>>((ref) async {
   final List<Tenant> tenants = [];
   for (final item in tenantsResponse as List) {
     final tenant = Tenant.fromJson(item as Map<String, dynamic>);
-    // Merge favorite from tenantUsers into Tenant model
+    // Merge favorite and role from tenantUsers into Tenant model
     final isFavorite = favoriteMap[tenant.id] ?? false;
-    tenants.add(isFavorite ? tenant.copyWith(favorite: true) : tenant);
+    final userRole = roleMap[tenant.id] ?? 99;
+    tenants.add(tenant.copyWith(
+      favorite: isFavorite ? true : null,
+      role: userRole,
+    ));
   }
 
   // Sort: favorites first, then alphabetically
