@@ -12,8 +12,23 @@ class AppConstants {
 
   /// Demo credentials from environment (for development only)
   /// SEC-009: Only expose in debug mode
-  static String get demoMail => kDebugMode ? (dotenv.env['DEMO_EMAIL'] ?? '') : '';
-  static String get demoPassword => kDebugMode ? (dotenv.env['DEMO_PASSWORD'] ?? '') : '';
+  static String get demoMail {
+    if (!kDebugMode) return '';
+    try {
+      return dotenv.env['DEMO_EMAIL'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  static String get demoPassword {
+    if (!kDebugMode) return '';
+    try {
+      return dotenv.env['DEMO_PASSWORD'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
 }
 
 /// Default avatar image URL
