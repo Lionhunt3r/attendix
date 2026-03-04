@@ -18,6 +18,7 @@ class AttendanceGrid extends StatelessWidget {
     required this.onNoteChanged,
     required this.onShowModifierInfo,
     required this.onRemoveFromAttendance,
+    this.clickMode = false,
   });
 
   final List<Person> persons;
@@ -28,6 +29,7 @@ class AttendanceGrid extends StatelessWidget {
   final void Function(int personId, String? notes) onNoteChanged;
   final void Function(int personId) onShowModifierInfo;
   final void Function(int personId) onRemoveFromAttendance;
+  final bool clickMode;
 
   @override
   Widget build(BuildContext context) {
@@ -57,6 +59,7 @@ class AttendanceGrid extends StatelessWidget {
           onNoteChanged: onNoteChanged,
           onShowModifierInfo: onShowModifierInfo,
           onRemoveFromAttendance: onRemoveFromAttendance,
+          clickMode: clickMode,
         );
       },
     );
@@ -95,6 +98,7 @@ class _InstrumentGroupSection extends StatelessWidget {
     required this.onNoteChanged,
     required this.onShowModifierInfo,
     required this.onRemoveFromAttendance,
+    this.clickMode = false,
   });
 
   final String groupName;
@@ -106,6 +110,7 @@ class _InstrumentGroupSection extends StatelessWidget {
   final void Function(int personId, String? notes) onNoteChanged;
   final void Function(int personId) onShowModifierInfo;
   final void Function(int personId) onRemoveFromAttendance;
+  final bool clickMode;
 
   @override
   Widget build(BuildContext context) {
@@ -161,6 +166,7 @@ class _InstrumentGroupSection extends StatelessWidget {
             status: status,
             notes: notes,
             availableStatuses: availableStatuses,
+            clickMode: clickMode,
             onStatusChanged: (newStatus) {
               if (person.id != null) {
                 onStatusChanged(person.id!, newStatus);

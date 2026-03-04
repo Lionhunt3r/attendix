@@ -230,7 +230,7 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
                     ),
                     const SizedBox(height: AppDimensions.paddingXL),
                     OutlinedButton.icon(
-                      onPressed: () => context.push('/tenants/new'),
+                      onPressed: () => context.push('/register'),
                       icon: const Icon(Icons.add),
                       label: const Text('Neue Gruppe erstellen'),
                     ),
@@ -242,10 +242,20 @@ class _TenantSelectionPageState extends ConsumerState<TenantSelectionPage> {
 
           return ListView.separated(
             padding: const EdgeInsets.all(AppDimensions.paddingM),
-            itemCount: tenants.length,
+            itemCount: tenants.length + 1, // +1 for create button
             separatorBuilder: (_, __) =>
                 const SizedBox(height: AppDimensions.paddingS),
             itemBuilder: (context, index) {
+              if (index == tenants.length) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: AppDimensions.paddingS),
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push('/register'),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Neue Instanz erstellen'),
+                  ),
+                );
+              }
               final tenant = tenants[index];
               return _TenantCard(
                 tenant: tenant,

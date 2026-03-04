@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/player_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/dialog_helper.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/utils/tenant_label_utils.dart';
@@ -373,8 +374,26 @@ class _PersonCreatePageState extends ConsumerState<PersonCreatePage> {
     setState(() => _isLoading = true);
 
     try {
-      // FN-002: Use WithTenant provider for proper tenantId handling
       final repo = ref.read(playerRepositoryWithTenantProvider);
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
+
+      // B3-015: Check for duplicate names
+      final existingPlayers = await repo.findPlayersByName(firstName, lastName);
+      if (existingPlayers.isNotEmpty && mounted) {
+        final confirmed = await DialogHelper.showConfirmation(
+          context,
+          title: 'Mögliches Duplikat',
+          message: 'Eine Person mit dem Namen "$firstName $lastName" existiert bereits '
+              '(${existingPlayers.length}x). Trotzdem erstellen?',
+          confirmText: 'Trotzdem erstellen',
+          cancelText: 'Abbrechen',
+        );
+        if (!confirmed) {
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
 
       final person = Person(
         firstName: _firstNameController.text.trim(),

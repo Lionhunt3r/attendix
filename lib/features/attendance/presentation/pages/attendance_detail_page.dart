@@ -69,6 +69,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   // Plan accordion state - expand after returning from planning with changes
   bool _planAccordionExpanded = false;
 
+  // Click mode: tap cycles status instead of opening picker
+  bool _clickMode = false;
+
   // Local songs/history entries
   List<SongHistoryEntry> _songEntries = [];
   bool _isSavingSongs = false;
@@ -373,6 +376,14 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
             ),
             actions: [
               IconButton(
+                icon: Icon(
+                  _clickMode ? Icons.touch_app : Icons.touch_app_outlined,
+                  color: _clickMode ? AppColors.primary : null,
+                ),
+                tooltip: _clickMode ? 'Klick-Modus aktiv' : 'Klick-Modus',
+                onPressed: () => setState(() => _clickMode = !_clickMode),
+              ),
+              IconButton(
                 icon: const Icon(Icons.help_outline),
                 tooltip: 'Legende',
                 onPressed: () => showAttendanceLegendSheet(context),
@@ -521,6 +532,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                       localStatuses: _localStatuses,
                       personNotes: _personNotes,
                       availableStatuses: availableStatuses,
+                      clickMode: _clickMode,
                       onStatusChanged: (personId, status) {
                         final previousStatus = _localStatuses[personId];
                         setState(() {

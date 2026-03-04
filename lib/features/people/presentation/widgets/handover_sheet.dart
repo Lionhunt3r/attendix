@@ -39,10 +39,27 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
   List<Group> _targetGroups = [];
   bool _initialized = false;
   int? _sourceGroupFilter;
+  int? _minAge;
+  int? _maxAge;
 
   List<Person> get _filteredPlayers {
-    if (_sourceGroupFilter == null) return widget.selectedPlayers;
-    return widget.selectedPlayers.where((p) => p.instrument == _sourceGroupFilter).toList();
+    var players = widget.selectedPlayers;
+    if (_sourceGroupFilter != null) {
+      players = players.where((p) => p.instrument == _sourceGroupFilter).toList();
+    }
+    if (_minAge != null || _maxAge != null) {
+      final now = DateTime.now();
+      players = players.where((p) {
+        if (p.birthday == null) return false;
+        final birthday = DateTime.tryParse(p.birthday!);
+        if (birthday == null) return false;
+        final age = now.year - birthday.year - (now.isBefore(DateTime(now.year, birthday.month, birthday.day)) ? 1 : 0);
+        if (_minAge != null && age < _minAge!) return false;
+        if (_maxAge != null && age > _maxAge!) return false;
+        return true;
+      }).toList();
+    }
+    return players;
   }
 
   @override
@@ -285,6 +302,8 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
                 ),
               ),
             ],
+            // Age filter
+            _buildAgeFilter(),
             const SizedBox(height: AppDimensions.paddingS),
             Wrap(
               spacing: AppDimensions.paddingS,
@@ -312,6 +331,66 @@ class _HandoverSheetState extends ConsumerState<HandoverSheet> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAgeFilter() {
+    // Check if any player has a birthday
+    final hasBirthdays = widget.selectedPlayers.any((p) => p.birthday != null);
+    if (!hasBirthdays) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppDimensions.paddingS),
+      child: Row(
+        children: [
+          const Icon(Icons.cake_outlined, size: 16, color: AppColors.medium),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 70,
+            child: TextField(
+              decoration: const InputDecoration(
+                labelText: 'Ab',
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                suffixText: 'J.',
+              ),
+              keyboardType: TextInputType.number,
+              onChanged: (value) => setState(() {
+                _minAge = int.tryParse(value);
+              }),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Text('–', style: TextStyle(color: AppColors.medium)),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 70,
+            child: TextField(
+              decoration: const InputDecoration(
+                labelText: 'Bis',
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                suffixText: 'J.',
+              ),
+              keyboardType: TextInputType.number,
+              onChanged: (value) => setState(() {
+                _maxAge = int.tryParse(value);
+              }),
+            ),
+          ),
+          if (_minAge != null || _maxAge != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.clear, size: 18),
+              onPressed: () => setState(() {
+                _minAge = null;
+                _maxAge = null;
+              }),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ],
       ),
     );
   }

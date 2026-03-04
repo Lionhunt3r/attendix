@@ -21,6 +21,7 @@ class AttendancePersonTile extends StatelessWidget {
     required this.onNoteChanged,
     required this.onShowModifierInfo,
     required this.onRemoveFromAttendance,
+    this.clickMode = false,
   });
 
   final Person person;
@@ -31,6 +32,7 @@ class AttendancePersonTile extends StatelessWidget {
   final void Function(String?) onNoteChanged;
   final VoidCallback onShowModifierInfo;
   final VoidCallback onRemoveFromAttendance;
+  final bool clickMode;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +100,8 @@ class AttendancePersonTile extends StatelessWidget {
       child: Card(
         margin: const EdgeInsets.only(bottom: AppDimensions.paddingXS),
         child: InkWell(
-          onTap: () => _showStatusPicker(context),
+          onTap: clickMode ? _cycleStatus : () => _showStatusPicker(context),
+          onLongPress: clickMode ? () => _showStatusPicker(context) : null,
           borderRadius: BorderRadius.circular(AppDimensions.borderRadiusM),
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -163,7 +166,7 @@ class AttendancePersonTile extends StatelessWidget {
                 // Status indicator
                 StatusChip(
                   status: status,
-                  onTap: () => _showStatusPicker(context),
+                  onTap: clickMode ? _cycleStatus : () => _showStatusPicker(context),
                 ),
               ],
             ),
@@ -219,6 +222,13 @@ class AttendancePersonTile extends StatelessWidget {
   void _onStatusChangedWithHaptic(AttendanceStatus newStatus) {
     HapticHelper.light();
     onStatusChanged(newStatus);
+  }
+
+  /// Cycle through available statuses
+  void _cycleStatus() {
+    final currentIndex = availableStatuses.indexOf(status);
+    final nextIndex = (currentIndex + 1) % availableStatuses.length;
+    _onStatusChangedWithHaptic(availableStatuses[nextIndex]);
   }
 
   void _showStatusPicker(BuildContext context) {

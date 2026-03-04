@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
+import '../../../../core/providers/group_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/dialog_helper.dart';
@@ -66,6 +68,8 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   List<ChecklistItem> _checklist = [];
   List<Map<String, dynamic>> _planFields = [];
   String _planningTitle = '';
+  List<int> _relevantGroups = [];
+  Map<String, dynamic>? _additionalFieldsFilter;
 
   bool _isLoading = true;
   bool _hasChanges = false;
@@ -125,6 +129,10 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         _planningTitle = type.planningTitle ?? '';
         _planningTitleController.text = _planningTitle;
         _planFields = _parsePlanFields(type.defaultPlan);
+        _relevantGroups = List<int>.from(type.relevantGroups ?? []);
+        _additionalFieldsFilter = type.additionalFieldsFilter != null
+            ? Map<String, dynamic>.from(type.additionalFieldsFilter!)
+            : null;
         _isLoading = false;
       });
     } else {
@@ -452,6 +460,14 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
             ),
             const SizedBox(height: AppDimensions.paddingL),
 
+            // Relevant Groups (B8-009)
+            _buildRelevantGroupsSection(),
+            const SizedBox(height: AppDimensions.paddingL),
+
+            // Additional Fields Filter (B8-010)
+            _buildAdditionalFieldsFilterSection(),
+            const SizedBox(height: AppDimensions.paddingL),
+
             // Ablaufplan (Default Plan) - only when manageSongs is enabled
             if (_manageSongs) ...[
               _buildSection(
@@ -737,6 +753,124 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         const SizedBox(height: 8),
         child,
       ],
+    );
+  }
+
+  Widget _buildRelevantGroupsSection() {
+    final groupsAsync = ref.watch(groupsProvider);
+
+    return _buildSection(
+      title: 'Relevante Gruppen',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Leer = gilt für alle Gruppen',
+            style: TextStyle(fontSize: 12, color: AppColors.medium),
+          ),
+          const SizedBox(height: 8),
+          groupsAsync.when(
+            loading: () => const LinearProgressIndicator(),
+            error: (e, _) => Text('Fehler: $e'),
+            data: (groups) => Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: groups.where((g) => g.id != null).map((group) {
+                final isSelected = _relevantGroups.contains(group.id);
+                return FilterChip(
+                  label: Text(group.shortName ?? group.name),
+                  selected: isSelected,
+                  onSelected: (selected) => setState(() {
+                    if (selected) {
+                      _relevantGroups.add(group.id!);
+                    } else {
+                      _relevantGroups.remove(group.id!);
+                    }
+                    _hasChanges = true;
+                  }),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdditionalFieldsFilterSection() {
+    final tenant = ref.watch(currentTenantProvider);
+    final extraFields = (tenant?.additionalFields ?? [])
+        .where((f) => f.type == 'select')
+        .toList();
+
+    if (extraFields.isEmpty) return const SizedBox.shrink();
+
+    final selectedFieldId = _additionalFieldsFilter?['key'] as String?;
+    final selectedOption = _additionalFieldsFilter?['option'] as String?;
+    final selectedField = extraFields.where((f) => f.id == selectedFieldId).firstOrNull;
+    final options = selectedField?.options ?? [];
+
+    return _buildSection(
+      title: 'Zusatzfeld-Filter',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Nur Spieler mit diesem Zusatzfeld-Wert einbeziehen',
+            style: TextStyle(fontSize: 12, color: AppColors.medium),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String?>(
+            value: selectedFieldId,
+            decoration: const InputDecoration(
+              labelText: 'Zusatzfeld',
+              isDense: true,
+            ),
+            items: [
+              const DropdownMenuItem(
+                value: null,
+                child: Text('Kein Filter'),
+              ),
+              ...extraFields.map((f) => DropdownMenuItem(
+                    value: f.id,
+                    child: Text(f.name),
+                  )),
+            ],
+            onChanged: (value) => setState(() {
+              if (value == null) {
+                _additionalFieldsFilter = null;
+              } else {
+                final field = extraFields.where((f) => f.id == value).firstOrNull;
+                _additionalFieldsFilter = {
+                  'key': value,
+                  'option': field?.options?.firstOrNull ?? '',
+                };
+              }
+              _hasChanges = true;
+            }),
+          ),
+          if (selectedFieldId != null && options.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: options.contains(selectedOption) ? selectedOption : options.firstOrNull,
+              decoration: const InputDecoration(
+                labelText: 'Wert',
+                isDense: true,
+              ),
+              items: options
+                  .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+                  .toList(),
+              onChanged: (value) => setState(() {
+                _additionalFieldsFilter = {
+                  'key': selectedFieldId,
+                  'option': value,
+                };
+                _hasChanges = true;
+              }),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1049,6 +1183,8 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
             ? {'fields': _planFields}
             : null,
         'planning_title': _planningTitle.isNotEmpty ? _planningTitle : null,
+        'relevant_groups': _relevantGroups.isNotEmpty ? _relevantGroups : null,
+        'additional_fields_filter': _additionalFieldsFilter,
       };
 
       await ref.read(attendanceTypeNotifierProvider.notifier).updateType(widget.typeId, updates);

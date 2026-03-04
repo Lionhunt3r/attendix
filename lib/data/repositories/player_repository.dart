@@ -166,6 +166,25 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Find players by first and last name (for duplicate detection)
+  Future<List<Person>> findPlayersByName(String firstName, String lastName) async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('*')
+          .eq('tenantId', currentTenantId)
+          .ilike('firstName', firstName)
+          .ilike('lastName', lastName);
+
+      return (response as List)
+          .map((e) => Person.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'findPlayersByName');
+      return [];
+    }
+  }
+
   /// Create a new player
   Future<Person> createPlayer(Person player) async {
     try {
