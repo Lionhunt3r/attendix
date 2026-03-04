@@ -30,6 +30,14 @@ class AttendanceListPage extends ConsumerStatefulWidget {
 
 class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
 
+  /// Navigate to detail page, refresh list data when returning
+  Future<void> _navigateToDetail(int attendanceId) async {
+    await context.push('/attendance/$attendanceId');
+    if (mounted) {
+      ref.invalidate(realtimeAttendanceListProvider);
+    }
+  }
+
   Future<void> _confirmDelete(BuildContext context, Attendance attendance) async {
     final dateFormatted = _formatDateForDialog(attendance.date);
     final confirmed = await DialogHelper.showConfirmation(
@@ -41,6 +49,7 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
     );
     if (confirmed && context.mounted) {
       await ref.read(attendanceNotifierProvider.notifier).deleteAttendance(attendance.id!);
+      ref.invalidate(realtimeAttendanceListProvider);
     }
   }
 
@@ -141,7 +150,7 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
                         child: _AttendanceListItem(
                           key: ValueKey(categorized.current!.id),
                           attendance: categorized.current!,
-                          onTap: () => context.push('/attendance/${categorized.current!.id}'),
+                          onTap: () => _navigateToDetail(categorized.current!.id!),
                           onDelete: role.canAddAttendance
                               ? () => _confirmDelete(context, categorized.current!)
                               : null,
@@ -164,7 +173,7 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
                         child: _AttendanceListItem(
                           key: ValueKey(entry.value.id),
                           attendance: entry.value,
-                          onTap: () => context.push('/attendance/${entry.value.id}'),
+                          onTap: () => _navigateToDetail(entry.value.id!),
                           onDelete: role.canAddAttendance
                               ? () => _confirmDelete(context, entry.value)
                               : null,
@@ -215,7 +224,7 @@ class _AttendanceListPageState extends ConsumerState<AttendanceListPage> {
                         child: _AttendanceListItem(
                           key: ValueKey(entry.value.id),
                           attendance: entry.value,
-                          onTap: () => context.push('/attendance/${entry.value.id}'),
+                          onTap: () => _navigateToDetail(entry.value.id!),
                           onDelete: role.canAddAttendance
                               ? () => _confirmDelete(context, entry.value)
                               : null,

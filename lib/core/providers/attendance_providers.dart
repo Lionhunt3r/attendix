@@ -106,7 +106,7 @@ class CategorizedAttendances {
 }
 
 /// Provider that categorizes and sorts attendances (computed once per data change)
-final categorizedAttendancesProvider = Provider.autoDispose<CategorizedAttendances>((ref) {
+final categorizedAttendancesProvider = Provider<CategorizedAttendances>((ref) {
   final attendances = ref.watch(realtimeAttendanceListProvider).valueOrNull ?? [];
 
   final now = DateTime.now();
@@ -151,7 +151,7 @@ final categorizedAttendancesProvider = Provider.autoDispose<CategorizedAttendanc
 });
 
 /// Provider for average attendance percentage of past attendances
-final averageAttendancePercentProvider = Provider.autoDispose<double?>((ref) {
+final averageAttendancePercentProvider = Provider<double?>((ref) {
   final categorized = ref.watch(categorizedAttendancesProvider);
   // BL-005: Include 0% attendances in average calculation (changed > 0 to != null)
   final pastAttendances = categorized.past
