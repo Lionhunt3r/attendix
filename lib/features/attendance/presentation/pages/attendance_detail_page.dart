@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -55,9 +54,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   // Provider subscription - managed separately from realtime
   ProviderSubscription? _providerSubscription;
 
-  // View mode state (click vs select)
-  AttendanceViewMode _viewMode = AttendanceViewMode.click;
-
   // Local checklist state - maintained separately to allow editing
   List<ChecklistItem> _localChecklist = [];
   bool _checklistLoaded = false;
@@ -72,8 +68,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   @override
   void initState() {
     super.initState();
-    // Load saved view mode preference
-    _loadViewMode();
     // Subscribe to realtime changes and ensure PersonAttendances exist after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _subscribeToRealtimeChanges();
@@ -82,31 +76,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       _loadChecklistFromAttendance();
       _loadSongEntries();
     });
-  }
-
-  /// Load view mode preference from SharedPreferences
-  Future<void> _loadViewMode() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final modeStr = prefs.getString('attendanceViewMode');
-      if (modeStr != null && mounted) {
-        setState(() {
-          _viewMode = AttendanceViewMode.fromValue(modeStr);
-        });
-      }
-    } catch (_) {
-      // Ignore errors, use default
-    }
-  }
-
-  /// Save view mode preference to SharedPreferences
-  Future<void> _saveViewMode() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('attendanceViewMode', _viewMode.value);
-    } catch (_) {
-      // Ignore errors
-    }
   }
 
   /// Load checklist from attendance data
@@ -387,23 +356,6 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
               PopupMenuButton<String>(
                 onSelected: _handleMenuAction,
                 itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'switchMode',
-                    child: ListTile(
-                      leading: Icon(
-                        _viewMode == AttendanceViewMode.click
-                            ? Icons.touch_app
-                            : Icons.checklist,
-                      ),
-                      title: Text(
-                        _viewMode == AttendanceViewMode.click
-                            ? 'Auswahl-Modus'
-                            : 'Klick-Modus',
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuDivider(),
                   const PopupMenuItem(
                     value: 'stats',
                     child: ListTile(
@@ -682,28 +634,10 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       case 'photo':
         _takePhoto();
         break;
-      case 'switchMode':
-        _toggleViewMode();
-        break;
       case 'export_excel':
         _exportAttendanceToExcel();
         break;
     }
-  }
-
-  void _toggleViewMode() {
-    setState(() {
-      _viewMode = _viewMode == AttendanceViewMode.click
-          ? AttendanceViewMode.select
-          : AttendanceViewMode.click;
-    });
-    _saveViewMode();
-    ToastHelper.showInfo(
-      context,
-      _viewMode == AttendanceViewMode.click
-          ? 'Klick-Modus aktiviert'
-          : 'Auswahl-Modus aktiviert',
-    );
   }
 
   // ============== CHECKLIST METHODS ==============

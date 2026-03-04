@@ -257,19 +257,3 @@ enum FieldType {
     );
   }
 }
-
-/// Attendance view mode
-enum AttendanceViewMode {
-  click('click'),
-  select('select');
-
-  const AttendanceViewMode(this.value);
-  final String value;
-
-  static AttendanceViewMode fromValue(String value) {
-    return AttendanceViewMode.values.firstWhere(
-      (e) => e.value == value,
-      orElse: () => AttendanceViewMode.click,
-    );
-  }
-}
