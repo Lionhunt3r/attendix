@@ -86,22 +86,22 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
-  /// Create a new group
-  Future<Group> createGroup({
-    required String name,
-    bool maingroup = false,
-  }) async {
+  /// Create a new group/instrument
+  Future<Group> createGroup(Map<String, dynamic> data) async {
     try {
+      // Set defaults and required fields
+      data['tenantId'] = currentTenantId;
+      data.putIfAbsent('tuning', () => 'C');
+      data.putIfAbsent('clefs', () => ['g']);
+      // Remove read-only fields that shouldn't be inserted
+      data.remove('id');
+      data.remove('created_at');
+      data.remove('categoryData');
+
       // RT-008: Use maybeSingle() to avoid StateError on empty result
       final response = await supabase
           .from('instruments')
-          .insert({
-            'name': name,
-            'tuning': 'C',
-            'clefs': ['g'],
-            'tenantId': currentTenantId,
-            'maingroup': maingroup,
-          })
+          .insert(data)
           .select()
           .maybeSingle();
 
@@ -171,6 +171,28 @@ class GroupRepository extends BaseRepository with TenantAwareRepository {
       return (response as List).length;
     } catch (e, stack) {
       handleError(e, stack, 'getPlayerCountInGroup');
+      rethrow;
+    }
+  }
+
+  /// Get player counts for all groups in a single query
+  Future<Map<int, int>> getPlayerCountsForGroups() async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('instrument')
+          .eq('tenantId', currentTenantId)
+          .isFilter('left', null)
+          .not('instrument', 'is', null);
+
+      final counts = <int, int>{};
+      for (final row in response as List) {
+        final groupId = row['instrument'] as int;
+        counts[groupId] = (counts[groupId] ?? 0) + 1;
+      }
+      return counts;
+    } catch (e, stack) {
+      handleError(e, stack, 'getPlayerCountsForGroups');
       rethrow;
     }
   }

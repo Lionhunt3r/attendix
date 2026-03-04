@@ -26,16 +26,11 @@ void main() {
   group('Multi-Tenant Security - GroupRepository', () {
     group('Instruments Table - Write Operations', () {
       test('createGroup sets tenantId in insert data', () {
-        // Find insert on instruments table
-        final insertQuery = RegExp(
-          r"\.from\('instruments'\)[^;]*\.insert\(\{[^}]+\}",
-          multiLine: true,
-        ).firstMatch(groupRepoSource);
-
-        expect(insertQuery, isNotNull, reason: 'Should have insert query');
+        final section = _extractMethodBody(groupRepoSource, 'createGroup');
+        expect(section, isNotNull, reason: 'createGroup should exist');
         expect(
-          insertQuery!.group(0),
-          contains("'tenantId': currentTenantId"),
+          section,
+          contains("'tenantId'] = currentTenantId"),
           reason: 'createGroup must set tenantId in insert data',
         );
       });

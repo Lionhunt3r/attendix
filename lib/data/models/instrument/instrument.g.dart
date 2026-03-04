@@ -59,13 +59,23 @@ _$GroupImpl _$$GroupImplFromJson(Map<String, dynamic> json) => _$GroupImpl(
   shortName: json['shortName'] as String?,
   color: json['color'] as String?,
   index: (json['index'] as num?)?.toInt(),
-  categoryId: (json['category_id'] as num?)?.toInt(),
+  categoryId: (json['category'] as num?)?.toInt(),
   createdAt:
       json['created_at'] == null
           ? null
           : DateTime.parse(json['created_at'] as String),
   maingroup: json['maingroup'] as bool? ?? false,
   synonyms: json['synonyms'] as String?,
+  tuning: json['tuning'] as String?,
+  range: json['range'] as String?,
+  clefs: (json['clefs'] as List<dynamic>?)?.map((e) => e as String).toList(),
+  notes: json['notes'] as String?,
+  categoryData:
+      json['categoryData'] == null
+          ? null
+          : GroupCategory.fromJson(
+            json['categoryData'] as Map<String, dynamic>,
+          ),
 );
 
 Map<String, dynamic> _$$GroupImplToJson(_$GroupImpl instance) =>
@@ -76,10 +86,14 @@ Map<String, dynamic> _$$GroupImplToJson(_$GroupImpl instance) =>
       'shortName': instance.shortName,
       'color': instance.color,
       'index': instance.index,
-      'category_id': instance.categoryId,
+      'category': instance.categoryId,
       'created_at': instance.createdAt?.toIso8601String(),
       'maingroup': instance.maingroup,
       'synonyms': instance.synonyms,
+      'tuning': instance.tuning,
+      'range': instance.range,
+      'clefs': instance.clefs,
+      'notes': instance.notes,
     };
 
 _$GroupCategoryImpl _$$GroupCategoryImplFromJson(Map<String, dynamic> json) =>

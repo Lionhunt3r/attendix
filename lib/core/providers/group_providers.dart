@@ -56,10 +56,19 @@ final mainGroupProvider = FutureProvider<Group?>((ref) async {
 /// Provider for group categories
 final groupCategoriesProvider = FutureProvider<List<GroupCategory>>((ref) async {
   final repo = ref.watch(groupRepositoryWithTenantProvider);
-  
+
   if (!repo.hasTenantId) return [];
-  
+
   return repo.getGroupCategories();
+});
+
+/// Provider for player counts per group (instrument)
+final playerCountsForGroupsProvider = FutureProvider<Map<int, int>>((ref) async {
+  final repo = ref.watch(groupRepositoryWithTenantProvider);
+
+  if (!repo.hasTenantId) return {};
+
+  return repo.getPlayerCountsForGroups();
 });
 
 /// Notifier for group mutations
@@ -69,10 +78,10 @@ class GroupNotifier extends Notifier<AsyncValue<void>> {
 
   GroupRepository get _repo => ref.read(groupRepositoryWithTenantProvider);
 
-  Future<Group?> createGroup(String name, {bool maingroup = false}) async {
+  Future<Group?> createGroup(Map<String, dynamic> data) async {
     state = const AsyncValue.loading();
     try {
-      final result = await _repo.createGroup(name: name, maingroup: maingroup);
+      final result = await _repo.createGroup(data);
       state = const AsyncValue.data(null);
       ref.invalidate(groupsProvider);
       ref.invalidate(groupsMapProvider);
@@ -122,12 +131,41 @@ class GroupNotifier extends Notifier<AsyncValue<void>> {
     }
   }
 
+  Future<GroupCategory?> updateGroupCategory(int id, Map<String, dynamic> updates) async {
+    state = const AsyncValue.loading();
+    try {
+      final result = await _repo.updateGroupCategory(id, updates);
+      state = const AsyncValue.data(null);
+      ref.invalidate(groupCategoriesProvider);
+      return result;
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      return null;
+    }
+  }
+
   Future<void> deleteGroupCategory(int id) async {
     state = const AsyncValue.loading();
     try {
       await _repo.deleteGroupCategory(id);
       state = const AsyncValue.data(null);
       ref.invalidate(groupCategoriesProvider);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
+  }
+
+  Future<void> reorderGroupCategories(List<GroupCategory> reordered) async {
+    state = const AsyncValue.loading();
+    try {
+      for (int i = 0; i < reordered.length; i++) {
+        if (reordered[i].id != null && reordered[i].index != i) {
+          await _repo.updateGroupCategory(reordered[i].id!, {'index': i});
+        }
+      }
+      state = const AsyncValue.data(null);
+      ref.invalidate(groupCategoriesProvider);
+      ref.invalidate(groupsProvider);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }

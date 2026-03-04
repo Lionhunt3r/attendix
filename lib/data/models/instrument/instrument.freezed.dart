@@ -587,12 +587,18 @@ mixin _$Group {
   String? get shortName => throw _privateConstructorUsedError;
   String? get color => throw _privateConstructorUsedError;
   int? get index => throw _privateConstructorUsedError;
-  @JsonKey(name: 'category_id')
+  @JsonKey(name: 'category')
   int? get categoryId => throw _privateConstructorUsedError;
   @JsonKey(name: 'created_at')
-  DateTime? get createdAt => throw _privateConstructorUsedError; // Fields from Ionic instruments table
+  DateTime? get createdAt => throw _privateConstructorUsedError;
   bool? get maingroup => throw _privateConstructorUsedError;
   String? get synonyms => throw _privateConstructorUsedError;
+  String? get tuning => throw _privateConstructorUsedError;
+  String? get range => throw _privateConstructorUsedError;
+  List<String>? get clefs => throw _privateConstructorUsedError;
+  String? get notes => throw _privateConstructorUsedError;
+  @JsonKey(includeToJson: false)
+  GroupCategory? get categoryData => throw _privateConstructorUsedError;
 
   /// Serializes this Group to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -615,11 +621,18 @@ abstract class $GroupCopyWith<$Res> {
     String? shortName,
     String? color,
     int? index,
-    @JsonKey(name: 'category_id') int? categoryId,
+    @JsonKey(name: 'category') int? categoryId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     bool? maingroup,
     String? synonyms,
+    String? tuning,
+    String? range,
+    List<String>? clefs,
+    String? notes,
+    @JsonKey(includeToJson: false) GroupCategory? categoryData,
   });
+
+  $GroupCategoryCopyWith<$Res>? get categoryData;
 }
 
 /// @nodoc
@@ -647,6 +660,11 @@ class _$GroupCopyWithImpl<$Res, $Val extends Group>
     Object? createdAt = freezed,
     Object? maingroup = freezed,
     Object? synonyms = freezed,
+    Object? tuning = freezed,
+    Object? range = freezed,
+    Object? clefs = freezed,
+    Object? notes = freezed,
+    Object? categoryData = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -700,9 +718,48 @@ class _$GroupCopyWithImpl<$Res, $Val extends Group>
                     ? _value.synonyms
                     : synonyms // ignore: cast_nullable_to_non_nullable
                         as String?,
+            tuning:
+                freezed == tuning
+                    ? _value.tuning
+                    : tuning // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            range:
+                freezed == range
+                    ? _value.range
+                    : range // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            clefs:
+                freezed == clefs
+                    ? _value.clefs
+                    : clefs // ignore: cast_nullable_to_non_nullable
+                        as List<String>?,
+            notes:
+                freezed == notes
+                    ? _value.notes
+                    : notes // ignore: cast_nullable_to_non_nullable
+                        as String?,
+            categoryData:
+                freezed == categoryData
+                    ? _value.categoryData
+                    : categoryData // ignore: cast_nullable_to_non_nullable
+                        as GroupCategory?,
           )
           as $Val,
     );
+  }
+
+  /// Create a copy of Group
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $GroupCategoryCopyWith<$Res>? get categoryData {
+    if (_value.categoryData == null) {
+      return null;
+    }
+
+    return $GroupCategoryCopyWith<$Res>(_value.categoryData!, (value) {
+      return _then(_value.copyWith(categoryData: value) as $Val);
+    });
   }
 }
 
@@ -721,11 +778,19 @@ abstract class _$$GroupImplCopyWith<$Res> implements $GroupCopyWith<$Res> {
     String? shortName,
     String? color,
     int? index,
-    @JsonKey(name: 'category_id') int? categoryId,
+    @JsonKey(name: 'category') int? categoryId,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     bool? maingroup,
     String? synonyms,
+    String? tuning,
+    String? range,
+    List<String>? clefs,
+    String? notes,
+    @JsonKey(includeToJson: false) GroupCategory? categoryData,
   });
+
+  @override
+  $GroupCategoryCopyWith<$Res>? get categoryData;
 }
 
 /// @nodoc
@@ -752,6 +817,11 @@ class __$$GroupImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? maingroup = freezed,
     Object? synonyms = freezed,
+    Object? tuning = freezed,
+    Object? range = freezed,
+    Object? clefs = freezed,
+    Object? notes = freezed,
+    Object? categoryData = freezed,
   }) {
     return _then(
       _$GroupImpl(
@@ -805,6 +875,31 @@ class __$$GroupImplCopyWithImpl<$Res>
                 ? _value.synonyms
                 : synonyms // ignore: cast_nullable_to_non_nullable
                     as String?,
+        tuning:
+            freezed == tuning
+                ? _value.tuning
+                : tuning // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        range:
+            freezed == range
+                ? _value.range
+                : range // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        clefs:
+            freezed == clefs
+                ? _value._clefs
+                : clefs // ignore: cast_nullable_to_non_nullable
+                    as List<String>?,
+        notes:
+            freezed == notes
+                ? _value.notes
+                : notes // ignore: cast_nullable_to_non_nullable
+                    as String?,
+        categoryData:
+            freezed == categoryData
+                ? _value.categoryData
+                : categoryData // ignore: cast_nullable_to_non_nullable
+                    as GroupCategory?,
       ),
     );
   }
@@ -820,11 +915,16 @@ class _$GroupImpl implements _Group {
     this.shortName,
     this.color,
     this.index,
-    @JsonKey(name: 'category_id') this.categoryId,
+    @JsonKey(name: 'category') this.categoryId,
     @JsonKey(name: 'created_at') this.createdAt,
     this.maingroup = false,
     this.synonyms,
-  });
+    this.tuning,
+    this.range,
+    final List<String>? clefs,
+    this.notes,
+    @JsonKey(includeToJson: false) this.categoryData,
+  }) : _clefs = clefs;
 
   factory _$GroupImpl.fromJson(Map<String, dynamic> json) =>
       _$$GroupImplFromJson(json);
@@ -842,21 +942,39 @@ class _$GroupImpl implements _Group {
   @override
   final int? index;
   @override
-  @JsonKey(name: 'category_id')
+  @JsonKey(name: 'category')
   final int? categoryId;
   @override
   @JsonKey(name: 'created_at')
   final DateTime? createdAt;
-  // Fields from Ionic instruments table
   @override
   @JsonKey()
   final bool? maingroup;
   @override
   final String? synonyms;
+  @override
+  final String? tuning;
+  @override
+  final String? range;
+  final List<String>? _clefs;
+  @override
+  List<String>? get clefs {
+    final value = _clefs;
+    if (value == null) return null;
+    if (_clefs is EqualUnmodifiableListView) return _clefs;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  @override
+  final String? notes;
+  @override
+  @JsonKey(includeToJson: false)
+  final GroupCategory? categoryData;
 
   @override
   String toString() {
-    return 'Group(id: $id, tenantId: $tenantId, name: $name, shortName: $shortName, color: $color, index: $index, categoryId: $categoryId, createdAt: $createdAt, maingroup: $maingroup, synonyms: $synonyms)';
+    return 'Group(id: $id, tenantId: $tenantId, name: $name, shortName: $shortName, color: $color, index: $index, categoryId: $categoryId, createdAt: $createdAt, maingroup: $maingroup, synonyms: $synonyms, tuning: $tuning, range: $range, clefs: $clefs, notes: $notes, categoryData: $categoryData)';
   }
 
   @override
@@ -879,7 +997,13 @@ class _$GroupImpl implements _Group {
             (identical(other.maingroup, maingroup) ||
                 other.maingroup == maingroup) &&
             (identical(other.synonyms, synonyms) ||
-                other.synonyms == synonyms));
+                other.synonyms == synonyms) &&
+            (identical(other.tuning, tuning) || other.tuning == tuning) &&
+            (identical(other.range, range) || other.range == range) &&
+            const DeepCollectionEquality().equals(other._clefs, _clefs) &&
+            (identical(other.notes, notes) || other.notes == notes) &&
+            (identical(other.categoryData, categoryData) ||
+                other.categoryData == categoryData));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -896,6 +1020,11 @@ class _$GroupImpl implements _Group {
     createdAt,
     maingroup,
     synonyms,
+    tuning,
+    range,
+    const DeepCollectionEquality().hash(_clefs),
+    notes,
+    categoryData,
   );
 
   /// Create a copy of Group
@@ -920,10 +1049,15 @@ abstract class _Group implements Group {
     final String? shortName,
     final String? color,
     final int? index,
-    @JsonKey(name: 'category_id') final int? categoryId,
+    @JsonKey(name: 'category') final int? categoryId,
     @JsonKey(name: 'created_at') final DateTime? createdAt,
     final bool? maingroup,
     final String? synonyms,
+    final String? tuning,
+    final String? range,
+    final List<String>? clefs,
+    final String? notes,
+    @JsonKey(includeToJson: false) final GroupCategory? categoryData,
   }) = _$GroupImpl;
 
   factory _Group.fromJson(Map<String, dynamic> json) = _$GroupImpl.fromJson;
@@ -941,15 +1075,26 @@ abstract class _Group implements Group {
   @override
   int? get index;
   @override
-  @JsonKey(name: 'category_id')
+  @JsonKey(name: 'category')
   int? get categoryId;
   @override
   @JsonKey(name: 'created_at')
-  DateTime? get createdAt; // Fields from Ionic instruments table
+  DateTime? get createdAt;
   @override
   bool? get maingroup;
   @override
   String? get synonyms;
+  @override
+  String? get tuning;
+  @override
+  String? get range;
+  @override
+  List<String>? get clefs;
+  @override
+  String? get notes;
+  @override
+  @JsonKey(includeToJson: false)
+  GroupCategory? get categoryData;
 
   /// Create a copy of Group
   /// with the given fields replaced by the non-null parameter values.
