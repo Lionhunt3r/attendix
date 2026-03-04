@@ -12,6 +12,7 @@ import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/debug_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/dialog_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -709,7 +710,7 @@ void _showAttendanceSelectionDialog(BuildContext context, List<Attendance> atten
 }
 
 /// Calendar view sheet widget
-class _CalendarViewSheet extends StatefulWidget {
+class _CalendarViewSheet extends ConsumerStatefulWidget {
   const _CalendarViewSheet({
     required this.attendanceMap,
     required this.onDateSelected,
@@ -719,10 +720,10 @@ class _CalendarViewSheet extends StatefulWidget {
   final void Function(DateTime date, List<Attendance> attendances) onDateSelected;
 
   @override
-  State<_CalendarViewSheet> createState() => _CalendarViewSheetState();
+  ConsumerState<_CalendarViewSheet> createState() => _CalendarViewSheetState();
 }
 
-class _CalendarViewSheetState extends State<_CalendarViewSheet> {
+class _CalendarViewSheetState extends ConsumerState<_CalendarViewSheet> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -732,8 +733,27 @@ class _CalendarViewSheetState extends State<_CalendarViewSheet> {
     return widget.attendanceMap[normalizedDay] ?? [];
   }
 
+  Color? _getTypeColorForDay(DateTime day, List<AttendanceType> types) {
+    final attendances = _getAttendancesForDay(day);
+    if (attendances.isEmpty) return null;
+
+    final attendance = attendances.first;
+    if (attendance.typeId == null) return null;
+
+    final type = types.cast<AttendanceType?>().firstWhere(
+      (t) => t!.id == attendance.typeId,
+      orElse: () => null,
+    );
+    if (type == null) return null;
+
+    return ColorUtils.parseNamedColor(type.color);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final typesAsync = ref.watch(attendanceTypesProvider);
+    final types = typesAsync.valueOrNull ?? [];
+
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
@@ -810,34 +830,67 @@ class _CalendarViewSheetState extends State<_CalendarViewSheet> {
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
-                    markerDecoration: const BoxDecoration(
-                      color: AppColors.success,
-                      shape: BoxShape.circle,
-                    ),
-                    markersMaxCount: 3,
+                    markersMaxCount: 0,
                   ),
                   headerStyle: const HeaderStyle(
                     formatButtonVisible: true,
                     titleCentered: true,
                   ),
                   calendarBuilders: CalendarBuilders(
-                    markerBuilder: (context, date, events) {
-                      if (events.isEmpty) return null;
-                      return Positioned(
-                        bottom: 1,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: events.take(3).map((event) {
-                            return Container(
-                              width: 6,
-                              height: 6,
-                              margin: const EdgeInsets.symmetric(horizontal: 1),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _getAttendanceColor(event),
-                              ),
-                            );
-                          }).toList(),
+                    defaultBuilder: (context, day, focusedDay) {
+                      final color = _getTypeColorForDay(day, types);
+                      if (color == null) return null;
+                      return Container(
+                        margin: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${day.day}',
+                          style: TextStyle(color: color),
+                        ),
+                      );
+                    },
+                    todayBuilder: (context, day, focusedDay) {
+                      final color = _getTypeColorForDay(day, types);
+                      return Container(
+                        margin: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: color?.withValues(alpha: 0.18) ??
+                              AppColors.primary.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: color ?? AppColors.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${day.day}',
+                          style: TextStyle(
+                            color: color ?? AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    },
+                    selectedBuilder: (context, day, focusedDay) {
+                      final color = _getTypeColorForDay(day, types);
+                      return Container(
+                        margin: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: color ?? AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${day.day}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       );
                     },
@@ -845,19 +898,45 @@ class _CalendarViewSheetState extends State<_CalendarViewSheet> {
                 ),
               ),
             ),
+            // Legend
+            if (types.isNotEmpty)
+              _buildLegend(types),
           ],
         );
       },
     );
   }
 
-  Color _getAttendanceColor(Attendance attendance) {
-    // Color based on percentage if available
-    if (attendance.percentage != null) {
-      if (attendance.percentage! >= 80) return AppColors.success;
-      if (attendance.percentage! >= 60) return AppColors.warning;
-      return AppColors.danger;
-    }
-    return AppColors.primary;
+  Widget _buildLegend(List<AttendanceType> types) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: types.where((t) => t.visible == true).map((type) {
+          final color = ColorUtils.parseNamedColor(type.color);
+          return Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  type.name,
+                  style: TextStyle(fontSize: 12, color: AppColors.dark),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 }
