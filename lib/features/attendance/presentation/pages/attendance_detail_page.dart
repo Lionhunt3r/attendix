@@ -12,7 +12,6 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_detail_providers.dart';
-import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/conductor_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
@@ -1593,14 +1592,15 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
     _savingPersonIds.add(personId);
     try {
-      final notifier = ref.read(attendanceNotifierProvider.notifier);
-      await notifier.updatePersonAttendance(
-        personAttendanceId,
-        widget.attendanceId,
-        personId,
-        {'status': status.value},
-      );
-      await notifier.recalculatePercentage(widget.attendanceId);
+      final supabase = ref.read(supabaseClientProvider);
+      await supabase
+          .from('person_attendances')
+          .update({
+            'status': status.value,
+            'changed_at': DateTime.now().toIso8601String(),
+            'changed_by': supabase.auth.currentUser?.id,
+          })
+          .eq('id', personAttendanceId);
     } catch (e) {
       if (mounted) {
         if (previousStatus != null) {
