@@ -168,15 +168,15 @@ class StatusOverviewSheet extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '$count',
+                '${percentage.toStringAsFixed(0)}%',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 18,
                   color: status.color,
                 ),
               ),
               Text(
-                '${percentage.toStringAsFixed(0)}%',
+                '$count',
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.medium,
