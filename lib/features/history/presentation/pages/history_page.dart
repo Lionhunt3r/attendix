@@ -67,7 +67,7 @@ final songHistoryProvider = FutureProvider<List<HistoryEntry>>((ref) async {
   final response = await supabase
       .from('history')
       .select('*, song:songs(name, number)')
-      .eq('tenant_id', tenant.id!)
+      .eq('tenantId', tenant.id!)
       .order('date', ascending: false)
       .limit(200);
 
@@ -98,7 +98,7 @@ final conductorsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asyn
   final response = await supabase
       .from('persons')
       .select('id, firstName, lastName, left')
-      .eq('tenant_id', tenant.id!)
+      .eq('tenantId', tenant.id!)
       .eq('conductor', true);
 
   return (response as List).cast<Map<String, dynamic>>();
@@ -435,7 +435,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       final tenant = ref.read(currentTenantProvider);
 
       await supabase.from('history').insert({
-        'tenant_id': tenant?.id,
+        'tenantId': tenant?.id,
         'song_id': songId,
         'person_id': conductorId,
         'otherConductor': otherConductor,
@@ -481,7 +481,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
           .from('history')
           .delete()
           .eq('id', entry.id!)
-          .eq('tenant_id', tenant!.id!);
+          .eq('tenantId', tenant!.id!);
 
       ref.invalidate(songHistoryProvider);
       if (mounted) {

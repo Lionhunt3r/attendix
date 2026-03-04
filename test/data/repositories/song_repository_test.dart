@@ -190,6 +190,25 @@ void main() {
               'in the grouping logic to prevent duplicate date sections',
         );
       });
+
+      test('getCurrentSongs deduplicates by songId within each date', () {
+        // When the same song is played at multiple events on the same day
+        // (e.g. Probe + Konzert), getCurrentSongs should only show it once
+        // per date. The grouping logic must track seen songIds per date.
+        final groupByStart = songRepoSource.indexOf('Group by date');
+        final groupedEntriesEnd = songRepoSource.indexOf('grouped.entries');
+        expect(groupByStart, isNot(-1), reason: 'Should find "Group by date" comment');
+        expect(groupedEntriesEnd, isNot(-1), reason: 'Should find "grouped.entries"');
+
+        final groupingSection = songRepoSource.substring(groupByStart, groupedEntriesEnd);
+        expect(
+          groupingSection,
+          contains('seenSongIds'),
+          reason:
+              'getCurrentSongs must deduplicate songs by songId per date '
+              'to prevent the same song appearing multiple times on one day',
+        );
+      });
     });
 
     group('Summary Statistics', () {

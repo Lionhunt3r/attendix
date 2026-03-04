@@ -330,13 +330,22 @@ class SongRepository extends BaseRepository with TenantAwareRepository {
           .gte('date', now.toIso8601String().substring(0, 10))
           .order('date');
 
-      // Group by date
+      // Group by date, deduplicate by songId within each date
       final Map<String, List<SongHistory>> grouped = {};
+      final Map<String, Set<int>> seenSongIds = {};
       for (final item in response as List) {
         final history = SongHistory.fromJson(item as Map<String, dynamic>);
         final rawDate = history.date ?? '';
         // Normalize to YYYY-MM-DD to prevent duplicate groups from different date formats
         final date = rawDate.length >= 10 ? rawDate.substring(0, 10) : rawDate;
+
+        // Deduplicate: only keep first occurrence of each songId per date
+        final songId = history.songId;
+        if (songId != null) {
+          final seen = seenSongIds.putIfAbsent(date, () => <int>{});
+          if (!seen.add(songId)) continue;
+        }
+
         grouped.putIfAbsent(date, () => []).add(history);
       }
 
