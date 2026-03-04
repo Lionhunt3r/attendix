@@ -21,6 +21,11 @@
         "✨ Lieder: Warnung bei doppelter Nummer",
         "✨ Abmeldegründe: Einheitlich in Self-Service und Elternportal",
         "✨ Haptic Feedback bei destruktiven Aktionen",
+        "✨ Toast-Nachrichten mit Terminname personalisiert",
+        "✨ Termintyp-Editor: Nutzungshinweis wenn Typ verwendet wird",
+        "✨ Besprechungen: Alle auswählen/abwählen Button",
+        "✨ Personen: Archivieren mit Datum und Begründung",
+        "✨ Personen: Instrumente-Feld für Chöre",
         "🐛 Hauptgruppe wird bei Instanzerstellung korrekt markiert"
       ]
     },
