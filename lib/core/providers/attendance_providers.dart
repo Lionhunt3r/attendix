@@ -273,7 +273,9 @@ class AttendanceNotifier extends Notifier<AsyncValue<void>> {
       await _repo.batchUpdatePersonAttendances(personAttendanceIds, newStatus);
       state = const AsyncValue.data(null);
       ref.invalidate(attendanceByIdProvider(attendanceId));
-      await recalculatePercentage(attendanceId);
+      // Fire-and-forget: don't await so a recalculation failure doesn't
+      // overwrite the successful batch update state
+      recalculatePercentage(attendanceId);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }

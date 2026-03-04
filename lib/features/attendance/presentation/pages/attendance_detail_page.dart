@@ -1615,10 +1615,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
           .eq('id', personAttendanceId);
 
       // Recalculate percentage so list page updates via realtime
+      // (fire-and-forget: recalculatePercentage invalidates attendanceListProvider after DB update)
       ref.read(attendanceNotifierProvider.notifier)
           .recalculatePercentage(widget.attendanceId);
-      // Also directly invalidate for immediate local feedback
-      ref.invalidate(attendanceListProvider);
     } catch (e) {
       if (mounted) {
         if (previousStatus != null) {
