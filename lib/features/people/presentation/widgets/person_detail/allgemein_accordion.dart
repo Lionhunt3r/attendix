@@ -9,6 +9,7 @@ import '../../../../../core/providers/shift_providers.dart';
 import '../../../../../core/providers/teacher_providers.dart';
 import '../../../../../core/providers/tenant_providers.dart';
 import '../../../../../core/theme/app_colors.dart';
+import '../../../../../core/utils/tenant_label_utils.dart';
 import '../../../../../data/models/parent/parent_model.dart';
 import '../../../../../data/models/person/person.dart';
 import '../../../../../data/models/shift/shift_plan.dart';
@@ -245,6 +246,7 @@ class AllgemeinAccordion extends ConsumerWidget {
   Widget _buildGroupField(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(groupsMapProvider);
     final currentGroupId = selectedGroupId ?? person.instrument;
+    final tenantType = ref.watch(currentTenantProvider)?.type;
 
     return groupsAsync.when(
       loading: () => const LinearProgressIndicator(),
@@ -256,7 +258,7 @@ class AllgemeinAccordion extends ConsumerWidget {
 
         return EditableInfoRow(
           icon: Icons.group,
-          label: 'Gruppe',
+          label: groupLabel(tenantType),
           value: groupName,
           editable: canEdit,
           onEdit: () async {
@@ -266,10 +268,10 @@ class AllgemeinAccordion extends ConsumerWidget {
 
             final result = await SelectionSheet.show<int>(
               context,
-              title: 'Gruppe auswählen',
+              title: '${groupLabel(tenantType)} auswählen',
               items: items,
               selectedValue: currentGroupId,
-              noneLabel: 'Keine Gruppe',
+              noneLabel: 'Keine ${groupLabel(tenantType)}',
               icon: Icons.group,
             );
 

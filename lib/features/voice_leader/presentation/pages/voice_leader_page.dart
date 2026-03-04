@@ -298,15 +298,55 @@ class _MemberTile extends StatelessWidget {
                     ),
                   ),
 
+                if ((person.email == null || person.email!.isEmpty) &&
+                    (person.phone == null || person.phone!.isEmpty))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.contact_mail_outlined,
+                          size: 14,
+                          color: AppColors.medium,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Keine Kontaktdaten',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.medium,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Upcoming absences
                 if (absences.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
-                    children: absences.take(5).map((absence) {
-                      return _AbsenceChip(absence: absence);
-                    }).toList(),
+                    children: [
+                      ...absences.take(5).map((absence) {
+                        return _AbsenceChip(absence: absence);
+                      }),
+                      if (absences.length > 5)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.medium.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '+${absences.length - 5} weitere',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.medium,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ],

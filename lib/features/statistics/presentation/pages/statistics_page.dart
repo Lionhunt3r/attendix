@@ -196,13 +196,19 @@ class _SummaryCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avgColor = statistics.averagePercentage >= 80
+        ? AppColors.success
+        : statistics.averagePercentage >= 50
+            ? AppColors.warning
+            : AppColors.danger;
+
     return Row(
       children: [
         Expanded(
           child: _StatCard(
             title: 'Ø Anwesenheit',
             value: '${statistics.averagePercentage}%',
-            color: AppColors.success,
+            color: avgColor,
             icon: Icons.trending_up,
           ),
         ),

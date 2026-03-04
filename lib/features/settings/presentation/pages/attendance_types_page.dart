@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -74,7 +75,30 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
             );
           }
 
-          return _isReordering
+          return Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.all(AppDimensions.paddingM),
+                padding: const EdgeInsets.all(AppDimensions.paddingM),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppDimensions.borderRadiusS),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                    SizedBox(width: AppDimensions.paddingS),
+                    Expanded(
+                      child: Text(
+                        'Anwesenheitstypen definieren die verschiedenen Termine deiner Gruppe. Jeder Typ hat eigene Einstellungen für Status, Uhrzeit und Programm.',
+                        style: TextStyle(fontSize: 13, color: AppColors.dark),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _isReordering
               ? ReorderableListView.builder(
                   itemCount: displayTypes.length,
                   onReorder: (oldIndex, newIndex) {
@@ -102,7 +126,10 @@ class _AttendanceTypesPageState extends ConsumerState<AttendanceTypesPage> {
                       trailing: const Icon(Icons.chevron_right),
                     );
                   },
-                );
+                ),
+              ),
+            ],
+          );
         },
       ),
       floatingActionButton: !_isReordering

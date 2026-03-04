@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/group_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/tenant_label_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/instrument/instrument.dart';
 import '../widgets/instrument_categories_sheet.dart';
@@ -21,10 +22,16 @@ class InstrumentsListPage extends ConsumerWidget {
     final playerCountsAsync = ref.watch(playerCountsForGroupsProvider);
     final currentRole = ref.watch(currentRoleProvider);
     final isConductor = currentRole.isConductor;
+    final tenant = ref.watch(currentTenantProvider);
+    final label = groupLabelPlural(tenant?.type);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Instrumente'),
+        title: groupsAsync.when(
+          data: (groups) => Text('$label (${groups.length})'),
+          loading: () => Text(label),
+          error: (_, __) => Text(label),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/settings'),

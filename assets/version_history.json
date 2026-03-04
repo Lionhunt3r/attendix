@@ -1,6 +1,23 @@
 {
   "versions": [
     {
+      "version": "0.1.20",
+      "date": "4.3.2026",
+      "changes": [
+        "✨ Login: Versionsanzeige auf der Anmeldeseite",
+        "✨ Dynamische Labels: Stimme/Instrument/Gruppe je nach Vereinstyp",
+        "✨ Statistik: Farbcodierte Durchschnitts-Anwesenheit",
+        "✨ Instrumente: Anzahl im Seitentitel",
+        "✨ Anwesenheitstypen: Info-Card mit Erklärung",
+        "✨ Stimmführer: '+X weitere' bei abgeschnittenen Abwesenheiten",
+        "✨ Stimmführer: 'Keine Kontaktdaten' Platzhalter",
+        "🔧 Werke: URL-Validierung bei Link-Eingabe",
+        "🔧 Abmeldung: Mindestens 5 Zeichen für eigenen Grund",
+        "🔧 Einstellungen: Hinweis zum Neuladen nach Speichern",
+        "🔧 Lehrer: Strengere Validierung (Telefonnummer-Format)"
+      ]
+    },
+    {
       "version": "0.1.19",
       "date": "4.3.2026",
       "changes": [
