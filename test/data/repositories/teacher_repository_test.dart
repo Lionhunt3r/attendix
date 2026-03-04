@@ -3,17 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Security tests for TeacherRepository
 ///
-/// These tests verify that ALL operations include tenant_id filtering
+/// These tests verify that ALL operations include tenantId filtering
 /// to prevent cross-tenant data access.
 ///
 /// Tables:
-/// - ausbilder: uses 'tenant_id' column
+/// - teachers: uses 'tenantId' column
 ///
 /// Security Model:
-/// - SELECT: Must have .eq('tenant_id', currentTenantId)
-/// - UPDATE: Must have .eq('tenant_id', currentTenantId)
-/// - DELETE: Must have .eq('tenant_id', currentTenantId)
-/// - INSERT: Must set tenant_id in the data object
+/// - SELECT: Must have .eq('tenantId', currentTenantId)
+/// - UPDATE: Must have .eq('tenantId', currentTenantId)
+/// - DELETE: Must have .eq('tenantId', currentTenantId)
+/// - INSERT: Must set tenantId in the data object
 void main() {
   late String repoSource;
 
@@ -29,14 +29,14 @@ void main() {
         expect(section, isNotNull, reason: 'createTeacher should exist');
         expect(
           section,
-          contains("'tenant_id': currentTenantId"),
-          reason: 'createTeacher must set tenant_id in insert data',
+          contains("'tenantId': currentTenantId"),
+          reason: 'createTeacher must set tenantId in insert data',
         );
       });
 
       test('all UPDATE operations include tenant_id filter', () {
         final updateQueries = RegExp(
-          r"supabase[^;]*\.from\('ausbilder'\)[^;]*\.update\([^;]+",
+          r"supabase[^;]*\.from\('teachers'\)[^;]*\.update\([^;]+",
           multiLine: true,
         ).allMatches(repoSource);
 
@@ -46,15 +46,15 @@ void main() {
           final query = match.group(0)!;
           expect(
             query,
-            contains(".eq('tenant_id', currentTenantId)"),
-            reason: 'UPDATE query on ausbilder missing tenant_id filter:\n$query',
+            contains(".eq('tenantId', currentTenantId)"),
+            reason: 'UPDATE query on teachers missing tenantId filter:\n$query',
           );
         }
       });
 
       test('all DELETE operations include tenant_id filter', () {
         final deleteQueries = RegExp(
-          r"supabase[^;]*\.from\('ausbilder'\)[^;]*\.delete\(\)[^;]+",
+          r"supabase[^;]*\.from\('teachers'\)[^;]*\.delete\(\)[^;]+",
           multiLine: true,
         ).allMatches(repoSource);
 
@@ -64,17 +64,17 @@ void main() {
           final query = match.group(0)!;
           expect(
             query,
-            contains(".eq('tenant_id', currentTenantId)"),
-            reason: 'DELETE query on ausbilder missing tenant_id filter:\n$query',
+            contains(".eq('tenantId', currentTenantId)"),
+            reason: 'DELETE query on teachers missing tenantId filter:\n$query',
           );
         }
       });
     });
 
     group('Ausbilder Table - Read Operations', () {
-      test('all SELECT operations on ausbilder include tenant_id filter', () {
+      test('all SELECT operations on teachers include tenant_id filter', () {
         final selectQueries = RegExp(
-          r"supabase[^;]*\.from\('ausbilder'\)\s*\n?\s*\.select\([^;]+",
+          r"supabase[^;]*\.from\('teachers'\)\s*\n?\s*\.select\([^;]+",
           multiLine: true,
         ).allMatches(repoSource);
 
@@ -90,8 +90,8 @@ void main() {
           final query = match.group(0)!;
           expect(
             query,
-            contains(".eq('tenant_id', currentTenantId)"),
-            reason: 'SELECT query on ausbilder missing tenant_id filter:\n$query',
+            contains(".eq('tenantId', currentTenantId)"),
+            reason: 'SELECT query on teachers missing tenantId filter:\n$query',
           );
         }
       });
@@ -101,58 +101,58 @@ void main() {
       test('getTeachers has tenant_id filter', () {
         final section = _extractMethodBody(repoSource, 'getTeachers');
         expect(section, isNotNull, reason: 'getTeachers should exist');
-        expect(section, contains(".eq('tenant_id', currentTenantId)"));
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
 
       test('getTeacherById has both id and tenant_id filter', () {
         final section = _extractMethodBody(repoSource, 'getTeacherById');
         expect(section, isNotNull, reason: 'getTeacherById should exist');
         expect(section, contains(".eq('id', id)"));
-        expect(section, contains(".eq('tenant_id', currentTenantId)"));
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
 
       test('updateTeacher has both id and tenant_id filter', () {
         final section = _extractMethodBody(repoSource, 'updateTeacher');
         expect(section, isNotNull, reason: 'updateTeacher should exist');
         expect(section, contains(".eq('id', id)"));
-        expect(section, contains(".eq('tenant_id', currentTenantId)"));
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
 
       test('deleteTeacher has both id and tenant_id filter', () {
         final section = _extractMethodBody(repoSource, 'deleteTeacher');
         expect(section, isNotNull, reason: 'deleteTeacher should exist');
         expect(section, contains(".eq('id', id)"));
-        expect(section, contains(".eq('tenant_id', currentTenantId)"));
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
 
       test('getStudentCounts has tenant_id filter', () {
         final section = _extractMethodBody(repoSource, 'getStudentCounts');
         expect(section, isNotNull, reason: 'getStudentCounts should exist');
-        expect(section, contains(".eq('tenant_id', currentTenantId)"));
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
     });
 
     group('Summary Statistics', () {
-      test('high tenant_id filter coverage for ausbilder table', () {
+      test('high tenant_id filter coverage for teachers table', () {
         final allQueries = RegExp(
-          r"\.from\('ausbilder'\)",
+          r"\.from\('teachers'\)",
         ).allMatches(repoSource).length;
 
         final withTenantFilter = RegExp(
-          r"\.from\('ausbilder'\)[^;]*\.eq\('tenant_id',\s*currentTenantId\)",
+          r"\.from\('teachers'\)[^;]*\.eq\('tenantId',\s*currentTenantId\)",
           multiLine: true,
         ).allMatches(repoSource).length;
 
-        final insertWithTenant = repoSource.contains("'tenant_id': currentTenantId")
+        final insertWithTenant = repoSource.contains("'tenantId': currentTenantId")
             ? 1
             : 0;
 
         final totalCovered = withTenantFilter + insertWithTenant;
 
         // ignore: avoid_print
-        print('Total ausbilder queries: $allQueries');
+        print('Total teachers queries: $allQueries');
         // ignore: avoid_print
-        print('With tenant_id filter: $withTenantFilter');
+        print('With tenantId filter: $withTenantFilter');
         // ignore: avoid_print
         print('Insert with tenant: $insertWithTenant');
         // ignore: avoid_print
@@ -162,7 +162,7 @@ void main() {
         expect(
           coverage,
           greaterThanOrEqualTo(0.8),
-          reason: 'Expected at least 80% tenant_id coverage for ausbilder, got ${(coverage * 100).toStringAsFixed(1)}%',
+          reason: 'Expected at least 80% tenantId coverage for teachers, got ${(coverage * 100).toStringAsFixed(1)}%',
         );
       });
     });
