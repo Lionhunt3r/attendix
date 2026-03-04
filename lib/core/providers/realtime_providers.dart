@@ -155,6 +155,9 @@ final _attendanceRealtimeSubscriptionProvider = Provider.autoDispose<void>((ref)
         event: PostgresChangeEvent.update,
         schema: 'public',
         table: 'person_attendances',
+        // No tenant filter possible — person_attendances has no tenantId column.
+        // Tenant isolation is in the data query (.eq('tenantId', ...)).
+        // Cost of spurious refetch: one tenant-filtered SELECT — negligible.
         callback: onChanged,
       )
       .subscribe();

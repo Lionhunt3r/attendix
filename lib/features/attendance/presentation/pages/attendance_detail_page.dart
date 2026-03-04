@@ -41,6 +41,13 @@ class AttendanceDetailPage extends ConsumerStatefulWidget {
 }
 
 class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
+  // ARCHITECTURE: Two complementary sync mechanisms:
+  // 1. _personAttChannel (Supabase realtime): instant updates from Postgres
+  //    change payloads — avoids full refetch for individual status changes.
+  // 2. _providerSubscription (Riverpod listenManual): full dataset sync after
+  //    provider invalidation — catches additions/deletions.
+  // Both check _savingPersonIds to avoid overwriting optimistic local updates.
+
   final Map<int, AttendanceStatus> _localStatuses = {};
   final Map<int, String?> _personAttendanceIds = {}; // Map personId -> personAttendanceId
   final Map<int, String?> _personNotes = {}; // Map personId -> notes
@@ -219,13 +226,20 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   /// Ensures PersonAttendance records exist for this attendance.
   Future<void> _ensurePersonAttendancesExist() async {
     final personAttendances = await ref.read(personAttendancesForAttendanceProvider(widget.attendanceId).future);
-
     if (personAttendances.isNotEmpty) return;
 
     final supabase = ref.read(supabaseClientProvider);
     final tenant = ref.read(currentTenantProvider);
+    if (tenant?.id == null) return;
 
-    if (tenant == null) return;
+    // Validate attendance belongs to current tenant before inserting
+    final attendanceCheck = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('id', widget.attendanceId)
+        .eq('tenantId', tenant!.id!)
+        .maybeSingle();
+    if (attendanceCheck == null || !mounted) return;
 
     final attendanceType = ref.read(attendanceTypeForAttendanceProvider(widget.attendanceId)).valueOrNull;
     final defaultStatus = attendanceType?.defaultStatus ?? AttendanceStatus.neutral;
@@ -238,7 +252,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
         .eq('paused', false);
 
     final playerList = players as List;
-    if (playerList.isEmpty) return;
+    if (playerList.isEmpty || !mounted) return;
 
     final records = playerList.map((p) => {
       'attendance_id': widget.attendanceId,
@@ -246,8 +260,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       'status': defaultStatus.value,
     }).toList();
 
-    await supabase.from('person_attendances').insert(records);
+    // Upsert prevents duplicates from concurrent devices (TOCTOU race)
+    await supabase
+        .from('person_attendances')
+        .upsert(records, onConflict: 'attendance_id,person_id', ignoreDuplicates: true);
 
+    if (!mounted) return;
     ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
   }
 
@@ -690,6 +708,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       });
 
       await _saveChecklist();
+      if (!mounted) return;
       ToastHelper.showSuccess(context, 'To-Do hinzugefügt');
     }
   }
@@ -711,6 +730,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       });
 
       await _saveChecklist();
+      if (!mounted) return;
       ToastHelper.showSuccess(context, 'To-Do gelöscht');
     }
   }
@@ -1247,6 +1267,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
         .eq('attendance_id', widget.attendanceId)
         .eq('tenantId', tenant!.id!);
 
+    if (!mounted) return;
+
     // Create new history entries if there are songs
     if (_songEntries.isNotEmpty) {
       final entries = _songEntries.map((entry) {
@@ -1602,6 +1624,16 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   }) async {
     final personAttendanceId = _personAttendanceIds[personId];
     if (personAttendanceId == null) {
+      if (mounted && previousStatus != null) {
+        setState(() {
+          _localStatuses[personId] = previousStatus;
+        });
+      }
+      return;
+    }
+
+    final isValid = await _validatePersonAttendanceTenant(personAttendanceId);
+    if (!isValid) {
       if (mounted && previousStatus != null) {
         setState(() {
           _localStatuses[personId] = previousStatus;
