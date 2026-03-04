@@ -209,8 +209,27 @@ class _FileUploadSheetState extends ConsumerState<FileUploadSheet> {
 
     if (files == null || files.isEmpty) return;
 
+    const maxSizeBytes = 10 * 1024 * 1024; // 10 MB
+    final accepted = <PlatformFile>[];
+    final rejected = <String>[];
+
+    for (final file in files) {
+      if (file.size > maxSizeBytes) {
+        rejected.add(file.name);
+      } else {
+        accepted.add(file);
+      }
+    }
+
+    if (rejected.isNotEmpty && mounted) {
+      ToastHelper.showWarning(
+        context,
+        '${rejected.length} Datei(en) zu groß (max. 10 MB): ${rejected.join(', ')}',
+      );
+    }
+
     setState(() {
-      for (final file in files) {
+      for (final file in accepted) {
         // Try to match instrument from filename
         final matchedId = InstrumentMatcher.matchInstrument(
           file.name,
@@ -323,6 +342,12 @@ class _FileItem extends StatelessWidget {
     return Icons.insert_drive_file;
   }
 
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dismissible(
@@ -352,6 +377,10 @@ class _FileItem extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w500),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _formatFileSize(file.platformFile.size),
+                      style: const TextStyle(fontSize: 11, color: AppColors.medium),
                     ),
                     const SizedBox(height: 4),
                     _CategoryDropdown(

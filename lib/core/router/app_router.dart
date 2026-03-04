@@ -192,7 +192,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         name: 'register',
-        builder: (context, state) => const RegisterPage(),
+        builder: (context, state) => RegisterPage(
+          email: state.uri.queryParameters['email'],
+        ),
       ),
       GoRoute(
         path: '/forgot-password',

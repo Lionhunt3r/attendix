@@ -14,6 +14,7 @@ import '../../../../core/utils/quill_utils.dart';
 import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../shared/widgets/loading/list_skeleton.dart';
+import '../../../../shared/widgets/loading/skeleton_list_tile.dart';
 
 /// Meeting detail page for viewing/editing a meeting
 class MeetingDetailPage extends ConsumerStatefulWidget {
@@ -126,7 +127,16 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
         ],
       ),
       body: meetingAsync.when(
-        loading: () => const ListSkeleton(itemCount: 3),
+        loading: () => const Padding(
+          padding: EdgeInsets.all(AppDimensions.paddingM),
+          child: Column(
+            children: [
+              SkeletonCard(height: 120),
+              SizedBox(height: AppDimensions.paddingM),
+              SkeletonCard(height: 200),
+            ],
+          ),
+        ),
         error: (e, _) => _buildErrorState(e),
         data: (meeting) {
           if (meeting == null) {
@@ -298,6 +308,31 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                               fontWeight: FontWeight.w600,
                             ),
                       ),
+                      const Spacer(),
+                      if (availableAttendees.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            final validIds = availableAttendees
+                                .where((p) => p.id != null)
+                                .map((p) => p.id!)
+                                .toSet();
+                            setState(() {
+                              _hasChanges = true;
+                              if (_selectedAttendeeIds.length == validIds.length) {
+                                _selectedAttendeeIds.clear();
+                              } else {
+                                _selectedAttendeeIds = validIds.toList();
+                              }
+                            });
+                          },
+                          child: Text(
+                            _selectedAttendeeIds.length ==
+                                    availableAttendees.where((p) => p.id != null).length
+                                ? 'Alle abwählen'
+                                : 'Alle auswählen',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: AppDimensions.paddingM),

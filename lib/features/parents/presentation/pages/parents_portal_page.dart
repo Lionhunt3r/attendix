@@ -415,13 +415,7 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
     String title, {
     bool isLateComing = false,
   }) async {
-    final reasons = [
-      'Krankheitsbedingt',
-      'Urlaubsbedingt',
-      'Arbeitsbedingt',
-      'Familienbedingt',
-      'Sonstiger Grund',
-    ];
+    final reasons = kSignOutReasons;
 
     final reason = await showModalBottomSheet<String>(
       context: context,
@@ -587,13 +581,7 @@ class _ParentsPortalPageState extends ConsumerState<ParentsPortalPage> {
       return;
     }
 
-    final reasons = [
-      'Krankheitsbedingt',
-      'Urlaubsbedingt',
-      'Arbeitsbedingt',
-      'Familienbedingt',
-      'Sonstiger Grund',
-    ];
+    final reasons = kSignOutReasons;
 
     String? selectedReason = await showModalBottomSheet<String>(
       context: context,

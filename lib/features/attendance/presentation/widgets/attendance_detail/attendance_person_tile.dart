@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
+import '../../../../../core/utils/haptic_helper.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../../../../core/constants/app_constants.dart';
@@ -216,11 +217,7 @@ class AttendancePersonTile extends StatelessWidget {
 
   /// Trigger haptic feedback and change status
   void _onStatusChangedWithHaptic(AttendanceStatus newStatus) {
-    try {
-      HapticFeedback.lightImpact();
-    } catch (_) {
-      // PWA-kompatibel: ignoriere Fehler auf nicht-nativen Plattformen
-    }
+    HapticHelper.light();
     onStatusChanged(newStatus);
   }
 

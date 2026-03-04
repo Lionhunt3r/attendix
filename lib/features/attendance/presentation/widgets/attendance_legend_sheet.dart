@@ -4,19 +4,46 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/enums.dart';
 import '../../../../core/theme/app_colors.dart';
 
-/// Shows a modal bottom sheet explaining all attendance status types
-void showAttendanceLegendSheet(BuildContext context) {
+/// Shows a modal bottom sheet explaining attendance status types
+///
+/// If [availableStatuses] is provided, only those statuses are shown.
+void showAttendanceLegendSheet(
+  BuildContext context, {
+  Set<AttendanceStatus>? availableStatuses,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => const AttendanceLegendSheet(),
+    builder: (context) => AttendanceLegendSheet(
+      availableStatuses: availableStatuses,
+    ),
   );
 }
 
 /// Bottom sheet with legend explaining all attendance statuses
 class AttendanceLegendSheet extends StatelessWidget {
-  const AttendanceLegendSheet({super.key});
+  const AttendanceLegendSheet({super.key, this.availableStatuses});
+
+  final Set<AttendanceStatus>? availableStatuses;
+
+  static const _allItems = [
+    (AttendanceStatus.present, 'Person war bei dem Termin anwesend.'),
+    (AttendanceStatus.excused, 'Person hat sich im Voraus abgemeldet.'),
+    (AttendanceStatus.late, 'Person kam zu spät zum Termin.'),
+    (AttendanceStatus.lateExcused, 'Person kam zu spät, hatte aber vorher Bescheid gegeben.'),
+    (AttendanceStatus.absent, 'Person war nicht anwesend und hat sich nicht abgemeldet.'),
+    (AttendanceStatus.neutral, 'Status wurde noch nicht eingetragen.'),
+  ];
+
+  List<Widget> _buildLegendItems() {
+    final items = availableStatuses != null
+        ? _allItems.where((item) => availableStatuses!.contains(item.$1))
+        : _allItems;
+    return items
+        .map((item) => _LegendItem(status: item.$1, description: item.$2))
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,32 +97,7 @@ class AttendanceLegendSheet extends StatelessWidget {
                 child: ListView(
                   controller: scrollController,
                   padding: const EdgeInsets.all(AppDimensions.paddingM),
-                  children: const [
-                    _LegendItem(
-                      status: AttendanceStatus.present,
-                      description: 'Person war bei dem Termin anwesend.',
-                    ),
-                    _LegendItem(
-                      status: AttendanceStatus.excused,
-                      description: 'Person hat sich im Voraus abgemeldet.',
-                    ),
-                    _LegendItem(
-                      status: AttendanceStatus.late,
-                      description: 'Person kam zu spät zum Termin.',
-                    ),
-                    _LegendItem(
-                      status: AttendanceStatus.lateExcused,
-                      description: 'Person kam zu spät, hatte aber vorher Bescheid gegeben.',
-                    ),
-                    _LegendItem(
-                      status: AttendanceStatus.absent,
-                      description: 'Person war nicht anwesend und hat sich nicht abgemeldet.',
-                    ),
-                    _LegendItem(
-                      status: AttendanceStatus.neutral,
-                      description: 'Status wurde noch nicht eingetragen.',
-                    ),
-                  ],
+                  children: _buildLegendItems(),
                 ),
               ),
             ],

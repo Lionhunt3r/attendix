@@ -1,6 +1,35 @@
 {
   "versions": [
     {
+      "version": "0.1.24",
+      "date": "4.3.2026",
+      "changes": [
+        "✨ Personen: Notizen-Badge in der Liste",
+        "✨ Personen: Filter zurücksetzen bei Instanzwechsel",
+        "✨ Mitglieder: Skeleton-Loading statt Spinner",
+        "✨ Besprechungen: Swipe-to-Delete und Skeleton-Loading",
+        "✨ Instanz erstellen: Dynamische Platzhalter je nach Gruppentyp",
+        "✨ Instanz erstellen: Zeichenlimits mit Counter",
+        "✨ Registrierung: Erfolgsdialog statt Toast",
+        "✨ Login → Registrieren: E-Mail wird übernommen",
+        "✨ Export: Testergebnis als Exportfeld verfügbar",
+        "✨ Export: Hinweis zur PDF-Limitierung (8 Termine)",
+        "✨ Statistiken: Saisonstart als Standard-Zeitraum",
+        "✨ Legende: Zeigt nur aktivierte Status an",
+        "✨ Datei-Upload: Größenvalidierung (max. 10 MB)",
+        "✨ Datei-Upload: Dateigröße sichtbar",
+        "✨ Lieder: Warnung bei doppelter Nummer",
+        "✨ Abmeldegründe: Einheitlich in Self-Service und Elternportal",
+        "✨ Haptic Feedback bei destruktiven Aktionen",
+        "✨ Toast-Nachrichten mit Terminname personalisiert",
+        "✨ Termintyp-Editor: Nutzungshinweis wenn Typ verwendet wird",
+        "✨ Besprechungen: Alle auswählen/abwählen Button",
+        "✨ Personen: Archivieren mit Datum und Begründung",
+        "✨ Personen: Instrumente-Feld für Chöre",
+        "🐛 Hauptgruppe wird bei Instanzerstellung korrekt markiert"
+      ]
+    },
+    {
       "version": "0.1.23",
       "date": "4.3.2026",
       "changes": [

@@ -286,6 +286,8 @@ class ExportService {
         return player.email ?? '';
       case 'Telefon':
         return player.phone ?? '';
+      case 'Testergebnis':
+        return player.testResult ?? '';
       default:
         return '';
     }

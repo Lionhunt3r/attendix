@@ -448,6 +448,8 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         _draft = _draft.copyWith(otherExercise: value as String?);
       } else if (field == 'range') {
         _draft = _draft.copyWith(range: value as String?);
+      } else if (field == 'instruments') {
+        _draft = _draft.copyWith(instruments: value as String?);
       } else if (field == 'examinee') {
         _draft = _draft.copyWith(examinee: value as bool);
       } else if (field == 'testResult') {
@@ -548,6 +550,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'history': updatedHistory,
         'additional_fields': _additionalFieldValues.isNotEmpty ? _additionalFieldValues : null,
         'range': _draft.range?.isEmpty ?? true ? null : _draft.range,
+        'instruments': _draft.instruments?.isEmpty ?? true ? null : _draft.instruments,
         'examinee': _draft.examinee,
         'testResult': _draft.testResult?.isEmpty ?? true ? null : _draft.testResult,
         'email': _draft.email?.isEmpty ?? true ? null : _draft.email,

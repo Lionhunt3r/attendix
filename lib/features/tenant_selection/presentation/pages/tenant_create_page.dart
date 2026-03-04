@@ -152,11 +152,12 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
             // Short Name
             TextFormField(
               controller: _shortNameController,
-              decoration: const InputDecoration(
+              maxLength: 30,
+              decoration: InputDecoration(
                 labelText: 'Kurzname *',
-                hintText: 'z.B. JON oder Chor St. Peter',
+                hintText: _shortNameHint,
                 helperText: 'Wird in der Navigation angezeigt',
-                prefixIcon: Icon(Icons.short_text),
+                prefixIcon: const Icon(Icons.short_text),
               ),
               textCapitalization: TextCapitalization.words,
               validator: (value) {
@@ -175,10 +176,11 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
             // Long Name
             TextFormField(
               controller: _longNameController,
-              decoration: const InputDecoration(
+              maxLength: 100,
+              decoration: InputDecoration(
                 labelText: 'Vollständiger Name (optional)',
-                hintText: 'z.B. Jugendorchester Nürnberg',
-                prefixIcon: Icon(Icons.title),
+                hintText: _longNameHint,
+                prefixIcon: const Icon(Icons.title),
               ),
               textCapitalization: TextCapitalization.words,
             ),
@@ -216,6 +218,7 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
             // Main group name
             TextFormField(
               controller: _mainGroupNameController,
+              maxLength: 50,
               decoration: InputDecoration(
                 labelText: 'Name der ersten $_groupLabel',
                 hintText: _groupHint,
@@ -306,6 +309,18 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
     'orchestra' => 'z.B. Streicher',
     'choir' => 'z.B. Sopran',
     _ => 'z.B. Gruppe 1',
+  };
+
+  String get _shortNameHint => switch (_selectedType) {
+    'orchestra' => 'z.B. JON, Philharmonie',
+    'choir' => 'z.B. Chor St. Peter, Kantorei',
+    _ => 'z.B. Jugendgruppe, Verein XY',
+  };
+
+  String get _longNameHint => switch (_selectedType) {
+    'orchestra' => 'z.B. Jugendorchester Nürnberg',
+    'choir' => 'z.B. Kirchenchor St. Peter und Paul',
+    _ => 'z.B. Jugendgruppe Nürnberg e.V.',
   };
 
   String get _typeLabel => switch (_selectedType) {
@@ -460,6 +475,7 @@ class _TenantCreatePageState extends ConsumerState<TenantCreatePage> {
         'tenantId': tenantId,
         'name': groupName,
         'isSection': true,
+        'maingroup': true,
       });
 
       // Refresh the tenants list

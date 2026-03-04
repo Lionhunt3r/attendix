@@ -902,16 +902,36 @@ class _TenantRegistrationPageState extends ConsumerState<TenantRegistrationPage>
       String message;
       if (result.autoApproved) {
         message = result.isNewAccount
-            ? 'Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse.'
-            : 'Registrierung erfolgreich! Du bist nun Mitglied.';
+            ? 'Bitte bestätige deine E-Mail-Adresse, um die Registrierung abzuschließen.'
+            : 'Du bist nun Mitglied dieser Gruppe.';
       } else {
         message = result.isNewAccount
-            ? 'Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse und warte auf die Genehmigung.'
-            : 'Registrierung erfolgreich! Bitte warte auf die Genehmigung durch einen Administrator.';
+            ? 'Bitte bestätige deine E-Mail-Adresse und warte auf die Genehmigung durch einen Administrator.'
+            : 'Bitte warte auf die Genehmigung durch einen Administrator.';
       }
 
-      ToastHelper.showSuccess(context, message);
-      context.go('/login');
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          icon: Icon(
+            result.autoApproved ? Icons.check_circle : Icons.hourglass_top,
+            color: AppColors.success,
+            size: 48,
+          ),
+          title: const Text('Registrierung erfolgreich!'),
+          content: Text(message),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(result.isNewAccount ? 'Zum Login' : 'Weiter'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) context.go(_isLoggedIn ? '/tenants' : '/login');
     } else {
       ToastHelper.showError(
         context,

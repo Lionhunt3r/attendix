@@ -262,7 +262,8 @@ class _SelfServiceOverviewPageState
       if (state.hasError) {
         ToastHelper.showError(context, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
       } else {
-        ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+        final typeName = attendance.typeInfo ?? 'Termin';
+        ToastHelper.showSuccess(context, 'Angemeldet bei $typeName');
       }
     }
   }
@@ -274,12 +275,7 @@ class _SelfServiceOverviewPageState
       return;
     }
 
-    final reasons = [
-      'Krankheitsbedingt',
-      'Beruflich verhindert',
-      'Familienfeier',
-      'Urlaub',
-    ];
+    final reasons = kSignOutReasons;
 
     String? selectedReason = await showModalBottomSheet<String>(
       context: context,
@@ -325,11 +321,12 @@ class _SelfServiceOverviewPageState
         if (state.hasError) {
           ToastHelper.showError(context, 'Abmeldung fehlgeschlagen. Bitte versuche es erneut.');
         } else {
+          final typeName = attendance.typeInfo ?? 'Termin';
           ToastHelper.showSuccess(
               context,
               isLateComing
-                  ? 'Vielen Dank für die Info!'
-                  : 'Vielen Dank für deine rechtzeitige Abmeldung!');
+                  ? 'Verspätung für $typeName eingetragen'
+                  : 'Abgemeldet bei $typeName');
         }
       }
     }
@@ -568,7 +565,8 @@ class _SelfServiceOverviewPageState
         if (state.hasError) {
           ToastHelper.showError(context, 'Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
         } else {
-          ToastHelper.showSuccess(context, 'Schön, dass du dabei bist!');
+          final typeName = attendance.typeInfo ?? 'Termin';
+          ToastHelper.showSuccess(context, 'Angemeldet bei $typeName mit Notiz');
         }
       }
     }

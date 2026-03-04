@@ -7,6 +7,7 @@ import '../../../../core/constants/enums.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/organisation_providers.dart';
 import '../../../../core/providers/statistics_providers.dart';
+import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
@@ -32,11 +33,25 @@ class StatisticsPage extends ConsumerStatefulWidget {
 }
 
 class _StatisticsPageState extends ConsumerState<StatisticsPage> {
+  bool _dateRangeInitialized = false;
+
   @override
   Widget build(BuildContext context) {
     final dateRange = ref.watch(statisticsDateRangeProvider);
     final attendancesAsync = ref.watch(filteredAttendancesForStatsProvider);
     final statistics = ref.watch(attendanceStatisticsProvider);
+
+    // B6-011: Use season start as default if available
+    if (!_dateRangeInitialized) {
+      _dateRangeInitialized = true;
+      final tenant = ref.read(currentTenantProvider);
+      if (tenant?.seasonStart != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(statisticsDateRangeProvider.notifier)
+              .resetToDefault(seasonStart: tenant!.seasonStart);
+        });
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(

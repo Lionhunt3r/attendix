@@ -70,6 +70,7 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
   bool _isLoading = true;
   bool _hasChanges = false;
   AttendanceType? _originalType;
+  int _usageCount = 0;
 
   @override
   void initState() {
@@ -81,6 +82,12 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
     final type = await ref.read(attendanceTypeByIdProvider(widget.typeId).future);
 
     if (type != null && mounted) {
+      // Fetch usage count
+      try {
+        final repo = ref.read(attendanceTypeRepositoryWithTenantProvider);
+        _usageCount = await repo.getAttendanceCountForType(widget.typeId);
+      } catch (_) {}
+
       setState(() {
         _originalType = type;
         _nameController.text = type.name;
@@ -171,6 +178,28 @@ class _AttendanceTypeEditPageState extends ConsumerState<AttendanceTypeEditPage>
         child: ListView(
           padding: const EdgeInsets.all(AppDimensions.paddingM),
           children: [
+            // Usage warning
+            if (_usageCount > 0) ...[
+              Card(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.paddingS),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 18, color: AppColors.warning),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Wird in $_usageCount Termin(en) verwendet. Änderungen wirken sich auf bestehende Einträge aus.',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.paddingM),
+            ],
             // Name
             TextFormField(
               controller: _nameController,

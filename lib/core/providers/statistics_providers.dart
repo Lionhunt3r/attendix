@@ -39,6 +39,18 @@ class StatisticsDateRangeNotifier extends StateNotifier<StatisticsDateRange> {
   void setFromDateTimeRange(DateTimeRange range) {
     state = StatisticsDateRange(start: range.start, end: range.end);
   }
+
+  /// Reset to season start if available, otherwise 180 days
+  void resetToDefault({String? seasonStart}) {
+    if (seasonStart != null) {
+      final parsed = DateTime.tryParse(seasonStart);
+      if (parsed != null) {
+        state = StatisticsDateRange(start: parsed, end: DateTime.now());
+        return;
+      }
+    }
+    state = StatisticsDateRange.defaultRange();
+  }
 }
 
 final statisticsDateRangeProvider =

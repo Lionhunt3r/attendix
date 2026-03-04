@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'haptic_helper.dart';
+
 /// Helper class for showing dialogs
 class DialogHelper {
   /// Shows a confirmation dialog with title, message and custom button labels
@@ -24,7 +26,10 @@ class DialogHelper {
             child: Text(cancelText),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () {
+              if (isDestructive) HapticHelper.medium();
+              Navigator.of(context).pop(true);
+            },
             style: isDestructive
                 ? ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.error,
