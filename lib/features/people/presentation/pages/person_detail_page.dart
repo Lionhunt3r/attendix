@@ -25,12 +25,14 @@ final personProvider =
   final groups = await ref.watch(groupsMapProvider.future);
 
   if (tenant == null) return null;
+  final tenantId = tenant.id;
+  if (tenantId == null) return null;
 
   final response = await supabase
       .from('player')
       .select('*')
       .eq('id', personId)
-      .eq('tenantId', tenant.id!)
+      .eq('tenantId', tenantId)
       .maybeSingle();
 
   if (response == null) return null;
@@ -63,8 +65,9 @@ final personAttendanceStatsProvider =
   CriticalRulePeriodType? latePeriodType;
   int? latePeriodDays;
 
-  if (tenant?.criticalRules != null) {
-    for (final rule in tenant!.criticalRules!) {
+  final criticalRules = tenant?.criticalRules;
+  if (criticalRules != null) {
+    for (final rule in criticalRules) {
       if (rule.statuses.contains(3) && rule.enabled) {
         lateStatuses = rule.statuses;
         latePeriodType = rule.periodType;
@@ -82,8 +85,9 @@ final personAttendanceStatsProvider =
 
   final attendances = response as List;
   final now = DateTime.now();
-  final seasonStart = tenant?.seasonStart != null
-      ? DateTime.tryParse(tenant!.seasonStart!)
+  final seasonStartStr = tenant?.seasonStart;
+  final seasonStart = seasonStartStr != null
+      ? DateTime.tryParse(seasonStartStr)
       : null;
 
   final pastAttendances = attendances.where((a) {
@@ -109,8 +113,8 @@ final personAttendanceStatsProvider =
   DateTime? lateCountStartDate;
   if (latePeriodType == CriticalRulePeriodType.season) {
     // Use tenant's seasonStart
-    if (tenant?.seasonStart != null) {
-      lateCountStartDate = DateTime.tryParse(tenant!.seasonStart!);
+    if (seasonStartStr != null) {
+      lateCountStartDate = DateTime.tryParse(seasonStartStr);
     }
   } else if (latePeriodType == CriticalRulePeriodType.days) {
     // Use last X days
@@ -154,6 +158,8 @@ final personHistoryProvider =
   final tenant = ref.watch(currentTenantProvider);
 
   if (person == null || tenant == null) return [];
+  final tenantId = tenant.id;
+  if (tenantId == null) return [];
 
   final today = DateTime.now().toIso8601String().substring(0, 10);
 
@@ -161,13 +167,13 @@ final personHistoryProvider =
       .from('person_attendances')
       .select('*, attendance:attendance_id!inner(id, date, type, typeInfo, type_id, tenantId)')
       .eq('person_id', personId)
-      .eq('attendance.tenantId', tenant.id!);
+      .eq('attendance.tenantId', tenantId);
 
   List<Map<String, dynamic>> attendanceTypes = [];
   final typesResponse = await supabase
       .from('attendance_types')
       .select('*')
-      .eq('tenant_id', tenant.id!);
+      .eq('tenant_id', tenantId);
   attendanceTypes = List<Map<String, dynamic>>.from(typesResponse as List);
 
   final attendanceHistory = (attendanceResponse as List)

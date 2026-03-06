@@ -29,7 +29,8 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
   final groups = await ref.watch(groupsMapProvider.future);
   final repository = ref.watch(playerRepositoryWithTenantProvider);
 
-  if (tenant == null) return [];
+  final tenantId = tenant?.id;
+  if (tenant == null || tenantId == null) return [];
 
   // Check for auto-unpause (players whose pause period has ended)
   await repository.checkAndUnpausePlayers();
@@ -38,7 +39,7 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
     final response = await supabase
         .from('player')
         .select('*')
-        .eq('tenantId', tenant.id!)
+        .eq('tenantId', tenantId)
         .isFilter('left', null)      // Only active (not archived/left)
         .isFilter('pending', false)  // Only confirmed players
         .order('instrument')         // Sort by group (instrument) first
