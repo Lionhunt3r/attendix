@@ -99,14 +99,18 @@ enum Role {
   /// Can see the "Self-Service" tab (own attendances)
   bool get canSeeSelfServiceTab => isPlayerRole || isHelperRole;
 
-  /// Can see the "Members" tab (if tenant.showMembersList is enabled)
-  /// Note: APPLICANT is explicitly excluded (unlike isPlayerRole which includes it)
+  /// Can see the "Members" tab (if tenant.showMembersList is enabled).
+  ///
+  /// Excluded roles:
+  /// - Conductors (admin, responsible, viewer): see full People tab instead
+  /// - APPLICANT: still in waiting/approval state, not yet a member
+  /// - PARENT: has own portal
+  /// - NONE: fallback role with no permissions (contradicts canView)
   bool get canSeeMembersTab =>
       this == Role.player ||
       this == Role.helper ||
       this == Role.voiceLeader ||
-      this == Role.voiceLeaderHelper ||
-      this == Role.none;
+      this == Role.voiceLeaderHelper;
 
   /// Can see voice leader settings in settings page
   bool get canSeeVoiceLeaderSettings =>
