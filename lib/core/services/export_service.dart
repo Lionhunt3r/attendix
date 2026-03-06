@@ -584,10 +584,7 @@ class ExportService {
 
     // Summary section
     sheet.appendRow([]); // Empty row
-    final present = statuses.values.where((s) =>
-        s == AttendanceStatus.present ||
-        s == AttendanceStatus.late ||
-        s == AttendanceStatus.lateExcused).length;
+    final present = statuses.values.where((s) => s.countsAsPresent).length;
     final excused = statuses.values.where((s) => s == AttendanceStatus.excused).length;
     final absent = statuses.values.where((s) => s == AttendanceStatus.absent).length;
     final neutral = statuses.values.where((s) => s == AttendanceStatus.neutral).length;

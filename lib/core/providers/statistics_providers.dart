@@ -328,9 +328,7 @@ final groupChartDataProvider = Provider<List<GroupChartData>>((ref) {
     final groupName = playerGroupMap[pa.personId] ?? 'Ohne Gruppe';
     final current = groupStats[groupName] ?? (present: 0, total: 0);
 
-    final isPresent = pa.status == AttendanceStatus.present ||
-        pa.status == AttendanceStatus.late ||
-        pa.status == AttendanceStatus.lateExcused;
+    final isPresent = pa.status.countsAsPresent;
 
     groupStats[groupName] = (
       present: current.present + (isPresent ? 1 : 0),
@@ -393,9 +391,7 @@ final topPlayersChartDataProvider = Provider<List<PlayerChartData>>((ref) {
   for (final pa in personAttendances) {
     if (pa.personId != null && playerStats.containsKey(pa.personId)) {
       final current = playerStats[pa.personId]!;
-      final isPresent = pa.status == AttendanceStatus.present ||
-          pa.status == AttendanceStatus.late ||
-          pa.status == AttendanceStatus.lateExcused;
+      final isPresent = pa.status.countsAsPresent;
 
       playerStats[pa.personId!] = (
         name: current.name,

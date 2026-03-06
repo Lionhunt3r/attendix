@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/config/supabase_config.dart';
 import '../../../../../core/constants/app_constants.dart';
+import '../../../../../core/constants/enums.dart';
 import '../../../../../core/providers/tenant_providers.dart';
 import '../../../../../core/theme/app_colors.dart';
 
@@ -76,7 +77,7 @@ final otherTenantsProvider =
         final attended = attendances.where((a) {
           final status = a['status'];
           if (status is int) {
-            return status == 1 || status == 3 || status == 5;
+            return AttendanceStatus.fromValue(status).countsAsPresent;
           }
           return false;
         }).length;
