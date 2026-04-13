@@ -29,7 +29,7 @@ final peopleListProvider = FutureProvider<List<Person>>((ref) async {
   final groups = await ref.watch(groupsMapProvider.future);
   final repository = ref.watch(playerRepositoryWithTenantProvider);
 
-  if (tenant == null) return [];
+  if (tenant == null || tenant.id == null) return [];
 
   // Check for auto-unpause (players whose pause period has ended)
   await repository.checkAndUnpausePlayers();

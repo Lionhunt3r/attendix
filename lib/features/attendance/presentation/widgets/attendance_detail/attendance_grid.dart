@@ -117,9 +117,7 @@ class _InstrumentGroupSection extends StatelessWidget {
     // Count present persons (present, late, or lateExcused)
     final presentCount = persons.where((p) {
       final status = localStatuses[p.id];
-      return status == AttendanceStatus.present ||
-             status == AttendanceStatus.late ||
-             status == AttendanceStatus.lateExcused;
+      return status?.countsAsPresent ?? false;
     }).length;
 
     return Column(

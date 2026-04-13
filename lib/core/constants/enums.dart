@@ -75,6 +75,10 @@ enum Role {
   bool get isHelperRole => this == Role.helper || this == Role.voiceLeaderHelper;
 
   /// "Player roles" - only see self-service (their own attendances)
+  ///
+  /// Note: APPLICANT is included here for UI routing purposes (they see Self-Service tab
+  /// with waiting area view), but they have restricted permissions elsewhere.
+  /// See [canSeeMembersTab] and [canView] for permission restrictions.
   bool get isPlayerRole =>
       this == Role.player ||
       this == Role.voiceLeader ||
@@ -100,7 +104,15 @@ enum Role {
   bool get canSeeSelfServiceTab => isPlayerRole || isHelperRole;
 
   /// Can see the "Members" tab (if tenant.showMembersList is enabled)
-  /// Note: APPLICANT is explicitly excluded (unlike isPlayerRole which includes it)
+  ///
+  /// Note: APPLICANT is explicitly excluded for privacy reasons.
+  /// Applicants are users awaiting approval and should not see the member list
+  /// until their registration is approved. This differs from [isPlayerRole]
+  /// which includes APPLICANT for routing purposes.
+  ///
+  /// Role.none is included as a fallback for users with unassigned/unknown roles.
+  ///
+  /// See also: [canView], [canSeeNotifications] - also exclude APPLICANT
   bool get canSeeMembersTab =>
       this == Role.player ||
       this == Role.helper ||
