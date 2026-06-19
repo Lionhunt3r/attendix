@@ -115,13 +115,14 @@ POST-SPRINT:
 
 ## 3. Sprint-Reihenfolge (mit Begründung)
 
+> **Update 2026-06-19 (nach Sprint 1a):** Sprint 1b (Push-Foundation) wurde nach hinten geschoben, weil externe Pre-Conditions (Firebase-Projekt-Setup, APNS-Auth-Key, physisches iPhone) zum Zeitpunkt nicht verfügbar sind. Sprint 4 wurde in **4a** (ohne Push) und **4b** (mit Push, gemeinsam mit 1b) aufgeteilt. Tracking-Aufrufstellen (`pushReceived/pushOpened`) bleiben bis 1b ungenutzt — kein Funktions-Verlust für andere Sprints.
+
 | # | Sprint | Effort (verifiziert) | Issues | Begründung Reihenfolge |
 |---|--------|---------------------|--------|------------------------|
-| 1a | **Tracking + Audio Foundation** | ~10h | #220 partial | Klein, isoliert, low-risk. TrackingService wird von Sprint 1b PushService konsumiert. |
-| 1b | **Push-Foundation** | ~28h | #212, #220 partial | Pre-Condition: Firebase-Projekt-Audit. Foundation für Sprint 4 (Cold-Start) und alle Push-Aufrufstellen. |
+| 1a | **Tracking + Audio Foundation** ✅ DONE | ~38h actual | #220 partial | Merged 2026-06-19, commit 4edf10f. |
 | 2 | **Repository-Bypass-Refactor** | ~30h | #219 | Saubere Architektur bevor neue Pages dazukommen. Touched 20+ Files quer durch alle Features. |
-| 3 | **DSGVO-Compliance** | ~21h | #211, #215 partial | Erst nach Sprint 2 möglich (saubere AuthService-Basis), erst nach Sprint 1a (Tracking-Event AccountDeleted). App-Store-Submission danach möglich. |
-| 4 | **Cold-Start + Realtime + Reasons + Conductor** | ~15.5h | #213 | Braucht PushService aus 1b. User-sichtbare Attendance-Bugs. |
+| 3 | **DSGVO-Compliance** | ~21h | #211, #215 partial | Erst nach Sprint 2 möglich (saubere AuthService-Basis), Tracking-Event `accountDeleted` ist da (Sprint 1a). App-Store-Submission danach möglich. |
+| 4a | **Cold-Start (ohne Push) + Reasons + Conductor + Tenant-Auto-Close** | ~8.5h | #213 partial | User-sichtbare Attendance-Bugs die NICHT von PushService abhängen: B2-007 Notiz-ActionSheet (3h), B2-008 Conductor-Wechsel (4h), B2-009 Tenant-Auto-Close (1.5h). |
 | 5 | **Cross-Tenant Person-Matching** | ~37.5h | #214 | Eigenes großes Feature, profitiert von sauberer Repository-Basis aus Sprint 2. |
 | 6 | **Settings-Hub + Files + Shifts** | ~25h | #217 | Files-Page nutzt AudioPlayerService aus 1a. |
 | 7 | **Bulk-Edit + Role-Permissions** | ~48h | #218, #221 | Beide brauchen Tracking + Repository-Layer. Eventuell weiter splitten. |
@@ -130,9 +131,11 @@ POST-SPRINT:
 | 10 | **People Workflows** | ~22h | aus Report | isLeader-Dialog, Email-Account, syncPlayerWithUpcoming. |
 | 11 | **Sign-Out Reasons + Description-Modal** | ~24h | aus Report | tenant.absence_reasons + 4× Custom-Reason-Bug zentralisieren. |
 | 12 | **Attendance Workflows** | ~15h | aus Report | iOS-FAB, Personen-hinzufügen, Anhang, Status-Mapping. |
+| 1b | **Push-Foundation** | ~28h | #212, #220 partial | **Pre-Conditions:** Firebase-Projekt-Audit, APNS-Key, iPhone. Foundation für 4b. |
+| 4b | **Cold-Start Push + getAttendanceByIdRobust** | ~7h | #213 partial | B2-010 RLS-Race nach Push-Auth-Restore (4h) + B2-032 Robust-Fetch (3h). Nur sinnvoll mit funktionierendem PushService aus 1b. |
 | 13 | **Long Tail** | laufend | viele | 118 MITTEL + 66 NIEDRIG als Wochen-Tickets. |
 
-**Gesamt-Effort:** ~315h (verifiziert, war 290h vor Sprint-1-Verifikation). Bei 8h/Tag Vollzeit: **~6-8 Wochen**, realistisch mit Reviews/Iteration **3-4 Monate**.
+**Gesamt-Effort:** ~315h (unverändert; Sprint 4 nur gesplittet, nicht reduziert).
 
 **Wichtige Reihenfolge-Entscheidungen:**
 
@@ -515,17 +518,27 @@ Für die Sprints 2-12 gilt: **Vor jedem Sprint-Start läuft die 3-Iterationen-Ve
 **Pre-Condition aus Sprint 1a:** TrackingEvent `accountDeleted` muss existieren.
 **Pre-Condition aus Sprint 2:** AuthService sauber (kein Repository-Bypass).
 
-### Sprint 4: Cold-Start + Realtime + Reasons + Conductor (~15.5h)
+### Sprint 4a: Cold-Start (ohne Push) + Tenant-Auto-Close + Reasons + Conductor (~8.5h)
 
-**Issue:** #213
+**Issue:** #213 partial
 **Komponenten:**
 - Notiz-ActionSheet mit `tenant.absence_reasons` (NEU 7255abc)
 - Conductor-Wechsel im Attendance-Modal (NEU abc98c5)
 - Tenant-Change Auto-Close (NEU dadbab0)
-- Cold-Start two-stage fetch + `getAttendanceByIdRobust`
-- App-Lifecycle-Listener für Visibility-Resume
+- App-Lifecycle-Listener für Visibility-Resume (sofern ohne Push sinnvoll — sonst nach 4b)
+
+**KEINE Pre-Condition auf Sprint 1b** — diese drei Findings sind alle UI-/State-Bugs, kein Push beteiligt.
+
+### Sprint 4b: Cold-Start Push (~7h, mit Sprint 1b)
+
+**Issue:** #213 partial
+**Komponenten:**
+- B2-010 Cold-Start two-stage fetch nach Push-Auth-Restore (4h)
+- B2-032 `getAttendanceByIdRobust` Repository-Methode (3h)
 
 **Pre-Condition aus Sprint 1b:** PushService funktioniert.
+
+**Wird zusammen mit Sprint 1b ausgeführt** (am Ende des Master-Plans, sobald Firebase-Setup verfügbar).
 
 ### Sprint 5: Cross-Tenant Person-Matching (~37.5h)
 
@@ -660,7 +673,7 @@ Der Verifikations-Schritt für Sprint 1 hat gezeigt: Erstentwurf 25h → real 40
 
 **Stop-Punkte (User-Aktion erforderlich):**
 
-1. **Vor Sprint 1b:** Firebase-Projekt-Audit. Wenn nicht eingerichtet → User muss handeln.
+1. **Vor Sprint 1b** (jetzt am Ende des Master-Plans): Firebase-Projekt-Audit. Wenn nicht eingerichtet → User muss handeln. Falls Firebase nie eingerichtet wird, fällt 1b + 4b komplett aus dem Plan, B2-010 und B11-017 wandern in den Long-Tail-Backlog. Nicht-Push-Sprints sind alle unabhängig davon.
 2. **Vor jedem Sprint-Start:** Plan-Review nach `/writing-plans` (User akzeptiert oder ändert).
 3. **Vor jedem Merge:** Code-Review-Output + User-Freigabe.
 4. **Wenn Sprint-Verifikation Effort > 200% des Erstentwurfs ergibt:** Re-Brainstorming des Sprints.
