@@ -15,3 +15,4 @@ export 'organisation_repository.dart';
 export 'viewer_repository.dart';
 export 'parent_repository.dart';
 export 'church_repository.dart';
+export 'usage_events_repository.dart';
