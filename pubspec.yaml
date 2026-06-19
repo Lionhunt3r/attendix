@@ -32,6 +32,9 @@ dependencies:
   # Charts
   fl_chart: ^0.69.2
 
+  # Audio
+  just_audio: ^0.9.40
+
   # PDF
   pdf: ^3.11.1
   printing: ^5.13.4
