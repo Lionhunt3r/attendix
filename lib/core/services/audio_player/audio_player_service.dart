@@ -72,8 +72,14 @@ class AudioPlayerService extends Notifier<AudioPlayerState> {
 
       // Race guard: a newer playFromUrl call may have superseded us
       // while setUrl was loading. If so, _player no longer points to
-      // our player — bail out without touching state or calling play.
-      if (_player != player) return;
+      // our player — dispose ours (the newer call only cleans up the
+      // player that was active when IT started, not us) and bail out
+      // without touching state or calling play.
+      if (_player != player) {
+        await player.stop();
+        await player.dispose();
+        return;
+      }
 
       state = state.copyWith(
         currentUrl: url,
