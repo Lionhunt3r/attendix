@@ -32,6 +32,62 @@ Prüfe JEDE Supabase-Query auf tenantId-Filter:
 .insert(data)  // ohne tenantId
 ```
 
+### 1a. Repository-Bypass (KRITISCHES Anti-Pattern!)
+
+**Häufigster Anti-Pattern im Attendix-Code (im 2026-06-17 Re-Crawl 20+ mal gefunden).**
+
+```dart
+// ❌ FALSCH - Direkter Supabase-Client in UI/Page/Provider
+final supabase = ref.read(supabaseClientProvider);
+await supabase.from('player').update(data).eq('id', id);
+
+// ❌ FALSCH - Direkte Query in StateNotifier ohne Repository-Layer
+final response = await supabase.from('attendance').select(...);
+
+// ✅ RICHTIG - Repository nutzen
+final repo = ref.read(playerRepositoryWithTenantProvider);
+await repo.updatePlayer(id, data);
+```
+
+**Gefährliche Stellen wo das oft passiert:**
+- `_save*` Methoden in Detail-Pages (z.B. attendance_detail_page hatte 11 Calls)
+- Sheets mit Cross-Tenant-Operationen (copy_to_tenant_sheet, handover_sheet)
+- Provider die "schnell" gebaut wurden (parents_providers, members_providers)
+- Inline-Edit-Felder die direkt speichern
+
+**Erkennungsmuster:**
+```bash
+# Im Review: Suche nach diesen Aufrufen außerhalb von lib/data/repositories/
+grep -n "ref\.\(read\|watch\)(supabaseClientProvider)" lib/features/ lib/core/providers/
+grep -n "supabase\.from(" lib/features/ lib/core/providers/
+```
+
+### 1b. Force-Unwrap auf `tenant.id!` (Anti-Pattern)
+
+```dart
+// ❌ FALSCH - Crash-Risiko bei null
+.eq('tenantId', tenant.id!)
+
+// ✅ RICHTIG - mit Guard
+if (tenant.id == null) return [];
+.eq('tenantId', tenant.id)
+
+// ✅ ODER: hasTenantId-Pattern
+if (!repo.hasTenantId) return [];
+```
+
+### 1c. Cross-Tenant-Operationen ohne zentrale Validierung
+
+```dart
+// ❌ FALSCH - Direktes Schreiben in fremden Tenant
+await supabase.from('shifts').insert({'tenant_id': targetTenantId, ...});
+
+// ✅ RICHTIG - Über zentralen Service mit Membership-Validierung
+final crossTenantService = ref.read(crossTenantServiceProvider);
+await crossTenantService.copyShift(shift, targetTenantId);
+// Service prüft: ist User Mitglied des Ziel-Tenants? Audit-Log? RLS?
+```
+
 ### 2. Riverpod Best Practices
 
 **Provider-Naming:**
@@ -130,10 +186,13 @@ Prüfe ob alle Labels auf Deutsch sind:
 ## Sicherheit
 - [ ] tenantId-Filter in allen Queries ✅/❌
 - [ ] Keine SQL-Injection möglich ✅/❌
+- [ ] Kein Repository-Bypass (kein supabaseClientProvider in UI/Provider) ✅/❌
+- [ ] Kein Force-Unwrap auf tenant.id! ✅/❌
+- [ ] Cross-Tenant-Operationen mit Membership-Validierung ✅/❌
 
 ## Patterns
 - [ ] Riverpod Naming Convention ✅/❌
-- [ ] Correct Repository Usage ✅/❌
+- [ ] Correct Repository Usage (WithTenant + hasTenantId-Check) ✅/❌
 - [ ] Proper Async Handling ✅/❌
 
 ## Qualität
