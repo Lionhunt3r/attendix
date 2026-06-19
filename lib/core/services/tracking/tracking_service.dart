@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/tenant_providers.dart';
-import '../../../data/models/usage_event.dart';
-import '../../../data/repositories/usage_events_repository.dart';
+import 'package:attendix/core/providers/tenant_providers.dart';
+import 'package:attendix/data/models/usage_event.dart';
+import 'package:attendix/data/repositories/usage_events_repository.dart';
 import 'tracking_event.dart';
 
 /// Resolves the current device platform once per process.
@@ -15,9 +14,14 @@ import 'tracking_event.dart';
 /// so suites are deterministic on any host.
 final trackingDeviceTypeProvider = Provider<String>((ref) {
   if (kIsWeb) return 'web';
-  if (Platform.isIOS) return 'ios';
-  if (Platform.isAndroid) return 'android';
-  return 'web';
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.iOS:
+      return 'ios';
+    case TargetPlatform.android:
+      return 'android';
+    default:
+      return 'web';
+  }
 });
 
 /// Cross-cutting analytics service. Fire-and-forget — never throws.
