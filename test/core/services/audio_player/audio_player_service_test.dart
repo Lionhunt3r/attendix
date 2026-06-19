@@ -57,6 +57,7 @@ class _FakeAudioPlayer implements AudioPlayer {
 
   @override
   Future<void> stop() async {
+    if (disposed) return;
     playing = false;
     _playingCtrl.add(false);
   }
@@ -69,6 +70,7 @@ class _FakeAudioPlayer implements AudioPlayer {
 
   @override
   Future<void> dispose() async {
+    if (disposed) return;
     disposed = true;
     await _playingCtrl.close();
     await _positionCtrl.close();
@@ -84,6 +86,20 @@ class _FakeAudioPlayer implements AudioPlayer {
   @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError(invocation.memberName.toString());
+}
+
+/// Fake whose `setUrl` always throws — for the failure-path test.
+class _FailingSetUrlFake extends _FakeAudioPlayer {
+  @override
+  Future<Duration?> setUrl(
+    String url, {
+    Map<String, String>? headers,
+    Duration? initialPosition,
+    bool preload = true,
+    dynamic tag,
+  }) async {
+    throw StateError('boom');
+  }
 }
 
 void main() {
@@ -220,6 +236,59 @@ void main() {
       await svc.stopSeeking(const Duration(seconds: 90));
       expect(fake.position, const Duration(seconds: 90));
       expect(c.read(audioPlayerServiceProvider).isSeeking, isFalse);
+    });
+
+    test('rapid playFromUrl: second call supersedes first without leaking state',
+        () async {
+      // For this test we need a *fresh* fake per factory call, so the
+      // race-guard (`_player != player`) actually triggers — otherwise
+      // both calls would share one already-disposed fake.
+      final fakes = <_FakeAudioPlayer>[];
+      final c = ProviderContainer(
+        overrides: [
+          audioPlayerFactoryProvider.overrideWithValue(() {
+            final f = _FakeAudioPlayer();
+            fakes.add(f);
+            return f;
+          }),
+        ],
+      );
+      addTearDown(c.dispose);
+      final svc = c.read(audioPlayerServiceProvider.notifier);
+
+      // Two back-to-back calls; the second resolves last in this synthetic
+      // setup (just_audio fake's setUrl is `async {... return ...; }`).
+      final first = svc.playFromUrl('https://a.example/1.mp3', '1.mp3', 'One');
+      final second = svc.playFromUrl('https://a.example/2.mp3', '2.mp3', 'Two');
+
+      await Future.wait([first, second]);
+
+      // The newer call wins — state reflects '2.mp3', not '1.mp3'.
+      final state = c.read(audioPlayerServiceProvider);
+      expect(state.currentUrl, 'https://a.example/2.mp3');
+      expect(state.currentFileName, '2.mp3');
+      expect(state.currentSongName, 'Two');
+    });
+
+    test('setUrl failure is propagated and state is reset', () async {
+      final failingFake = _FailingSetUrlFake();
+      final c = ProviderContainer(
+        overrides: [
+          audioPlayerFactoryProvider.overrideWithValue(() => failingFake),
+        ],
+      );
+      addTearDown(c.dispose);
+      final svc = c.read(audioPlayerServiceProvider.notifier);
+
+      await expectLater(
+        svc.playFromUrl('https://bad.example/x.mp3', 'x.mp3', 'X'),
+        throwsA(isA<StateError>()),
+      );
+
+      // After failure: state is reset, no leaked currentUrl.
+      final state = c.read(audioPlayerServiceProvider);
+      expect(state.hasFile, isFalse);
+      expect(state.isPlaying, isFalse);
     });
   });
 }

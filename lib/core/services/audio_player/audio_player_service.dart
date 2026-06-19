@@ -67,16 +67,31 @@ class AudioPlayerService extends Notifier<AudioPlayerState> {
     _player = player;
     _wireStreams(player);
 
-    final loadedDuration = await player.setUrl(url);
-    state = state.copyWith(
-      currentUrl: url,
-      currentFileName: fileName,
-      currentSongName: songName,
-      duration: loadedDuration ?? Duration.zero,
-      currentTime: Duration.zero,
-      isSeeking: false,
-    );
-    await player.play();
+    try {
+      final loadedDuration = await player.setUrl(url);
+
+      // Race guard: a newer playFromUrl call may have superseded us
+      // while setUrl was loading. If so, _player no longer points to
+      // our player — bail out without touching state or calling play.
+      if (_player != player) return;
+
+      state = state.copyWith(
+        currentUrl: url,
+        currentFileName: fileName,
+        currentSongName: songName,
+        duration: loadedDuration ?? Duration.zero,
+        currentTime: Duration.zero,
+        isSeeking: false,
+      );
+      await player.play();
+    } catch (_) {
+      // setUrl or play failed (network drop, bad URL, codec error).
+      // Tear down so we're not left wired to a half-initialized player.
+      if (_player == player) {
+        await _stopInternal();
+      }
+      rethrow;
+    }
   }
 
   Future<void> togglePlayPause() async {
