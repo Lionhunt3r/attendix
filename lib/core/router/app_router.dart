@@ -6,6 +6,7 @@ import '../config/supabase_config.dart';
 import '../constants/enums.dart';
 import '../providers/tenant_providers.dart';
 import 'page_transitions.dart';
+import 'tracking_observer.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
@@ -118,6 +119,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/login',
     debugLogDiagnostics: true,
     refreshListenable: authNotifier,
+    observers: [TrackingObserver(ref.container)],
     redirect: (context, state) {
       // Read auth state inside redirect (not watch)
       final authState = ref.read(authStateProvider);

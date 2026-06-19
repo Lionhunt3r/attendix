@@ -7,6 +7,7 @@ import '../../../core/constants/enums.dart';
 import '../../../core/providers/debug_providers.dart';
 import '../../../core/providers/tenant_providers.dart';
 import '../../../data/models/tenant/tenant.dart';
+import '../audio_player/audio_player_widget.dart';
 import '../debug/debug_role_fab.dart';
 
 /// Represents a navigation destination with its route
@@ -137,7 +138,12 @@ class MainShell extends ConsumerWidget {
     }
 
     return Scaffold(
-      body: child,
+      body: Column(
+        children: [
+          Expanded(child: child),
+          const AudioPlayerWidget(),
+        ],
+      ),
       // Debug FAB only visible in debug mode
       floatingActionButton: kDebugMode ? const DebugRoleFab() : null,
       bottomNavigationBar: NavigationBar(
