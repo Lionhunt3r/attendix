@@ -120,7 +120,9 @@ POST-SPRINT:
 | # | Sprint | Effort (verifiziert) | Issues | Begründung Reihenfolge |
 |---|--------|---------------------|--------|------------------------|
 | 1a | **Tracking + Audio Foundation** ✅ DONE | ~38h actual | #220 partial | Merged 2026-06-19, commit 4edf10f. |
-| 2 | **Repository-Bypass-Refactor** | ~30h | #219 | Saubere Architektur bevor neue Pages dazukommen. Touched 20+ Files quer durch alle Features. |
+| 2a | **Repository-Bypass-Refactor — Existing Repos** | ~8h | #219 partial | Pure Migration auf bestehende Repos. Plus auth_service Bug-Fix (tenantUsers casing). Etabliert Migration-Praxis für 2b/2c. |
+| 2b | **Repository-Bypass-Refactor — New Repos** | ~10h | #219 partial | Erzeugt `TenantUserRepository`, `HistoryRepository`, `TenantRepository`. Migriert user_management, profile, history, general_settings. |
+| 2c | **Repository-Bypass-Refactor — Cross-Tenant + Realtime + Storage + core/providers** | ~10h | #219 partial | `*InTenant()` Overloads, Realtime/Storage in AttendanceRepository, ~25 core/providers-Migration. Lint-Regel. |
 | 3 | **DSGVO-Compliance** | ~21h | #211, #215 partial | Erst nach Sprint 2 möglich (saubere AuthService-Basis), Tracking-Event `accountDeleted` ist da (Sprint 1a). App-Store-Submission danach möglich. |
 | 4a | **Cold-Start (ohne Push) + Reasons + Conductor + Tenant-Auto-Close** | ~8.5h | #213 partial | User-sichtbare Attendance-Bugs die NICHT von PushService abhängen: B2-007 Notiz-ActionSheet (3h), B2-008 Conductor-Wechsel (4h), B2-009 Tenant-Auto-Close (1.5h). |
 | 5 | **Cross-Tenant Person-Matching** | ~37.5h | #214 | Eigenes großes Feature, profitiert von sauberer Repository-Basis aus Sprint 2. |
