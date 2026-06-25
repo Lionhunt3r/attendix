@@ -336,7 +336,10 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   ///
   /// person_attendances has no tenantId column, so this joins the parent
   /// attendance row and compares its tenantId. Returns `false` on any error
-  /// or mismatch (defense-in-depth: deny by default).
+  /// or mismatch (defense-in-depth: deny by default). Errors are logged via
+  /// the base repository's `handleError` so a real RLS/network outage is
+  /// observable, but never propagated — the deny-by-default contract is the
+  /// safety net.
   Future<bool> validatePersonAttendanceTenant(String personAttendanceId) async {
     try {
       final validation = await supabase
@@ -347,7 +350,15 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
           .maybeSingle();
 
       return validation != null;
-    } catch (_) {
+    } catch (e, stack) {
+      // Log but never propagate — caller must see `false` on any failure.
+      try {
+        handleError(e, stack, 'validatePersonAttendanceTenant');
+      } catch (_) {
+        // handleError rethrows by contract; we swallow the rethrow here so
+        // the deny-by-default return path stays intact even when logging
+        // succeeds.
+      }
       return false;
     }
   }
