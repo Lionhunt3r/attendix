@@ -1191,10 +1191,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     _isSavingSongs = true;
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
       final attendance = ref.read(attendanceDetailProvider(widget.attendanceId)).valueOrNull;
-      if (tenant?.id == null || attendance == null) return;
+      if (!repo.hasTenantId || attendance == null) return;
 
       final songIds = _songEntries.map((e) => e.songId).toList();
       final conductorIds = _songEntries
@@ -1203,14 +1202,13 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
           .toList();
 
       // 1. Update attendance table with songs/conductors arrays
-      await supabase
-          .from('attendance')
-          .update({
-            'songs': songIds,
-            'conductors': conductorIds,
-          })
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {
+          'songs': songIds,
+          'conductors': conductorIds,
+        },
+      );
 
       // 2. Sync history table: delete old entries and create new ones
       await _syncHistoryEntries(attendance.date);
