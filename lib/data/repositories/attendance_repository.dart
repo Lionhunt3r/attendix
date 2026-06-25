@@ -49,17 +49,21 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Get upcoming attendances (future dates)
-  Future<List<Attendance>> getUpcomingAttendances() async {
+  ///
+  /// Optionally limit the number of results returned.
+  Future<List<Attendance>> getUpcomingAttendances({int? limit}) async {
     try {
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
 
-      final response = await supabase
+      final ordered = supabase
           .from('attendance')
           .select('*')
           .eq('tenantId', currentTenantId)
           .gte('date', startOfDay.toIso8601String())
           .order('date');
+
+      final response = limit != null ? await ordered.limit(limit) : await ordered;
 
       return (response as List)
           .map((e) => Attendance.fromJson(e as Map<String, dynamic>))

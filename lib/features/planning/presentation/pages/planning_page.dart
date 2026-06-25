@@ -3,9 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/attendance_detail_providers.dart';
+import '../../../../core/providers/attendance_providers.dart';
 import '../../../../core/providers/attendance_type_providers.dart';
 import '../../../../core/providers/song_providers.dart';
 import '../../../../core/services/export_service.dart';
@@ -56,38 +56,16 @@ class FieldSelection {
 
 /// Provider for upcoming attendances
 final upcomingAttendancesProvider = FutureProvider<List<Attendance>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  final now = DateTime.now().toIso8601String().substring(0, 10);
-  final response = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .gte('date', now)
-      .order('date', ascending: true)
-      .limit(20);
-
-  return (response as List).map((e) => Attendance.fromJson(e as Map<String, dynamic>)).toList();
+  final repo = ref.watch(attendanceRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return [];
+  return repo.getUpcomingAttendances(limit: 20);
 });
 
 /// Provider for songs list (for adding to plan)
 final planSongsProvider = FutureProvider<List<Song>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('songs')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .order('number')
-      .order('name');
-
-  return (response as List).map((e) => Song.fromJson(e as Map<String, dynamic>)).toList();
+  final repo = ref.watch(songRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return [];
+  return repo.getSongs();
 });
 
 /// Planning Page
@@ -873,19 +851,16 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
 
   Future<void> _toggleSharePlan() async {
     if (_selectedAttendanceId == null) return;
-    final tenant = ref.read(currentTenantProvider);
-    if (tenant?.id == null) return;
+    final repo = ref.read(attendanceRepositoryWithTenantProvider);
+    if (!repo.hasTenantId) return;
 
     final newValue = !_sharePlan;
     setState(() => _sharePlan = newValue);
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase
-          .from('attendance')
-          .update({'share_plan': newValue})
-          .eq('id', _selectedAttendanceId!)
-          .eq('tenantId', tenant!.id!);
+      await repo.updateAttendance(_selectedAttendanceId!, {
+        'share_plan': newValue,
+      });
       _hasChanges = true;
     } catch (e) {
       // Rollback on failure
@@ -896,23 +871,18 @@ class _PlanningPageState extends ConsumerState<PlanningPage> {
   Future<void> _savePlan() async {
     if (_selectedAttendanceId == null) return;
 
-    // BL-004: Add tenantId filter for security
-    final tenant = ref.read(currentTenantProvider);
-    if (tenant?.id == null) return;
+    // BL-004: tenantId is enforced inside the repository
+    final repo = ref.read(attendanceRepositoryWithTenantProvider);
+    if (!repo.hasTenantId) return;
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase
-          .from('attendance')
-          .update({
-            'plan': {
-              'time': _formatTime(_startTime),
-              'end': _endTime != null ? _formatTime(_endTime!) : null,
-              'fields': _fields.map((f) => f.toJson()).toList(),
-            },
-          })
-          .eq('id', _selectedAttendanceId!)
-          .eq('tenantId', tenant!.id!);
+      await repo.updateAttendance(_selectedAttendanceId!, {
+        'plan': {
+          'time': _formatTime(_startTime),
+          'end': _endTime != null ? _formatTime(_endTime!) : null,
+          'fields': _fields.map((f) => f.toJson()).toList(),
+        },
+      });
 
       // Mark as changed so providers are invalidated on exit
       _hasChanges = true;
