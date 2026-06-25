@@ -574,15 +574,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     }
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase
-          .from('person_attendances')
-          .update({
-            'notes': notes,
-            'changed_at': DateTime.now().toIso8601String(),
-            'changed_by': supabase.auth.currentUser?.id,
-          })
-          .eq('id', personAttendanceId);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      await repo.updatePersonAttendance(personAttendanceId, {'notes': notes});
 
       setState(() {
         _personNotes[personId] = notes;
@@ -1438,11 +1431,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     if (!confirmed || !mounted) return;
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase
-          .from('person_attendances')
-          .delete()
-          .eq('id', personAttendanceId);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      await repo.deletePersonAttendance(personAttendanceId);
 
       setState(() {
         _localStatuses.remove(personId);
@@ -1633,15 +1623,11 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
     _savingPersonIds.add(personId);
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase
-          .from('person_attendances')
-          .update({
-            'status': status.value,
-            'changed_at': DateTime.now().toIso8601String(),
-            'changed_by': supabase.auth.currentUser?.id,
-          })
-          .eq('id', personAttendanceId);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      await repo.updatePersonAttendance(
+        personAttendanceId,
+        {'status': status.value},
+      );
 
       // Invalidate list provider so percentage updates when navigating back
       ref.invalidate(realtimeAttendanceListProvider);
