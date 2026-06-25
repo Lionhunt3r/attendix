@@ -185,6 +185,26 @@ void main() {
           reason: 'getUpcomingAbsencesForPersons must filter by attendance.tenantId',
         );
       });
+
+      test('getPersonAttendancesForPersons filters by attendance.tenantId', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'getPersonAttendancesForPersons',
+        );
+        expect(section, isNotNull, reason: 'getPersonAttendancesForPersons should exist');
+        expect(
+          section,
+          contains(".eq('attendance.tenantId', currentTenantId)"),
+          reason:
+              'getPersonAttendancesForPersons must filter by attendance.tenantId '
+              '(person_attendances has no tenantId column)',
+        );
+        expect(
+          section,
+          contains("inFilter('person_id', personIds)"),
+          reason: 'getPersonAttendancesForPersons must filter by person_id list',
+        );
+      });
     });
 
     group('Summary Statistics', () {

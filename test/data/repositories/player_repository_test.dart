@@ -170,6 +170,23 @@ void main() {
         expect(section, contains(".eq('instrument', instrumentId)"));
         expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
+
+      test('getChildrenForParent filters by tenantId and parent_id', () {
+        final section = _extractMethodBody(playerRepoSource, 'getChildrenForParent');
+        expect(section, isNotNull, reason: 'getChildrenForParent should exist');
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
+        expect(section, contains(".eq('parent_id', parentId)"));
+        expect(
+          section,
+          contains(".isFilter('pending', null)"),
+          reason: 'getChildrenForParent must exclude pending players',
+        );
+        expect(
+          section,
+          contains(".isFilter('left', null)"),
+          reason: 'getChildrenForParent must exclude left players',
+        );
+      });
     });
 
     group('Handover Operations', () {

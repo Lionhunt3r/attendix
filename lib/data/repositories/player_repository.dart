@@ -168,6 +168,31 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Returns players whose `parent_id` equals [parentId], in the current
+  /// tenant. Filters out pending and left players (matches `isFilter`
+  /// semantics used by the parents portal).
+  ///
+  /// Note: the DB column is `parent_id` (snake_case). Confirmed against
+  /// existing repository methods and the Ionic db.service.ts.
+  Future<List<Person>> getChildrenForParent(int parentId) async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('*')
+          .eq('tenantId', currentTenantId)
+          .eq('parent_id', parentId)
+          .isFilter('pending', null)
+          .isFilter('left', null)
+          .order('lastName');
+      return (response as List)
+          .map((e) => Person.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getChildrenForParent');
+      rethrow;
+    }
+  }
+
   /// Get players by parent ID (for parent role)
   Future<List<Person>> getPlayersByParentId(int parentId) async {
     try {

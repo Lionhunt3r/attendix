@@ -237,6 +237,44 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Returns raw person_attendances rows with embedded attendance details
+  /// for the given person IDs. Used by parent-portal multi-child views,
+  /// which map the results to a UI-specific ChildPersonAttendance type.
+  ///
+  /// Returns Map rows (not PersonAttendance) because the caller needs
+  /// the embedded attendance fields (date, typeInfo, plan, share_plan, etc.)
+  /// which are not on the PersonAttendance Freezed model.
+  ///
+  /// Multi-tenant safety: `person_attendances` has no `tenantId` column,
+  /// so the join filters by `attendance.tenantId = currentTenantId` to
+  /// prevent cross-tenant leakage.
+  Future<List<Map<String, dynamic>>> getPersonAttendancesForPersons(
+    List<int> personIds,
+  ) async {
+    if (personIds.isEmpty) return [];
+    try {
+      final response = await supabase
+          .from('person_attendances')
+          .select('''
+            *,
+            attendance:attendance_id(
+              id, date, type, typeInfo, start_time, end_time, deadline, tenantId,
+              type_id, plan, share_plan
+            )
+          ''')
+          .inFilter('person_id', personIds)
+          .eq('attendance.tenantId', currentTenantId)
+          .order('attendance(date)', ascending: false);
+      return (response as List)
+          .where((row) => row['attendance'] != null)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getPersonAttendancesForPersons');
+      rethrow;
+    }
+  }
+
   /// Create person attendance records (batch)
   /// SEC-001: Added tenant validation for attendance_id and person_id
   Future<void> createPersonAttendances(List<PersonAttendance> records) async {
