@@ -313,6 +313,29 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Update arbitrary fields on a player row. Used by inline-edit pages
+  /// where building a full Person object would be overkill (e.g. when
+  /// the payload mixes top-level fields with JSON-column updates).
+  ///
+  /// Read-only fields (id, tenantId, created_at) are stripped from the
+  /// input map before the update is sent.
+  Future<void> updatePlayerFields(int id, Map<String, dynamic> updates) async {
+    try {
+      updates.remove('id');
+      updates.remove('tenantId');
+      updates.remove('created_at');
+
+      await supabase
+          .from('player')
+          .update(updates)
+          .eq('id', id)
+          .eq('tenantId', currentTenantId);
+    } catch (e, stack) {
+      handleError(e, stack, 'updatePlayerFields');
+      rethrow;
+    }
+  }
+
   /// Archive a player (soft delete)
   Future<void> archivePlayer(Person player, String leftDate, String? reason) async {
     if (player.id == null) {

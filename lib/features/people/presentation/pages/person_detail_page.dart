@@ -507,7 +507,12 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
     setState(() => _isSaving = true);
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
+      // Sprint 2a: migrated to PlayerRepository.updatePlayerFields.
+      // The remaining supabaseClientProvider reads in this file (personProvider,
+      // appointmentsProvider, _getUserRole, _updateUserRole, _unlinkAccount)
+      // are Sprint 2b scope — they need TenantUserRepository which doesn't
+      // exist yet.
+      final repo = ref.read(playerRepositoryWithTenantProvider);
       final person = widget.person;
 
       // Build history entries for tracked changes
@@ -533,15 +538,13 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
 
       final existingHistory = person.history.map((h) => h.toJson()).toList();
       final updatedHistory = [...existingHistory, ...newHistoryEntries];
-      final tenant = ref.read(currentTenantProvider);
 
       final personId = person.id;
-      final tenantId = tenant?.id;
-      if (personId == null || tenantId == null) {
+      if (personId == null || !repo.hasTenantId) {
         throw Exception('Person-ID oder Tenant-ID fehlt');
       }
 
-      await supabase.from('player').update({
+      await repo.updatePlayerFields(personId, {
         'firstName': _draft.firstName,
         'lastName': _draft.lastName,
         'phone': _draft.phone?.isEmpty ?? true ? null : _draft.phone,
@@ -566,7 +569,7 @@ class _PersonDetailContentState extends ConsumerState<_PersonDetailContent> {
         'examinee': _draft.examinee,
         'testResult': _draft.testResult?.isEmpty ?? true ? null : _draft.testResult,
         'email': _draft.email?.isEmpty ?? true ? null : _draft.email,
-      }).eq('id', personId).eq('tenantId', tenantId);
+      });
 
       ref.invalidate(personProvider(widget.personId));
       ref.invalidate(realtimePlayersProvider);

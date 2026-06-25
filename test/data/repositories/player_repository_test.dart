@@ -115,6 +115,12 @@ void main() {
         expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
 
+      test('updatePlayerFields includes tenantId filter', () {
+        final section = _extractMethodBody(playerRepoSource, 'updatePlayerFields');
+        expect(section, isNotNull, reason: 'updatePlayerFields should exist');
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
+      });
+
       test('archivePlayer has both id and tenantId filter', () {
         final section = _extractMethodBody(playerRepoSource, 'archivePlayer');
         expect(section, isNotNull);
