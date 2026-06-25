@@ -232,42 +232,13 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     final personAttendances = await ref.read(personAttendancesForAttendanceProvider(widget.attendanceId).future);
     if (personAttendances.isNotEmpty) return;
 
-    final supabase = ref.read(supabaseClientProvider);
-    final tenant = ref.read(currentTenantProvider);
-    if (tenant?.id == null) return;
-
-    // Validate attendance belongs to current tenant before inserting
-    final attendanceCheck = await supabase
-        .from('attendance')
-        .select('id')
-        .eq('id', widget.attendanceId)
-        .eq('tenantId', tenant!.id!)
-        .maybeSingle();
-    if (attendanceCheck == null || !mounted) return;
+    final repo = ref.read(attendanceRepositoryWithTenantProvider);
+    if (!repo.hasTenantId) return;
 
     final attendanceType = ref.read(attendanceTypeForAttendanceProvider(widget.attendanceId)).valueOrNull;
     final defaultStatus = attendanceType?.defaultStatus ?? AttendanceStatus.neutral;
 
-    final players = await supabase
-        .from('player')
-        .select('id')
-        .eq('tenantId', tenant.id!)
-        .isFilter('left', null)
-        .eq('paused', false);
-
-    final playerList = players as List;
-    if (playerList.isEmpty || !mounted) return;
-
-    final records = playerList.map((p) => {
-      'attendance_id': widget.attendanceId,
-      'person_id': p['id'],
-      'status': defaultStatus.value,
-    }).toList();
-
-    // Upsert prevents duplicates from concurrent devices (TOCTOU race)
-    await supabase
-        .from('person_attendances')
-        .upsert(records, onConflict: 'attendance_id,person_id', ignoreDuplicates: true);
+    await repo.ensurePersonAttendances(widget.attendanceId, defaultStatus.value);
 
     if (!mounted) return;
     ref.invalidate(personAttendancesForAttendanceProvider(widget.attendanceId));
@@ -482,14 +453,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
                           onTypeInfoChanged: _updateTypeInfo,
                           onNotesChanged: (value) async {
                             try {
-                              final supabase = ref.read(supabaseClientProvider);
-                              final tenant = ref.read(currentTenantProvider);
-                              if (tenant?.id == null) return;
-                              await supabase
-                                  .from('attendance')
-                                  .update({'notes': value.isEmpty ? null : value})
-                                  .eq('id', widget.attendanceId)
-                                  .eq('tenantId', tenant!.id!);
+                              final repo = ref.read(attendanceRepositoryWithTenantProvider);
+                              if (!repo.hasTenantId) return;
+                              await repo.updateAttendance(
+                                widget.attendanceId,
+                                {'notes': value.isEmpty ? null : value},
+                              );
                               ref.invalidate(attendanceDetailProvider(widget.attendanceId));
                             } catch (e) {
                               if (mounted) {
@@ -583,23 +552,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   /// Validate that a personAttendance belongs to current tenant
   Future<bool> _validatePersonAttendanceTenant(String personAttendanceId) async {
-    final supabase = ref.read(supabaseClientProvider);
-    final tenant = ref.read(currentTenantProvider);
-    if (tenant?.id == null) return false;
-
-    try {
-      final validation = await supabase
-          .from('person_attendances')
-          .select('id, attendance:attendance_id(tenantId)')
-          .eq('id', personAttendanceId)
-          .maybeSingle();
-
-      if (validation == null) return false;
-      final attendanceTenantId = validation['attendance']?['tenantId'];
-      return attendanceTenantId == tenant!.id;
-    } catch (_) {
-      return false;
-    }
+    final repo = ref.read(attendanceRepositoryWithTenantProvider);
+    if (!repo.hasTenantId) return false;
+    return repo.validatePersonAttendanceTenant(personAttendanceId);
   }
 
   /// Update notes for a specific person
