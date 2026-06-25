@@ -204,6 +204,39 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Get upcoming absences (status 2/4/5) for a list of person IDs.
+  ///
+  /// Returns raw rows from `person_attendances` joined with the parent
+  /// `attendance` row (id, date, type, typeInfo). The caller is responsible
+  /// for filtering out past dates and mapping into a domain model — the
+  /// nested attendance fields (like typeInfo) are not part of the
+  /// PersonAttendance model, so this method exposes the raw shape.
+  ///
+  /// Multi-tenant safety: the join uses `attendance!inner` with
+  /// `attendance.tenantId = currentTenantId`, so cross-tenant rows cannot
+  /// leak even though `person_attendances` has no `tenantId` column.
+  Future<List<Map<String, dynamic>>> getUpcomingAbsencesForPersons(
+    List<int> personIds,
+  ) async {
+    if (personIds.isEmpty) return [];
+    try {
+      final response = await supabase
+          .from('person_attendances')
+          .select('*, attendance:attendance_id!inner(id, date, type, typeInfo, tenantId)')
+          .inFilter('person_id', personIds)
+          .inFilter('status', [2, 4, 5])
+          .eq('attendance.tenantId', currentTenantId);
+
+      return (response as List)
+          .where((row) => row['attendance'] != null)
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getUpcomingAbsencesForPersons');
+      rethrow;
+    }
+  }
+
   /// Create person attendance records (batch)
   /// SEC-001: Added tenant validation for attendance_id and person_id
   Future<void> createPersonAttendances(List<PersonAttendance> records) async {

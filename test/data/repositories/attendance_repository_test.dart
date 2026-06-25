@@ -167,6 +167,24 @@ void main() {
           reason: 'getPersonAttendancesForPerson must filter by attendance.tenantId (SEC-016)',
         );
       });
+
+      test('getUpcomingAbsencesForPersons uses inner join for tenant', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'getUpcomingAbsencesForPersons',
+        );
+        expect(section, isNotNull, reason: 'getUpcomingAbsencesForPersons should exist');
+        expect(
+          section,
+          contains('attendance:attendance_id!inner'),
+          reason: 'getUpcomingAbsencesForPersons must use inner join on attendance',
+        );
+        expect(
+          section,
+          contains(".eq('attendance.tenantId', currentTenantId)"),
+          reason: 'getUpcomingAbsencesForPersons must filter by attendance.tenantId',
+        );
+      });
     });
 
     group('Summary Statistics', () {
@@ -208,8 +226,11 @@ void main() {
 
 /// Extract method body from source code
 String? _extractMethodBody(String source, String methodName) {
+  // Supports up to two levels of nested generics in the return type, while
+  // restricting the match to a single line so the engine cannot greedily
+  // span an earlier method's signature.
   final methodStart = RegExp(
-    '(Future<[^>]+>|void)\\s+$methodName\\s*[(<]',
+    '(Future<[^\\n>]*(?:<[^\\n>]*(?:<[^\\n>]*>[^\\n>]*)?>[^\\n>]*)?>|void)\\s+$methodName\\s*[(<]',
   ).firstMatch(source);
 
   if (methodStart == null) return null;

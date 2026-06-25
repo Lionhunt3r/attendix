@@ -118,6 +118,31 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Get active players for a specific instrument/voice group.
+  ///
+  /// Returns players whose `instrument` matches [instrumentId] and who are
+  /// not pending and have not left. Ordered by leader first, then last name.
+  Future<List<Person>> getPlayersByInstrument(int instrumentId) async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('*')
+          .eq('tenantId', currentTenantId)
+          .eq('instrument', instrumentId)
+          .isFilter('left', null)
+          .isFilter('pending', false)
+          .order('isLeader', ascending: false)
+          .order('lastName');
+
+      return (response as List)
+          .map((e) => Person.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getPlayersByInstrument');
+      rethrow;
+    }
+  }
+
   /// Get conductors (main group members)
   Future<List<Person>> getConductors(int mainGroupId, {bool includeLeft = false}) async {
     try {
