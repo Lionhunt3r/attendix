@@ -4,6 +4,7 @@ import '../../core/config/supabase_config.dart';
 import '../../core/constants/enums.dart';
 import '../../data/models/person/person.dart';
 import '../../data/repositories/sign_in_out_repository.dart';
+import 'player_providers.dart';
 import 'tenant_providers.dart';
 
 export '../../core/constants/enums.dart' show AttendanceStatus;
@@ -167,24 +168,15 @@ class AttendanceStats {
 /// Provider for current player (user's linked player record for the current tenant)
 /// SEC-008: Added tenantId filter to prevent cross-tenant identity confusion
 final currentSelfServicePlayerProvider = FutureProvider<Person?>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final userId = supabase.auth.currentUser?.id;
-  final tenantId = ref.watch(currentTenantIdProvider);
-
+  final authState = ref.watch(authStateProvider).valueOrNull;
+  final userId = authState?.session?.user.id;
   if (userId == null) return null;
-  if (tenantId == null) return null;
 
-  // SEC-008: Filter by both appId AND tenantId
-  final response = await supabase
-      .from('player')
-      .select('*')
-      .eq('appId', userId)
-      .eq('tenantId', tenantId)
-      .limit(1)
-      .maybeSingle();
+  final repo = ref.watch(playerRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return null;
 
-  if (response == null) return null;
-  return Person.fromJson(response);
+  // SEC-008: getPlayerByAppId filters by both appId AND tenantId.
+  return repo.getPlayerByAppId(userId);
 });
 
 /// Provider to check if current user is an applicant in the current tenant
