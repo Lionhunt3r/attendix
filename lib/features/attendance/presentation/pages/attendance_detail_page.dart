@@ -765,16 +765,14 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   Future<void> _saveChecklist() async {
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      if (!repo.hasTenantId) return;
       final checklistJson = _localChecklist.map((item) => item.toJson()).toList();
 
-      await supabase
-          .from('attendance')
-          .update({'checklist': checklistJson})
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {'checklist': checklistJson},
+      );
 
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
     } catch (e) {
@@ -850,14 +848,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     }
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
-      await supabase
-          .from('attendance')
-          .update({'deadline': deadlineStr})
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      if (!repo.hasTenantId) return;
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {'deadline': deadlineStr},
+      );
 
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
 
@@ -912,14 +908,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     );
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
-      await supabase
-          .from('attendance')
-          .update({'deadline': finalDeadline.toIso8601String()})
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      if (!repo.hasTenantId) return;
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {'deadline': finalDeadline.toIso8601String()},
+      );
 
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
 
@@ -1139,15 +1133,13 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   Future<void> _toggleSharePlan(bool value) async {
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      if (!repo.hasTenantId) return;
 
-      await supabase
-          .from('attendance')
-          .update({'share_plan': value})
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {'share_plan': value},
+      );
 
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
 
@@ -1272,14 +1264,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   Future<void> _updateTypeInfo(String value) async {
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
-      await supabase
-          .from('attendance')
-          .update({'typeInfo': value.isEmpty ? null : value})
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      if (!repo.hasTenantId) return;
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {'typeInfo': value.isEmpty ? null : value},
+      );
 
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
     } catch (e) {
@@ -1314,14 +1304,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
-      await supabase
-          .from('attendance')
-          .update({'start_time': timeStr})
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      if (!repo.hasTenantId) return;
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {'start_time': timeStr},
+      );
 
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
       ToastHelper.showSuccess(context, 'Startzeit aktualisiert');
@@ -1357,14 +1345,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
     final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
 
     try {
-      final supabase = ref.read(supabaseClientProvider);
-      final tenant = ref.read(currentTenantProvider);
-      if (tenant?.id == null) return;
-      await supabase
-          .from('attendance')
-          .update({'end_time': timeStr})
-          .eq('id', widget.attendanceId)
-          .eq('tenantId', tenant!.id!);
+      final repo = ref.read(attendanceRepositoryWithTenantProvider);
+      if (!repo.hasTenantId) return;
+      await repo.updateAttendance(
+        widget.attendanceId,
+        {'end_time': timeStr},
+      );
 
       ref.invalidate(attendanceDetailProvider(widget.attendanceId));
       ToastHelper.showSuccess(context, 'Endzeit aktualisiert');
@@ -1488,14 +1474,12 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
     if (result != null && mounted) {
       try {
-        final supabase = ref.read(supabaseClientProvider);
-        final tenant = ref.read(currentTenantProvider);
-        if (tenant?.id == null) return;
-        await supabase
-            .from('attendance')
-            .update({'notes': result})
-            .eq('id', widget.attendanceId)
-            .eq('tenantId', tenant!.id!);
+        final repo = ref.read(attendanceRepositoryWithTenantProvider);
+        if (!repo.hasTenantId) return;
+        await repo.updateAttendance(
+          widget.attendanceId,
+          {'notes': result},
+        );
 
         ref.invalidate(attendanceDetailProvider(widget.attendanceId));
         if (mounted) {
