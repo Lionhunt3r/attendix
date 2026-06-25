@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/supabase_config.dart';
-import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/providers/group_providers.dart';
+import '../../../../core/providers/player_providers.dart';
 import '../../../../data/models/person/person.dart';
 
 /// Model for a grouped member list
@@ -19,45 +19,40 @@ class MembersGroup {
 
 /// Provider for all active members grouped by instrument
 final membersGroupedProvider = FutureProvider<List<MembersGroup>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
+  final groupRepo = ref.watch(groupRepositoryWithTenantProvider);
+  final playerRepo = ref.watch(playerRepositoryWithTenantProvider);
 
-  if (tenant == null) return [];
+  if (!groupRepo.hasTenantId || !playerRepo.hasTenantId) return [];
 
   // Get all groups/instruments
-  final groupsResponse = await supabase
-      .from('instruments')
-      .select('id, name, maingroup')
-      .eq('tenantId', tenant.id!)
-      .order('maingroup', ascending: false)
-      .order('name');
+  final groups = await groupRepo.getGroups();
 
-  final groups = (groupsResponse as List).map((g) => {
-    'id': g['id'] as int,
-    'name': g['name'] as String,
-    'maingroup': g['maingroup'] as bool? ?? false,
-  }).toList();
+  // Get all active players (getPlayers defaults: pending=false, left=null)
+  final players = await playerRepo.getPlayers();
 
-  // Get all active players
-  final playersResponse = await supabase
-      .from('player')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .isFilter('left', null)
-      .isFilter('pending', false)
-      .order('isLeader', ascending: false)
-      .order('lastName');
+  // Sort players: isLeader desc, then lastName asc (preserved from original query)
+  players.sort((a, b) {
+    final leaderCmp = (b.isLeader ? 1 : 0).compareTo(a.isLeader ? 1 : 0);
+    if (leaderCmp != 0) return leaderCmp;
+    return a.lastName.toLowerCase().compareTo(b.lastName.toLowerCase());
+  });
 
-  final players = (playersResponse as List)
-      .map((e) => Person.fromJson(e as Map<String, dynamic>))
-      .toList();
+  // Sort groups: maingroup desc, then name asc (preserved from original query)
+  final sortedGroups = [...groups]..sort((a, b) {
+    final aMain = a.maingroup ?? false;
+    final bMain = b.maingroup ?? false;
+    final mainCmp = (bMain ? 1 : 0).compareTo(aMain ? 1 : 0);
+    if (mainCmp != 0) return mainCmp;
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  });
 
   // Group players by instrument
   final List<MembersGroup> result = [];
 
-  for (final group in groups) {
-    final groupId = group['id'] as int;
-    final groupName = group['name'] as String;
+  for (final group in sortedGroups) {
+    final groupId = group.id;
+    if (groupId == null) continue;
+    final groupName = group.name;
     final groupMembers = players.where((p) => p.instrument == groupId).toList();
 
     if (groupMembers.isNotEmpty) {
