@@ -200,6 +200,8 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   }
 
   void _subscribeToRealtimeChanges() {
+    // TODO(sprint-2c): migrate Realtime channel subscription to a repository
+    // or dedicated realtime service. Keeping direct client access for now.
     final supabase = ref.read(supabaseClientProvider);
 
     _personAttChannel = supabase
@@ -221,6 +223,7 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
   void _unsubscribeFromRealtimeChanges() {
     final channel = _personAttChannel;
     if (channel != null) {
+      // TODO(sprint-2c): mirror the Realtime channel migration above.
       final supabase = ref.read(supabaseClientProvider);
       supabase.removeChannel(channel);
       _personAttChannel = null;
@@ -1228,6 +1231,10 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
 
   /// Sync history table entries for this attendance
   Future<void> _syncHistoryEntries(String date) async {
+    // TODO(sprint-2b): migrate history-table delete + insert to a new
+    // HistoryRepository. Both Supabase calls in this method (delete on
+    // history, insert on history) will move there together so they stay
+    // testable against tenantId.
     final supabase = ref.read(supabaseClientProvider);
     final tenant = ref.read(currentTenantProvider);
     if (tenant?.id == null) return;
@@ -1539,6 +1546,9 @@ class _AttendanceDetailPageState extends ConsumerState<AttendanceDetailPage> {
       final bytes = await image.readAsBytes();
       final fileName = 'attendance_${widget.attendanceId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
+      // TODO(sprint-2c): migrate Storage upload + public URL retrieval to a
+      // dedicated storage service. The subsequent attendance update can move
+      // to repo.updateAttendance once the URL is returned by that service.
       final supabase = ref.read(supabaseClientProvider);
       final tenant = ref.read(currentTenantProvider);
 
