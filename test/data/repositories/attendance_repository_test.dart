@@ -207,6 +207,69 @@ void main() {
       });
     });
 
+    group('Sprint 2a Task 7 - New Methods', () {
+      test('ensurePersonAttendances validates attendance tenant and filters player tenant', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'ensurePersonAttendances',
+        );
+        expect(section, isNotNull, reason: 'ensurePersonAttendances should exist');
+        // Validates attendance ownership
+        expect(
+          section,
+          contains(".eq('tenantId', currentTenantId)"),
+          reason: 'ensurePersonAttendances must filter by tenantId for attendance + player',
+        );
+        // Filters by current tenant when listing active players
+        expect(
+          section,
+          contains(".from('player')"),
+          reason: 'ensurePersonAttendances must query the player table for active players',
+        );
+        expect(
+          section,
+          contains('upsert'),
+          reason: 'ensurePersonAttendances must upsert to avoid duplicates (TOCTOU)',
+        );
+      });
+
+      test('validatePersonAttendanceTenant uses inner join with attendance.tenantId filter', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'validatePersonAttendanceTenant',
+        );
+        expect(section, isNotNull, reason: 'validatePersonAttendanceTenant should exist');
+        expect(
+          section,
+          contains('attendance:attendance_id!inner'),
+          reason: 'validatePersonAttendanceTenant must use inner join on attendance',
+        );
+        expect(
+          section,
+          contains(".eq('attendance.tenantId', currentTenantId)"),
+          reason: 'validatePersonAttendanceTenant must filter by attendance.tenantId',
+        );
+      });
+
+      test('deletePersonAttendance validates tenant before deleting', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'deletePersonAttendance',
+        );
+        expect(section, isNotNull, reason: 'deletePersonAttendance should exist');
+        expect(
+          section,
+          contains('validatePersonAttendanceTenant'),
+          reason: 'deletePersonAttendance must call validatePersonAttendanceTenant first',
+        );
+        expect(
+          section,
+          contains('RepositoryException'),
+          reason: 'deletePersonAttendance must throw on cross-tenant access',
+        );
+      });
+    });
+
     group('Summary Statistics', () {
       test('high tenantId filter coverage', () {
         final allAttendanceQueries = RegExp(

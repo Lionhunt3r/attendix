@@ -279,6 +279,101 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Ensure PersonAttendance rows exist for every active player in the tenant
+  /// for the given attendance. Validates that the attendance belongs to the
+  /// current tenant, then upserts one row per active (non-paused, non-left)
+  /// player with the supplied [defaultStatusValue] (e.g. neutral).
+  ///
+  /// Upsert with `ignoreDuplicates` prevents duplicates from concurrent
+  /// devices (TOCTOU race).
+  Future<void> ensurePersonAttendances(
+    int attendanceId,
+    int defaultStatusValue,
+  ) async {
+    try {
+      // Validate attendance belongs to current tenant before inserting
+      final attendanceCheck = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('id', attendanceId)
+          .eq('tenantId', currentTenantId)
+          .maybeSingle();
+
+      if (attendanceCheck == null) return;
+
+      final players = await supabase
+          .from('player')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .isFilter('left', null)
+          .eq('paused', false);
+
+      final playerList = players as List;
+      if (playerList.isEmpty) return;
+
+      final records = playerList
+          .map((p) => {
+                'attendance_id': attendanceId,
+                'person_id': p['id'],
+                'status': defaultStatusValue,
+              })
+          .toList();
+
+      await supabase
+          .from('person_attendances')
+          .upsert(
+            records,
+            onConflict: 'attendance_id,person_id',
+            ignoreDuplicates: true,
+          );
+    } catch (e, stack) {
+      handleError(e, stack, 'ensurePersonAttendances');
+      rethrow;
+    }
+  }
+
+  /// Validate that a person_attendances row belongs to the current tenant.
+  ///
+  /// person_attendances has no tenantId column, so this joins the parent
+  /// attendance row and compares its tenantId. Returns `false` on any error
+  /// or mismatch (defense-in-depth: deny by default).
+  Future<bool> validatePersonAttendanceTenant(String personAttendanceId) async {
+    try {
+      final validation = await supabase
+          .from('person_attendances')
+          .select('id, attendance:attendance_id!inner(tenantId)')
+          .eq('id', personAttendanceId)
+          .eq('attendance.tenantId', currentTenantId)
+          .maybeSingle();
+
+      return validation != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Delete a single person_attendances row after validating it belongs to
+  /// the current tenant. Throws [RepositoryException] on cross-tenant access.
+  Future<void> deletePersonAttendance(String personAttendanceId) async {
+    try {
+      final isValid = await validatePersonAttendanceTenant(personAttendanceId);
+      if (!isValid) {
+        throw RepositoryException(
+          message: 'PersonAttendance not found or belongs to different tenant',
+          operation: 'deletePersonAttendance',
+        );
+      }
+
+      await supabase
+          .from('person_attendances')
+          .delete()
+          .eq('id', personAttendanceId);
+    } catch (e, stack) {
+      handleError(e, stack, 'deletePersonAttendance');
+      rethrow;
+    }
+  }
+
   /// Create person attendance records (batch)
   /// SEC-001: Added tenant validation for attendance_id and person_id
   Future<void> createPersonAttendances(List<PersonAttendance> records) async {
