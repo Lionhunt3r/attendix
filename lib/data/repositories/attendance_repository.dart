@@ -49,17 +49,21 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
   }
 
   /// Get upcoming attendances (future dates)
-  Future<List<Attendance>> getUpcomingAttendances() async {
+  ///
+  /// Optionally limit the number of results returned.
+  Future<List<Attendance>> getUpcomingAttendances({int? limit}) async {
     try {
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
 
-      final response = await supabase
+      final ordered = supabase
           .from('attendance')
           .select('*')
           .eq('tenantId', currentTenantId)
           .gte('date', startOfDay.toIso8601String())
           .order('date');
+
+      final response = limit != null ? await ordered.limit(limit) : await ordered;
 
       return (response as List)
           .map((e) => Attendance.fromJson(e as Map<String, dynamic>))
@@ -200,6 +204,183 @@ class AttendanceRepository extends BaseRepository with TenantAwareRepository {
           .toList();
     } catch (e, stack) {
       handleError(e, stack, 'getPersonAttendancesForPerson');
+      rethrow;
+    }
+  }
+
+  /// Get upcoming absences (status 2/4/5) for a list of person IDs.
+  ///
+  /// Returns raw rows from `person_attendances` joined with the parent
+  /// `attendance` row (id, date, type, typeInfo). The caller is responsible
+  /// for filtering out past dates and mapping into a domain model — the
+  /// nested attendance fields (like typeInfo) are not part of the
+  /// PersonAttendance model, so this method exposes the raw shape.
+  ///
+  /// Multi-tenant safety: the join uses `attendance!inner` with
+  /// `attendance.tenantId = currentTenantId`, so cross-tenant rows cannot
+  /// leak even though `person_attendances` has no `tenantId` column.
+  Future<List<Map<String, dynamic>>> getUpcomingAbsencesForPersons(
+    List<int> personIds,
+  ) async {
+    if (personIds.isEmpty) return [];
+    try {
+      final response = await supabase
+          .from('person_attendances')
+          .select('*, attendance:attendance_id!inner(id, date, type, typeInfo, tenantId)')
+          .inFilter('person_id', personIds)
+          .inFilter('status', [2, 4, 5])
+          .eq('attendance.tenantId', currentTenantId);
+
+      return (response as List)
+          .where((row) => row['attendance'] != null)
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getUpcomingAbsencesForPersons');
+      rethrow;
+    }
+  }
+
+  /// Returns raw person_attendances rows with embedded attendance details
+  /// for the given person IDs. Used by parent-portal multi-child views,
+  /// which map the results to a UI-specific ChildPersonAttendance type.
+  ///
+  /// Returns Map rows (not PersonAttendance) because the caller needs
+  /// the embedded attendance fields (date, typeInfo, plan, share_plan, etc.)
+  /// which are not on the PersonAttendance Freezed model.
+  ///
+  /// Multi-tenant safety: `person_attendances` has no `tenantId` column,
+  /// so the join filters by `attendance.tenantId = currentTenantId` to
+  /// prevent cross-tenant leakage.
+  Future<List<Map<String, dynamic>>> getPersonAttendancesForPersons(
+    List<int> personIds,
+  ) async {
+    if (personIds.isEmpty) return [];
+    try {
+      final response = await supabase
+          .from('person_attendances')
+          .select('''
+            *,
+            attendance:attendance_id(
+              id, date, type, typeInfo, start_time, end_time, deadline, tenantId,
+              type_id, plan, share_plan
+            )
+          ''')
+          .inFilter('person_id', personIds)
+          .eq('attendance.tenantId', currentTenantId)
+          .order('attendance(date)', ascending: false);
+      return (response as List)
+          .where((row) => row['attendance'] != null)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getPersonAttendancesForPersons');
+      rethrow;
+    }
+  }
+
+  /// Ensure PersonAttendance rows exist for every active player in the tenant
+  /// for the given attendance. Validates that the attendance belongs to the
+  /// current tenant, then upserts one row per active (non-paused, non-left)
+  /// player with the supplied [defaultStatusValue] (e.g. neutral).
+  ///
+  /// Upsert with `ignoreDuplicates` prevents duplicates from concurrent
+  /// devices (TOCTOU race).
+  Future<void> ensurePersonAttendances(
+    int attendanceId,
+    int defaultStatusValue,
+  ) async {
+    try {
+      // Validate attendance belongs to current tenant before inserting
+      final attendanceCheck = await supabase
+          .from('attendance')
+          .select('id')
+          .eq('id', attendanceId)
+          .eq('tenantId', currentTenantId)
+          .maybeSingle();
+
+      if (attendanceCheck == null) return;
+
+      final players = await supabase
+          .from('player')
+          .select('id')
+          .eq('tenantId', currentTenantId)
+          .isFilter('left', null)
+          .eq('paused', false);
+
+      final playerList = players as List;
+      if (playerList.isEmpty) return;
+
+      final records = playerList
+          .map((p) => {
+                'attendance_id': attendanceId,
+                'person_id': p['id'],
+                'status': defaultStatusValue,
+              })
+          .toList();
+
+      await supabase
+          .from('person_attendances')
+          .upsert(
+            records,
+            onConflict: 'attendance_id,person_id',
+            ignoreDuplicates: true,
+          );
+    } catch (e, stack) {
+      handleError(e, stack, 'ensurePersonAttendances');
+      rethrow;
+    }
+  }
+
+  /// Validate that a person_attendances row belongs to the current tenant.
+  ///
+  /// person_attendances has no tenantId column, so this joins the parent
+  /// attendance row and compares its tenantId. Returns `false` on any error
+  /// or mismatch (defense-in-depth: deny by default). Errors are logged via
+  /// the base repository's `handleError` so a real RLS/network outage is
+  /// observable, but never propagated — the deny-by-default contract is the
+  /// safety net.
+  Future<bool> validatePersonAttendanceTenant(String personAttendanceId) async {
+    try {
+      final validation = await supabase
+          .from('person_attendances')
+          .select('id, attendance:attendance_id!inner(tenantId)')
+          .eq('id', personAttendanceId)
+          .eq('attendance.tenantId', currentTenantId)
+          .maybeSingle();
+
+      return validation != null;
+    } catch (e, stack) {
+      // Log but never propagate — caller must see `false` on any failure.
+      try {
+        handleError(e, stack, 'validatePersonAttendanceTenant');
+      } catch (_) {
+        // handleError rethrows by contract; we swallow the rethrow here so
+        // the deny-by-default return path stays intact even when logging
+        // succeeds.
+      }
+      return false;
+    }
+  }
+
+  /// Delete a single person_attendances row after validating it belongs to
+  /// the current tenant. Throws [RepositoryException] on cross-tenant access.
+  Future<void> deletePersonAttendance(String personAttendanceId) async {
+    try {
+      final isValid = await validatePersonAttendanceTenant(personAttendanceId);
+      if (!isValid) {
+        throw RepositoryException(
+          message: 'PersonAttendance not found or belongs to different tenant',
+          operation: 'deletePersonAttendance',
+        );
+      }
+
+      await supabase
+          .from('person_attendances')
+          .delete()
+          .eq('id', personAttendanceId);
+    } catch (e, stack) {
+      handleError(e, stack, 'deletePersonAttendance');
       rethrow;
     }
   }

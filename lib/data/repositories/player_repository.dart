@@ -118,6 +118,31 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
     }
   }
 
+  /// Get active players for a specific instrument/voice group.
+  ///
+  /// Returns players whose `instrument` matches [instrumentId] and who are
+  /// not pending and have not left. Ordered by leader first, then last name.
+  Future<List<Person>> getPlayersByInstrument(int instrumentId) async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('*')
+          .eq('tenantId', currentTenantId)
+          .eq('instrument', instrumentId)
+          .isFilter('left', null)
+          .isFilter('pending', false)
+          .order('isLeader', ascending: false)
+          .order('lastName');
+
+      return (response as List)
+          .map((e) => Person.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getPlayersByInstrument');
+      rethrow;
+    }
+  }
+
   /// Get conductors (main group members)
   Future<List<Person>> getConductors(int mainGroupId, {bool includeLeft = false}) async {
     try {
@@ -139,6 +164,31 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
           .toList();
     } catch (e, stack) {
       handleError(e, stack, 'getConductors');
+      rethrow;
+    }
+  }
+
+  /// Returns players whose `parent_id` equals [parentId], in the current
+  /// tenant. Filters out pending and left players (matches `isFilter`
+  /// semantics used by the parents portal).
+  ///
+  /// Note: the DB column is `parent_id` (snake_case). Confirmed against
+  /// existing repository methods and the Ionic db.service.ts.
+  Future<List<Person>> getChildrenForParent(int parentId) async {
+    try {
+      final response = await supabase
+          .from('player')
+          .select('*')
+          .eq('tenantId', currentTenantId)
+          .eq('parent_id', parentId)
+          .isFilter('pending', null)
+          .isFilter('left', null)
+          .order('lastName');
+      return (response as List)
+          .map((e) => Person.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, stack) {
+      handleError(e, stack, 'getChildrenForParent');
       rethrow;
     }
   }
@@ -259,6 +309,29 @@ class PlayerRepository extends BaseRepository with TenantAwareRepository {
       return Person.fromJson(response);
     } catch (e, stack) {
       handleError(e, stack, 'updatePlayer');
+      rethrow;
+    }
+  }
+
+  /// Update arbitrary fields on a player row. Used by inline-edit pages
+  /// where building a full Person object would be overkill (e.g. when
+  /// the payload mixes top-level fields with JSON-column updates).
+  ///
+  /// Read-only fields (id, tenantId, created_at) are stripped from the
+  /// input map before the update is sent.
+  Future<void> updatePlayerFields(int id, Map<String, dynamic> updates) async {
+    try {
+      updates.remove('id');
+      updates.remove('tenantId');
+      updates.remove('created_at');
+
+      await supabase
+          .from('player')
+          .update(updates)
+          .eq('id', id)
+          .eq('tenantId', currentTenantId);
+    } catch (e, stack) {
+      handleError(e, stack, 'updatePlayerFields');
       rethrow;
     }
   }

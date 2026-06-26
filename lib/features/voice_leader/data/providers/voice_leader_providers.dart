@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/supabase_config.dart';
-import '../../../../core/providers/tenant_providers.dart';
+import '../../../../core/providers/attendance_providers.dart';
+import '../../../../core/providers/group_providers.dart';
+import '../../../../core/providers/player_providers.dart';
 import '../../../../data/models/person/person.dart';
 
 /// Model for a voice group member with their upcoming absences
@@ -32,113 +34,82 @@ class UpcomingAbsence {
 
 /// Provider for the current user's player record
 final currentPlayerProvider = FutureProvider<Person?>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
-  final userId = supabase.auth.currentUser?.id;
+  final authState = ref.watch(authStateProvider).valueOrNull;
+  final userId = authState?.session?.user.id;
+  if (userId == null) return null;
 
-  if (tenant == null || userId == null) return null;
+  final repo = ref.watch(playerRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return null;
 
-  final response = await supabase
-      .from('player')
-      .select('*')
-      .eq('appId', userId)
-      .eq('tenantId', tenant.id!)
-      .maybeSingle();
-
-  if (response == null) return null;
-  return Person.fromJson(response);
+  return repo.getPlayerByAppId(userId);
 });
 
-/// Provider for the voice group name
+/// Provider for the voice group name (instrument display name).
 final voiceGroupNameProvider = FutureProvider<String?>((ref) async {
   final currentPlayer = await ref.watch(currentPlayerProvider.future);
-  if (currentPlayer?.instrument == null) return null;
+  final instrumentId = currentPlayer?.instrument;
+  if (instrumentId == null) return null;
 
-  final supabase = ref.watch(supabaseClientProvider);
+  final repo = ref.watch(groupRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return null;
 
-  final response = await supabase
-      .from('instruments')
-      .select('name')
-      .eq('id', currentPlayer!.instrument!)
-      .maybeSingle();
-
-  if (response == null) return null;
-  return response['name'] as String?;
+  final group = await repo.getGroupById(instrumentId);
+  return group?.name;
 });
 
 /// Provider for voice group members with their upcoming absences
-final voiceGroupMembersProvider = FutureProvider<List<VoiceGroupMember>>((ref) async {
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
+final voiceGroupMembersProvider =
+    FutureProvider<List<VoiceGroupMember>>((ref) async {
   final currentPlayer = await ref.watch(currentPlayerProvider.future);
+  final instrumentId = currentPlayer?.instrument;
+  if (instrumentId == null) return [];
 
-  if (tenant == null || currentPlayer == null || currentPlayer.instrument == null) {
-    return [];
-  }
+  final playerRepo = ref.watch(playerRepositoryWithTenantProvider);
+  final attendanceRepo = ref.watch(attendanceRepositoryWithTenantProvider);
+  if (!playerRepo.hasTenantId || !attendanceRepo.hasTenantId) return [];
 
-  // Get all players in the same group
-  final playersResponse = await supabase
-      .from('player')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .eq('instrument', currentPlayer.instrument!)
-      .isFilter('left', null)
-      .isFilter('pending', false)
-      .order('isLeader', ascending: false)
-      .order('lastName');
+  // Load every active player in the same voice group.
+  final players = await playerRepo.getPlayersByInstrument(instrumentId);
 
-  final players = (playersResponse as List)
-      .map((e) => Person.fromJson(e as Map<String, dynamic>))
-      .toList();
+  // Batch-fetch upcoming absences for all of them in a single query.
+  final playerIds = players
+      .where((p) => p.id != null)
+      .map((p) => p.id!)
+      .toList(growable: false);
+  final absencesRows =
+      await attendanceRepo.getUpcomingAbsencesForPersons(playerIds);
 
-  // Get upcoming absences for all players in a single batch query
-  final List<VoiceGroupMember> members = [];
+  // Group absences by person_id, filtering past dates in Dart so the SQL
+  // semantics stay identical to the previous implementation.
   final now = DateTime.now();
-
-  final playerIds = players.where((p) => p.id != null).map((p) => p.id!).toList();
-
-  // Single batch query for ALL players' absences (fixes N+1)
-  final List<dynamic> absencesResponse;
-  if (playerIds.isNotEmpty) {
-    absencesResponse = await supabase
-        .from('person_attendances')
-        .select('*, attendance:attendance_id(id, date, type, typeInfo)')
-        .inFilter('person_id', playerIds)
-        .inFilter('status', [2, 4, 5]);
-  } else {
-    absencesResponse = [];
-  }
-
-  // Group absences by person_id
   final absencesByPerson = <int, List<UpcomingAbsence>>{};
-  for (final item in absencesResponse) {
-    final personId = item['person_id'] as int;
-    final attendance = item['attendance'];
-    if (attendance == null) continue;
+  for (final row in absencesRows) {
+    final personId = row['person_id'] as int?;
+    final attendance = row['attendance'];
+    if (personId == null || attendance is! Map) continue;
 
     final dateStr = attendance['date'] as String?;
     if (dateStr == null) continue;
-
     final date = DateTime.tryParse(dateStr);
     if (date == null || date.isBefore(now)) continue;
 
-    absencesByPerson.putIfAbsent(personId, () => []).add(UpcomingAbsence(
-      attendanceId: attendance['id'] as int,
-      date: date,
-      status: item['status'] as int,
-      typeName: attendance['typeInfo']?['short'] as String?,
-    ));
+    final typeInfo = attendance['typeInfo'];
+    absencesByPerson.putIfAbsent(personId, () => []).add(
+          UpcomingAbsence(
+            attendanceId: attendance['id'] as int,
+            date: date,
+            status: row['status'] as int,
+            typeName: typeInfo is Map ? typeInfo['short'] as String? : null,
+          ),
+        );
   }
 
-  // Build members list
-  for (final player in players) {
-    final absences = absencesByPerson[player.id] ?? [];
-    absences.sort((a, b) => a.date.compareTo(b.date));
-    members.add(VoiceGroupMember(
-      person: player,
-      upcomingAbsences: absences,
-    ));
-  }
-
-  return members;
+  return [
+    for (final player in players)
+      VoiceGroupMember(
+        person: player,
+        upcomingAbsences: (absencesByPerson[player.id] ?? [])
+          ..sort((a, b) => a.date.compareTo(b.date)),
+      ),
+  ];
 });

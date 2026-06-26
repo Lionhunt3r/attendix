@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/supabase_config.dart';
 import '../../../../core/constants/enums.dart';
+import '../../../../core/providers/attendance_providers.dart';
+import '../../../../core/providers/player_providers.dart';
 import '../../../../core/providers/tenant_providers.dart';
 import '../../../../data/models/person/person.dart';
 import '../../../../data/repositories/sign_in_out_repository.dart';
@@ -202,23 +203,10 @@ final parentChildrenProvider = FutureProvider<List<Person>>((ref) async {
   final tenantUser = ref.watch(currentTenantUserProvider).valueOrNull;
   if (tenantUser?.parentId == null) return [];
 
-  final supabase = ref.watch(supabaseClientProvider);
-  final tenant = ref.watch(currentTenantProvider);
+  final repo = ref.watch(playerRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return [];
 
-  if (tenant == null) return [];
-
-  final response = await supabase
-      .from('player')
-      .select('*')
-      .eq('tenantId', tenant.id!)
-      .eq('parent_id', tenantUser!.parentId!)
-      .isFilter('pending', null)
-      .isFilter('left', null)
-      .order('lastName');
-
-  return (response as List)
-      .map((e) => Person.fromJson(e as Map<String, dynamic>))
-      .toList();
+  return repo.getChildrenForParent(tenantUser!.parentId!);
 });
 
 /// Provider for all attendances of children
@@ -227,7 +215,8 @@ final childrenAttendancesProvider =
   final children = ref.watch(parentChildrenProvider).valueOrNull ?? [];
   if (children.isEmpty) return [];
 
-  final supabase = ref.watch(supabaseClientProvider);
+  final repo = ref.watch(attendanceRepositoryWithTenantProvider);
+  if (!repo.hasTenantId) return [];
 
   final childIds = children.map((c) => c.id).whereType<int>().toList();
   if (childIds.isEmpty) return [];
@@ -238,20 +227,10 @@ final childrenAttendancesProvider =
       if (child.id != null) child.id!: '${child.firstName} ${child.lastName}',
   };
 
-  // Fetch all person attendances for children
-  final response = await supabase
-      .from('person_attendances')
-      .select('''
-        *,
-        attendance:attendance_id(
-          id, date, type, typeInfo, start_time, end_time, deadline, tenantId,
-          type_id, plan, share_plan
-        )
-      ''')
-      .inFilter('person_id', childIds)
-      .order('attendance(date)', ascending: false);
+  // Fetch all person attendances for children via repository
+  final rows = await repo.getPersonAttendancesForPersons(childIds);
 
-  return (response as List).map((json) {
+  return rows.map((json) {
     final attendance = json['attendance'] as Map<String, dynamic>?;
     final personId = json['person_id'] as int?;
 

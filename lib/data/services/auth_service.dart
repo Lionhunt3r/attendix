@@ -75,10 +75,10 @@ class AuthService {
           .eq('id', person.id!)
           .eq('tenantId', tenantId);
 
-      // 3. Create tenant_users entry
-      await _supabase.from('tenant_users').insert({
-        'user_id': userId,
-        'tenant_id': tenantId,
+      // 3. Create tenantUsers entry
+      await _supabase.from('tenantUsers').insert({
+        'userId': userId,
+        'tenantId': tenantId,
         'role': role.value,
       });
 
@@ -101,10 +101,10 @@ class AuthService {
   }) async {
     try {
       await _supabase
-          .from('tenant_users')
+          .from('tenantUsers')
           .update({'role': newRole.value})
-          .eq('user_id', userId)
-          .eq('tenant_id', tenantId);
+          .eq('userId', userId)
+          .eq('tenantId', tenantId);
     } catch (e) {
       throw AuthException('Fehler beim Ändern der Rolle: $e');
     }
@@ -117,10 +117,10 @@ class AuthService {
   }) async {
     try {
       final response = await _supabase
-          .from('tenant_users')
+          .from('tenantUsers')
           .select('role')
-          .eq('user_id', userId)
-          .eq('tenant_id', tenantId)
+          .eq('userId', userId)
+          .eq('tenantId', tenantId)
           .maybeSingle();
 
       if (response == null) return null;
@@ -145,12 +145,12 @@ class AuthService {
           .eq('id', personId)
           .eq('tenantId', tenantId);
 
-      // Remove tenant_users entry
+      // Remove tenantUsers entry
       await _supabase
-          .from('tenant_users')
+          .from('tenantUsers')
           .delete()
-          .eq('user_id', userId)
-          .eq('tenant_id', tenantId);
+          .eq('userId', userId)
+          .eq('tenantId', tenantId);
     } catch (e) {
       throw AuthException('Fehler beim Entfernen der Account-Verknüpfung: $e');
     }

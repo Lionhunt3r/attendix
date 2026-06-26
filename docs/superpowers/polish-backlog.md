@@ -87,6 +87,42 @@ Bezug: `docs/superpowers/plans/2026-06-19-sprint-1a-tracking-audio.md`, finaler 
 
 ---
 
+## Sprint 2a — Repository-Bypass-Refactor (Existing Repos) (2026-06-26)
+
+Bezug: `docs/superpowers/plans/2026-06-22-sprint-2a-repo-migration.md`, finaler Code-Review.
+
+### P-2a-1 — `getChildrenForParent` doc-comment kann das `isFilter('pending', null)` Pattern klarer dokumentieren
+- **Datei:** `lib/data/repositories/player_repository.dart` (~Zeile 172)
+- **Problem:** Doc-Comment sagt "Filters out pending and left players", was Leser zu `pending = false` führt — tatsächlich nutzt der Code `isFilter('pending', null)` (matched `pending IS NULL`).
+- **Fix-Vorschlag:** Doc-Comment präzisieren um Verwechslung zu vermeiden. Z.B. einen Satz wie "(NB: matches Ionic db.service.ts which uses `pending IS NULL`; do NOT change to `pending = false` without checking parents-portal expectations)".
+- **Effort:** 5 min
+
+### P-2a-2 — Inkonsistenz `getChildrenForParent` vs. `getPlayersByParentId`
+- **Datei:** `lib/data/repositories/player_repository.dart`
+- **Problem:** Beide Methoden filtern `pending` unterschiedlich: `getChildrenForParent` nutzt `isFilter('pending', null)` (matched NULL), `getPlayersByParentId` nutzt `pending = false`. Beide existierten vor Sprint 2a und wurden nur portiert.
+- **Fix-Vorschlag:** Klären welche Semantik korrekt ist (vermutlich `pending = false`), beide angleichen. Dabei prüfen welche Pages welche Methode aufrufen und ob das Verhalten ändern darf.
+- **Effort:** 1h (Untersuchung + Migration + Tests)
+
+### P-2a-3 — `recalculatePercentage` fire-and-forget
+- **Datei:** `lib/features/attendance/presentation/pages/attendance_detail_page.dart` (in `_savePersonStatus`)
+- **Problem:** `ref.read(attendanceNotifierProvider.notifier).recalculatePercentage(...)` wird ohne `await` aufgerufen — pre-existing, nicht durch Sprint 2a verursacht.
+- **Fix-Vorschlag:** Entweder awaiten und Loading-State zeigen, oder explizit dokumentieren dass es fire-and-forget ist.
+- **Effort:** 15 min
+
+### P-2a-4 — `attendance_detail_page` Realtime-Channel-Cleanup in `dispose()`
+- **Datei:** `lib/features/attendance/presentation/pages/attendance_detail_page.dart` (`_unsubscribeFromRealtimeChanges`)
+- **Problem:** `ref.read(supabaseClientProvider)` in `dispose()` ist riskant wenn der ProviderContainer schon abgebaut ist. Pre-existing.
+- **Fix-Vorschlag:** Wird automatisch durch Sprint 2c gelöst (Realtime kommt in Repository), kein separater Fix nötig.
+- **Effort:** 0h (passiert in Sprint 2c)
+
+### P-2a-5 — Test-Comment-Mismatch in `player_repository_test.dart:188`
+- **Datei:** `test/data/repositories/player_repository_test.dart` (~Zeile 188)
+- **Problem:** Comment sagt "must exclude pending players", asserted aber `isFilter('pending', null)`. Code ist korrekt (matches `pending IS NULL`), aber Comment ist missverständlich.
+- **Fix-Vorschlag:** Comment präziser machen: `"must keep historic isFilter('pending', null) semantics — i.e. only non-pending rows where pending column is null"`.
+- **Effort:** 2 min
+
+---
+
 ## Konvention für die Abarbeitung
 
 1. **Sprint 13 (Long Tail)** zieht alle hier gelisteten Findings ein und bündelt sie zu PRs nach Datei/Bereich.

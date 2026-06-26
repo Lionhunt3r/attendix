@@ -115,6 +115,12 @@ void main() {
         expect(section, contains(".eq('tenantId', currentTenantId)"));
       });
 
+      test('updatePlayerFields includes tenantId filter', () {
+        final section = _extractMethodBody(playerRepoSource, 'updatePlayerFields');
+        expect(section, isNotNull, reason: 'updatePlayerFields should exist');
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
+      });
+
       test('archivePlayer has both id and tenantId filter', () {
         final section = _extractMethodBody(playerRepoSource, 'archivePlayer');
         expect(section, isNotNull);
@@ -162,6 +168,30 @@ void main() {
         expect(section, isNotNull);
         expect(section, contains(".eq('id', player.id!)"));
         expect(section, contains(".eq('tenantId', currentTenantId)"));
+      });
+
+      test('getPlayersByInstrument filters by tenantId and instrument', () {
+        final section = _extractMethodBody(playerRepoSource, 'getPlayersByInstrument');
+        expect(section, isNotNull, reason: 'getPlayersByInstrument should exist');
+        expect(section, contains(".eq('instrument', instrumentId)"));
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
+      });
+
+      test('getChildrenForParent filters by tenantId and parent_id', () {
+        final section = _extractMethodBody(playerRepoSource, 'getChildrenForParent');
+        expect(section, isNotNull, reason: 'getChildrenForParent should exist');
+        expect(section, contains(".eq('tenantId', currentTenantId)"));
+        expect(section, contains(".eq('parent_id', parentId)"));
+        expect(
+          section,
+          contains(".isFilter('pending', null)"),
+          reason: 'getChildrenForParent must exclude pending players',
+        );
+        expect(
+          section,
+          contains(".isFilter('left', null)"),
+          reason: 'getChildrenForParent must exclude left players',
+        );
       });
     });
 
@@ -274,9 +304,12 @@ void main() {
 
 /// Extract method body from source code (finds method and extracts until next method)
 String? _extractMethodBody(String source, String methodName) {
-  // Find method declaration
+  // Find method declaration. Supports up to two levels of nested generics
+  // in the return type (e.g. Future<List<Map<String, dynamic>>>) by allowing
+  // optional nested `<...>` groups, while restricting matches to a single line
+  // so the engine cannot greedily span an earlier method's signature.
   final methodStart = RegExp(
-    '(Future<[^>]+>|void)\\s+$methodName\\s*[(<]',
+    '(Future<[^\\n>]*(?:<[^\\n>]*(?:<[^\\n>]*>[^\\n>]*)?>[^\\n>]*)?>|void)\\s+$methodName\\s*[(<]',
   ).firstMatch(source);
 
   if (methodStart == null) return null;

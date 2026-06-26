@@ -167,6 +167,107 @@ void main() {
           reason: 'getPersonAttendancesForPerson must filter by attendance.tenantId (SEC-016)',
         );
       });
+
+      test('getUpcomingAbsencesForPersons uses inner join for tenant', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'getUpcomingAbsencesForPersons',
+        );
+        expect(section, isNotNull, reason: 'getUpcomingAbsencesForPersons should exist');
+        expect(
+          section,
+          contains('attendance:attendance_id!inner'),
+          reason: 'getUpcomingAbsencesForPersons must use inner join on attendance',
+        );
+        expect(
+          section,
+          contains(".eq('attendance.tenantId', currentTenantId)"),
+          reason: 'getUpcomingAbsencesForPersons must filter by attendance.tenantId',
+        );
+      });
+
+      test('getPersonAttendancesForPersons filters by attendance.tenantId', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'getPersonAttendancesForPersons',
+        );
+        expect(section, isNotNull, reason: 'getPersonAttendancesForPersons should exist');
+        expect(
+          section,
+          contains(".eq('attendance.tenantId', currentTenantId)"),
+          reason:
+              'getPersonAttendancesForPersons must filter by attendance.tenantId '
+              '(person_attendances has no tenantId column)',
+        );
+        expect(
+          section,
+          contains("inFilter('person_id', personIds)"),
+          reason: 'getPersonAttendancesForPersons must filter by person_id list',
+        );
+      });
+    });
+
+    group('Sprint 2a Task 7 - New Methods', () {
+      test('ensurePersonAttendances validates attendance tenant and filters player tenant', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'ensurePersonAttendances',
+        );
+        expect(section, isNotNull, reason: 'ensurePersonAttendances should exist');
+        // Validates attendance ownership
+        expect(
+          section,
+          contains(".eq('tenantId', currentTenantId)"),
+          reason: 'ensurePersonAttendances must filter by tenantId for attendance + player',
+        );
+        // Filters by current tenant when listing active players
+        expect(
+          section,
+          contains(".from('player')"),
+          reason: 'ensurePersonAttendances must query the player table for active players',
+        );
+        expect(
+          section,
+          contains('upsert'),
+          reason: 'ensurePersonAttendances must upsert to avoid duplicates (TOCTOU)',
+        );
+      });
+
+      test('validatePersonAttendanceTenant uses inner join with attendance.tenantId filter', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'validatePersonAttendanceTenant',
+        );
+        expect(section, isNotNull, reason: 'validatePersonAttendanceTenant should exist');
+        expect(
+          section,
+          contains('attendance:attendance_id!inner'),
+          reason: 'validatePersonAttendanceTenant must use inner join on attendance',
+        );
+        expect(
+          section,
+          contains(".eq('attendance.tenantId', currentTenantId)"),
+          reason: 'validatePersonAttendanceTenant must filter by attendance.tenantId',
+        );
+      });
+
+      test('deletePersonAttendance validates tenant before deleting', () {
+        final section = _extractMethodBody(
+          attendanceRepoSource,
+          'deletePersonAttendance',
+        );
+        expect(section, isNotNull, reason: 'deletePersonAttendance should exist');
+        expect(
+          section,
+          contains('validatePersonAttendanceTenant'),
+          reason: 'deletePersonAttendance must call validatePersonAttendanceTenant first',
+        );
+        expect(
+          section,
+          contains('RepositoryException'),
+          reason: 'deletePersonAttendance must throw on cross-tenant access',
+        );
+      });
     });
 
     group('Summary Statistics', () {
@@ -208,8 +309,11 @@ void main() {
 
 /// Extract method body from source code
 String? _extractMethodBody(String source, String methodName) {
+  // Supports up to two levels of nested generics in the return type, while
+  // restricting the match to a single line so the engine cannot greedily
+  // span an earlier method's signature.
   final methodStart = RegExp(
-    '(Future<[^>]+>|void)\\s+$methodName\\s*[(<]',
+    '(Future<[^\\n>]*(?:<[^\\n>]*(?:<[^\\n>]*>[^\\n>]*)?>[^\\n>]*)?>|void)\\s+$methodName\\s*[(<]',
   ).firstMatch(source);
 
   if (methodStart == null) return null;
