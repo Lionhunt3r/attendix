@@ -14,6 +14,7 @@ import '../../../../core/providers/tenant_providers.dart';
 import '../../../../core/router/redesign_routes.dart';
 import '../../../../core/theme/redesign/rd_theme.dart';
 import '../../../../core/utils/event_list_utils.dart';
+import '../../../../core/utils/toast_helper.dart';
 import '../../../../data/models/attendance/attendance.dart';
 import '../../../../l10n/l10n.dart';
 import '../../../self_service/presentation/pages/signout_page.dart'
@@ -301,6 +302,34 @@ class _RdEventsPageState extends ConsumerState<RdEventsPage> {
   // Spieler, Stimmführer
   // ---------------------------------------------------------------------------
 
+  /// Opens the Termin a notification asked for (`pendingAttendanceId`)
+  /// once the own Termine are loaded: the own Termin page, or the sheet
+  /// "Meine Termine" opens (another group, a duty to take over). It looks in
+  /// the unfiltered own Termine, since the list here leaves out duties
+  /// without an own assignment; a Termin that is not there says so.
+  void _openPending(SignoutData data, SelfServiceEventActions actions) {
+    final pendingId = ref.read(pendingAttendanceIdProvider);
+    if (pendingId == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ref.read(pendingAttendanceIdProvider) != pendingId) return;
+      ref.read(pendingAttendanceIdProvider.notifier).state = null;
+      final all = ref.read(signoutDataProvider).valueOrNull ?? data;
+      final att = [...all.allUpcoming, ...all.past].where((a) => a.attendanceId == pendingId).firstOrNull;
+      if (att == null) {
+        ToastHelper.showInfo(context, context.l10n.redesignEventNotFound);
+        return;
+      }
+      final own = actions.isOwn(att);
+      // The own Termin page reads the filtered list, so only those open it.
+      final listed = [...data.allUpcoming, ...data.past].any((a) => a.id == att.id);
+      if (att.id != null && own && listed) {
+        context.push(RedesignRoutes.ownEvent(att.id!));
+      } else {
+        actions.presentActions(context, att);
+      }
+    });
+  }
+
   Widget _playerBody(BuildContext context) {
     final l10n = context.l10n;
     final async = ref.watch(rdSignoutDataProvider);
@@ -320,6 +349,10 @@ class _RdEventsPageState extends ConsumerState<RdEventsPage> {
     final tenant = ref.watch(currentTenantProvider);
     final player = ref.watch(currentSelfServicePlayerProvider).valueOrNull;
     final actions = signoutEventActions(context, ref, tenant: tenant, player: player);
+    // A notification, push or "open attendance" link asked for a Termin
+    // (like "Meine Termine" does); also when it arrives while open.
+    ref.watch(pendingAttendanceIdProvider);
+    _openPending(data, actions);
 
     bool waiting(CrossTenantPersonAttendance att) {
       final qa = actions.quickActions(att);
